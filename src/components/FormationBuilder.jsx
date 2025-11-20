@@ -160,10 +160,11 @@ const FormationBuilder = () => {
         try {
             const date = new Date().toISOString().split('T')[0];
             const dataUrl = await toPng(pitchRef.current, {
-                quality: 0.95,
-                backgroundColor: '#030712', // Match the dark background
+                quality: 1.0,
+                pixelRatio: 2, // Better quality for text
+                backgroundColor: '#030712',
                 style: {
-                    transform: 'scale(1)', // Ensure no scaling issues
+                    transform: 'scale(1)',
                 }
             });
 
@@ -178,6 +179,20 @@ const FormationBuilder = () => {
             setIsExporting(false);
         }
     };
+
+    // Sort positions by 'top' coordinate (ascending) so that players lower on the screen (higher top %)
+    // are rendered LAST (on top of others). This fixes overlap issues where a forward covers a midfielder.
+    // Wait, if GK is at 92% (bottom), and ST is at 18% (top).
+    // If we render ST first, then GK. GK is on top of ST.
+    // If ST's name extends down, it might be covered by a midfielder rendered later?
+    // We want players "closer" to the viewer (bottom of screen) to be on top.
+    // So we should render from Top to Bottom?
+    // If ST (18%) is rendered first. Then CAM (30%).
+    // If ST's name overlaps CAM's head, CAM (rendered later) will cover ST's name. This is correct for 3D.
+    // So we want to render smaller 'top' values first, larger 'top' values last.
+    const sortedPositions = Object.entries(currentPositions).sort(([, a], [, b]) => {
+        return parseFloat(a.top) - parseFloat(b.top);
+    });
 
     return (
         <div className="h-full flex flex-col pb-20">
@@ -226,69 +241,78 @@ const FormationBuilder = () => {
                 </div>
             </div>
 
-            {/* Pitch - Using SVG background */}
+            {/* Card Container - This is what gets downloaded */}
             <div
                 ref={pitchRef}
-                className="relative w-full aspect-[2/3] rounded-xl border-2 border-white/20 overflow-hidden shadow-2xl mb-6 mx-auto max-w-sm"
-                style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grass' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23166534'/%3E%3Cstop offset='100%25' style='stop-color:%231e7e34'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='150' fill='url(%23grass)'/%3E%3Cg stroke='white' stroke-width='0.5' fill='none' opacity='0.4'%3E%3Crect x='5' y='5' width='90' height='140'/%3E%3Cline x1='5' x2='95' y1='75' y2='75'/%3E%3Ccircle cx='50' cy='75' r='10'/%3E%3Ccircle cx='50' cy='75' r='0.5' fill='white'/%3E%3Crect x='30' y='5' width='40' height='18'/%3E%3Crect x='40' y='5' width='20' height='7'/%3E%3Ccircle cx='50' cy='0.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 23 A 10 10 0 0 0 65 23' /%3E%3Crect x='30' y='127' width='40' height='18'/%3E%3Crect x='40' y='138' width='20' height='7'/%3E%3Ccircle cx='50' cy='149.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 127 A 10 10 0 0 1 65 127' /%3E%3Cpath d='M 5 5 Q 7 7 5 9' /%3E%3Cpath d='M 95 5 Q 93 7 95 9' /%3E%3Cpath d='M 5 145 Q 7 143 5 141' /%3E%3Cpath d='M 95 145 Q 93 143 95 141' /%3E%3C/g%3E%3C/svg%3E")`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
-                }}>
+                className="mx-auto max-w-sm bg-[#030712] rounded-xl overflow-hidden shadow-2xl mb-6 border border-white/10 relative"
+            >
+                {/* Card Header */}
+                <div className="bg-gradient-to-b from-slate-900/80 to-slate-900/40 p-4 text-center border-b border-white/5 backdrop-blur-sm">
+                    <h1 className="text-2xl font-bold text-yellow-400 tracking-tight drop-shadow-md">Fenerbahçe Hub</h1>
+                    <p className="text-xs text-blue-200/80 font-medium uppercase tracking-widest mt-1">Efsane 11 Kadrom</p>
+                </div>
 
-                {/* Positions */}
-                {Object.entries(currentPositions).map(([posKey, style]) => {
-                    const player = pitchPlayers[posKey];
-                    return (
-                        <div
-                            key={posKey}
-                            className="absolute transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 flex items-center justify-center transition-all duration-200"
-                            style={style}
-                            onDrop={(e) => handleDrop(e, posKey)}
-                            onDragOver={handleDragOver}
-                            onClick={() => handlePositionClick(posKey)}
-                        >
-                            {player ? (
-                                <div className="relative w-full h-full flex flex-col items-center">
-                                    <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-pointer">
-                                        {player.photo ? (
-                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
-                                        )}
-                                        {/* Hide delete button during export if needed, but html-to-image captures DOM as is. 
-                                            Usually we want to hide controls. We can add a class 'no-export' and filter it in toPng if needed, 
-                                            or just accept it. For now, let's keep it simple. 
-                                            Actually, the delete button is small, maybe okay. 
-                                            But better to hide it if we can. 
-                                            Let's add a condition: !isExporting && ... 
-                                        */}
-                                        {!isExporting && (
-                                            <button
-                                                type="button"
-                                                aria-label={`${player.name} pozisyonundan çıkar`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removePlayer(posKey);
-                                                }}
-                                                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg active:scale-95"
-                                            >
-                                                ×
-                                            </button>
-                                        )}
+                {/* Pitch */}
+                <div
+                    className="relative w-full aspect-[2/3] overflow-hidden"
+                    style={{
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grass' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23166534'/%3E%3Cstop offset='100%25' style='stop-color:%231e7e34'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='150' fill='url(%23grass)'/%3E%3Cg stroke='white' stroke-width='0.5' fill='none' opacity='0.4'%3E%3Crect x='5' y='5' width='90' height='140'/%3E%3Cline x1='5' x2='95' y1='75' y2='75'/%3E%3Ccircle cx='50' cy='75' r='10'/%3E%3Ccircle cx='50' cy='75' r='0.5' fill='white'/%3E%3Crect x='30' y='5' width='40' height='18'/%3E%3Crect x='40' y='5' width='20' height='7'/%3E%3Ccircle cx='50' cy='0.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 23 A 10 10 0 0 0 65 23' /%3E%3Crect x='30' y='127' width='40' height='18'/%3E%3Crect x='40' y='138' width='20' height='7'/%3E%3Ccircle cx='50' cy='149.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 127 A 10 10 0 0 1 65 127' /%3E%3Cpath d='M 5 5 Q 7 7 5 9' /%3E%3Cpath d='M 95 5 Q 93 7 95 9' /%3E%3Cpath d='M 5 145 Q 7 143 5 141' /%3E%3Cpath d='M 95 145 Q 93 143 95 141' /%3E%3C/g%3E%3C/svg%3E")`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center'
+                    }}>
+
+                    {/* Positions */}
+                    {sortedPositions.map(([posKey, style]) => {
+                        const player = pitchPlayers[posKey];
+                        return (
+                            <div
+                                key={posKey}
+                                className="absolute transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 flex items-center justify-center transition-all duration-200"
+                                style={style}
+                                onDrop={(e) => handleDrop(e, posKey)}
+                                onDragOver={handleDragOver}
+                                onClick={() => handlePositionClick(posKey)}
+                            >
+                                {player ? (
+                                    <div className="relative w-full h-full flex flex-col items-center group">
+                                        <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-pointer z-10 group-hover:scale-110 transition-transform">
+                                            {player.photo ? (
+                                                <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
+                                            )}
+                                            {!isExporting && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={`${player.name} pozisyonundan çıkar`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removePlayer(posKey);
+                                                    }}
+                                                    className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg active:scale-95 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    ×
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="mt-1 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] text-white font-medium truncate w-20 text-center border border-white/10 backdrop-blur-sm shadow-sm z-20">
+                                            {player.name.split(' ').pop()}
+                                        </div>
                                     </div>
-                                    <div className="mt-1 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] text-white font-medium truncate w-20 text-center border border-white/10 backdrop-blur-sm shadow-sm">
-                                        {player.name.split(' ').pop()}
+                                ) : (
+                                    <div className="w-10 h-10 rounded-full border-2 border-dashed border-white/40 bg-white/5 flex items-center justify-center hover:bg-white/10 hover:border-yellow-400/50 transition-all cursor-pointer">
+                                        <span className="text-2xl text-white/50 hover:text-yellow-400">+</span>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="w-10 h-10 rounded-full border-2 border-dashed border-white/40 bg-white/5 flex items-center justify-center hover:bg-white/10 hover:border-yellow-400/50 transition-all cursor-pointer">
-                                    <span className="text-2xl text-white/50 hover:text-yellow-400">+</span>
-                                </div>
-                            )}
-                        </div>
-                    );
-                })}
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Footer */}
+                <div className="bg-slate-900/90 p-2 text-center border-t border-white/5">
+                    <p className="text-[10px] text-slate-500 font-medium">fenerbahce-hub.vercel.app</p>
+                </div>
             </div>
 
             {/* Player Pool */}
