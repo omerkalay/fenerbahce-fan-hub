@@ -9,6 +9,7 @@ const FormationBuilder = () => {
     const [loading, setLoading] = useState(true);
     const [showPlayerModal, setShowPlayerModal] = useState(false);
     const [selectedPosition, setSelectedPosition] = useState(null);
+    const [playerSearch, setPlayerSearch] = useState('');
     const pitchRef = useRef(null);
 
     useEffect(() => {
@@ -70,36 +71,7 @@ const FormationBuilder = () => {
         }
         setShowPlayerModal(false);
         setSelectedPosition(null);
-    };
-
-    const downloadFormation = () => {
-        if (!Object.keys(pitchPlayers).length) return;
-
-        const formationData = {
-            formation,
-            generatedAt: new Date().toISOString(),
-            players: Object.entries(pitchPlayers).map(([positionKey, player]) => ({
-                positionKey,
-                player: {
-                    id: player.id,
-                    name: player.name,
-                    number: player.number,
-                    position: player.position,
-                    photo: player.photo
-                }
-            }))
-        };
-
-        const blob = new Blob([JSON.stringify(formationData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        const date = new Date().toISOString().split('T')[0];
-        link.href = url;
-        link.download = `fenerbahce-${formation.replace(/[^0-9a-z-]/gi, '')}-${date}.json`;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
+        setPlayerSearch('');
     };
 
     const formations = {
@@ -173,7 +145,6 @@ const FormationBuilder = () => {
     const currentPositions = formations[formation];
     const filledSpots = Object.keys(pitchPlayers).length;
     const totalSpots = Object.keys(currentPositions).length;
-    const isFormationComplete = filledSpots === totalSpots;
 
     const downloadLineupCard = async () => {
         if (!pitchRef.current || !filledSpots) return;
@@ -192,6 +163,7 @@ const FormationBuilder = () => {
             link.click();
         } catch (error) {
             console.error('Kadro kartı indirilirken hata oluştu:', error);
+            window.alert('Kart indirilirken bir hata oluştu. Lütfen tekrar deneyin.');
         }
     };
 
@@ -220,26 +192,6 @@ const FormationBuilder = () => {
                 <div className="glass-panel rounded-xl p-4 flex flex-col gap-3 border border-white/5">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div>
-                            <p className="text-sm font-semibold text-white">JSON olarak kaydet</p>
-                            <p className="text-[11px] text-slate-400">Şu anki dizilişi yedekle</p>
-                        </div>
-                        <button
-                            onClick={downloadFormation}
-                            disabled={!filledSpots}
-                            className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${
-                                filledSpots
-                                    ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-400/30'
-                                    : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
-                            }`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 10l5 5m0 0 5-5m-5 5V4"/>
-                            </svg>
-                            JSON İndir
-                        </button>
-                    </div>
-                    <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-3 flex-wrap">
-                        <div>
                             <p className="text-sm font-semibold text-white">Kart olarak indir</p>
                             <p className="text-[11px] text-slate-400">
                                 Tamamlanan kadro: <span className="font-semibold text-white">{filledSpots}/{totalSpots}</span>
@@ -247,9 +199,9 @@ const FormationBuilder = () => {
                         </div>
                         <button
                             onClick={downloadLineupCard}
-                            disabled={!isFormationComplete}
+                            disabled={!filledSpots}
                             className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${
-                                isFormationComplete
+                                filledSpots
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
                                     : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
                             }`}
@@ -356,12 +308,37 @@ const FormationBuilder = () => {
 
             {/* Player Selection Modal */}
             {showPlayerModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowPlayerModal(false)}>
-                    <div className="glass-card rounded-2xl p-6 w-full max-w-sm max-h-[70vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-white">Oyuncu Seç</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => {
+                    setShowPlayerModal(false);
+                    setPlayerSearch('');
+                }}>
+                    <div className="glass-card rounded-2xl p-6 w-full max-w-sm max-h-[75vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4 gap-3">
+                            <div className="flex-1">
+                                <h3 className="text-lg font-bold text-white">Oyuncu Seç</h3>
+                                <div className="mt-3 relative">
+                                    <input
+                                        type="text"
+                                        value={playerSearch}
+                                        onChange={(e) => setPlayerSearch(e.target.value)}
+                                        placeholder="İsim ya da forma no ile ara..."
+                                        className="w-full bg-slate-900/60 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-yellow-400"
+                                    />
+                                    {playerSearch && (
+                                        <button
+                                            onClick={() => setPlayerSearch('')}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+                                        >
+                                            Temizle
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             <button
-                                onClick={() => setShowPlayerModal(false)}
+                                onClick={() => {
+                                    setShowPlayerModal(false);
+                                    setPlayerSearch('');
+                                }}
                                 className="text-slate-400 hover:text-white"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -371,36 +348,55 @@ const FormationBuilder = () => {
                         </div>
                         <div className="flex-1 overflow-y-auto no-scrollbar">
                             <div className="grid grid-cols-3 gap-2">
-                                {squad.map(player => {
-                                    const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
-                                    return (
-                                        <button
-                                            key={player.id}
-                                            onClick={() => handlePlayerSelect(player)}
-                                            disabled={isAlreadyOnPitch}
-                                            className={`glass-panel rounded-lg p-2 flex flex-col items-center gap-1 transition-all ${isAlreadyOnPitch
-                                                ? 'opacity-50 cursor-not-allowed'
-                                                : 'hover:bg-yellow-400/20 hover:border-yellow-400/30 cursor-pointer'
-                                                }`}
-                                        >
-                                            <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden border border-white/10">
-                                                {player.photo ? (
-                                                    <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
-                                                        {player.number}
-                                                    </div>
-                                                )}
+                                {(() => {
+                                    const normalizedSearch = playerSearch.trim().toLowerCase();
+                                    const filteredPlayers = normalizedSearch
+                                        ? squad.filter(player => {
+                                            const nameMatch = player.name?.toLowerCase().includes(normalizedSearch);
+                                            const numberMatch = String(player.number ?? '').includes(normalizedSearch);
+                                            return nameMatch || numberMatch;
+                                        })
+                                        : squad;
+
+                                    if (!filteredPlayers.length) {
+                                        return (
+                                            <div className="col-span-3 text-center text-slate-500 text-xs py-6">
+                                                Oyuncu bulunamadı
                                             </div>
-                                            <span className="text-[9px] text-center leading-tight line-clamp-2 h-6 flex items-center">
-                                                {player.name.split(' ').slice(-1)[0]}
-                                            </span>
-                                            <span className="text-[8px] text-slate-500 bg-slate-900/50 px-1.5 rounded">
-                                                {player.position}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
+                                        );
+                                    }
+
+                                    return filteredPlayers.map(player => {
+                                        const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
+                                        return (
+                                            <button
+                                                key={player.id}
+                                                onClick={() => handlePlayerSelect(player)}
+                                                disabled={isAlreadyOnPitch}
+                                                className={`glass-panel rounded-lg p-2 flex flex-col items-center gap-1 transition-all ${isAlreadyOnPitch
+                                                    ? 'opacity-50 cursor-not-allowed'
+                                                    : 'hover:bg-yellow-400/20 hover:border-yellow-400/30 cursor-pointer'
+                                                    }`}
+                                            >
+                                                <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden border border-white/10">
+                                                    {player.photo ? (
+                                                        <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
+                                                            {player.number}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <span className="text-[9px] text-center leading-tight line-clamp-2 h-6 flex items-center">
+                                                    {player.name.split(' ').slice(-1)[0]}
+                                                </span>
+                                                <span className="text-[8px] text-slate-500 bg-slate-900/50 px-1.5 rounded">
+                                                    {player.position}
+                                                </span>
+                                            </button>
+                                        );
+                                    });
+                                })()}
                             </div>
                         </div>
                     </div>
