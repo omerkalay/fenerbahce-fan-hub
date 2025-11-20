@@ -49,7 +49,8 @@ async function fetchDataFromAPI() {
                 name: item.player.name,
                 position: item.player.position,
                 number: item.player.jerseyNumber,
-                photo: `https://api.sofascore.app/api/v1/player/${item.player.id}/image`,
+                // Fallback to generic player icon if SofaScore images have CORS issues
+                photo: null, // Will show jersey number instead
                 country: item.player.country?.name,
                 marketValue: item.player.proposedMarketValue,
                 status: null
