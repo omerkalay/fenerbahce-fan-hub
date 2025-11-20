@@ -18,7 +18,9 @@ let cache = {
 const FENERBAHCE_ID = 3052;
 const API_KEY = process.env.RAPIDAPI_KEY;
 const API_HOST = process.env.RAPIDAPI_HOST || 'sofascore.p.rapidapi.com';
-const SOFASCORE_IMAGE_BASE = 'https://img.sofascore.com/api/v1';
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
+const SOFASCORE_IMAGE_BASE_HTTP = 'http://img.sofascore.com/api/v1';
+const IMAGE_USER_AGENT = process.env.IMAGE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const headers = {
     'x-rapidapi-key': API_KEY,
@@ -51,8 +53,8 @@ async function fetchDataFromAPI() {
                     name: item.player.name,
                     position: item.player.position,
                     number: item.player.jerseyNumber,
-                    // Direct SofaScore image CDN URL (public)
-                    photo: `${SOFASCORE_IMAGE_BASE}/player/${item.player.id}/image`,
+                    // Serve images via backend proxy so HTTPS frontend can load them
+                    photo: `${PUBLIC_BASE_URL}/api/player-image/${item.player.id}`,
                     country: item.player.country?.name,
                     marketValue: item.player.proposedMarketValue,
                     status: null
@@ -111,26 +113,36 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Image proxy endpoint to bypass CORS
-app.get('/api/player-image/:playerId', async (req, res) => {
+async function proxyImage(req, res, type = 'player') {
     try {
-        const { playerId } = req.params;
-        const imageUrl = `${SOFASCORE_IMAGE_BASE}/player/${playerId}/image`;
+        const { id } = req.params;
+        const imageUrl = `${SOFASCORE_IMAGE_BASE_HTTP}/${type}/${id}/image`;
 
-        const response = await fetch(imageUrl);
+        const response = await fetch(imageUrl, {
+            headers: {
+                'User-Agent': IMAGE_USER_AGENT,
+                'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
+            }
+        });
+
         if (!response.ok) {
-            return res.status(404).send('Image not found');
+            console.warn(`Image proxy upstream error ${response.status} for ${imageUrl}`);
+            return res.status(response.status).send('Image not found');
         }
 
-        const imageBuffer = await response.arrayBuffer();
-        res.set('Content-Type', 'image/png');
+        res.set('Content-Type', response.headers.get('content-type') || 'image/jpeg');
         res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24h
-        res.send(Buffer.from(imageBuffer));
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        res.send(buffer);
     } catch (error) {
-        console.error('Error proxying image:', error);
+        console.error('Error proxying image:', error.message);
         res.status(500).send('Error loading image');
     }
-});
+}
+
+app.get('/api/player-image/:id', (req, res) => proxyImage(req, res, 'player'));
+app.get('/api/team-image/:id', (req, res) => proxyImage(req, res, 'team'));
 
 app.get('/', (req, res) => {
     res.json({
