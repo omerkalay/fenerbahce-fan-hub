@@ -70,6 +70,36 @@ const FormationBuilder = () => {
         setSelectedPosition(null);
     };
 
+    const downloadFormation = () => {
+        if (!Object.keys(pitchPlayers).length) return;
+
+        const formationData = {
+            formation,
+            generatedAt: new Date().toISOString(),
+            players: Object.entries(pitchPlayers).map(([positionKey, player]) => ({
+                positionKey,
+                player: {
+                    id: player.id,
+                    name: player.name,
+                    number: player.number,
+                    position: player.position,
+                    photo: player.photo
+                }
+            }))
+        };
+
+        const blob = new Blob([JSON.stringify(formationData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const date = new Date().toISOString().split('T')[0];
+        link.href = url;
+        link.download = `fenerbahce-${formation.replace(/[^0-9a-z-]/gi, '')}-${date}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    };
+
     const formations = {
         '4-3-3': {
             GK: { top: '92%', left: '50%' },
@@ -143,22 +173,45 @@ const FormationBuilder = () => {
     return (
         <div className="h-full flex flex-col pb-20">
             {/* Controls */}
-            <div className="flex justify-between items-center mb-4 px-2">
-                <select
-                    value={formation}
-                    onChange={(e) => setFormation(e.target.value)}
-                    className="bg-slate-800 text-white text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-yellow-400"
-                >
-                    {Object.keys(formations).map(f => (
-                        <option key={f} value={f}>{f}</option>
-                    ))}
-                </select>
-                <button
-                    onClick={() => setPitchPlayers({})}
-                    className="text-xs text-red-400 hover:text-red-300 font-medium px-3 py-2 bg-red-400/10 rounded-lg border border-red-400/20"
-                >
-                    Temizle
-                </button>
+            <div className="flex flex-col gap-3 mb-4 px-2">
+                <div className="flex justify-between items-center">
+                    <select
+                        value={formation}
+                        onChange={(e) => setFormation(e.target.value)}
+                        className="bg-slate-800 text-white text-sm rounded-lg px-3 py-2 border border-slate-700 focus:outline-none focus:border-yellow-400"
+                    >
+                        {Object.keys(formations).map(f => (
+                            <option key={f} value={f}>{f}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={() => setPitchPlayers({})}
+                        className="text-xs text-red-400 hover:text-red-300 font-medium px-3 py-2 bg-red-400/10 rounded-lg border border-red-400/20"
+                    >
+                        Temizle
+                    </button>
+                </div>
+
+                <div className="glass-panel rounded-xl p-3 flex items-center justify-between gap-3 border border-white/5">
+                    <div>
+                        <p className="text-sm font-semibold text-white">Takımı indir</p>
+                        <p className="text-[11px] text-slate-400">Şu anki dizilişi JSON olarak kaydet</p>
+                    </div>
+                    <button
+                        onClick={downloadFormation}
+                        disabled={!Object.keys(pitchPlayers).length}
+                        className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${
+                            Object.keys(pitchPlayers).length
+                                ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-400/30'
+                                : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
+                        }`}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 10l5 5m0 0 5-5m-5 5V4"/>
+                        </svg>
+                        İndir
+                    </button>
+                </div>
             </div>
 
             {/* Pitch - Using SVG background */}
