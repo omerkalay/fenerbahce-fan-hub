@@ -1,6 +1,6 @@
 # ⚽ Fenerbahçe Fan Hub
 
-Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, squad management, and formation builder.
+Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, squad management, formation builder, and full PWA (Progressive Web App) support.
 
 [![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_Site-yellow?style=for-the-badge)](https://omerkalay.com/fenerbahce-fan-hub/)
 
@@ -30,7 +30,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Styling**: Tailwind CSS v4
 - **API**: SofaScore (via RapidAPI)
 - **Caching**: localStorage (6-24h per user)
-- **Deployment**: GitHub Pages (frontend) + Render (backend)
+- **Deployment**: GitHub Pages (frontend, PWA) + Render (backend)
 
 ## 📁 Project Structure
 
