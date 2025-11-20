@@ -1,79 +1,44 @@
-const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
-const API_HOST = 'sofascore.p.rapidapi.com';
-const FENERBAHCE_ID = 3052; // Fenerbahçe SK ID on SofaScore
+// Backend API URL (Render)
+const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
 
-const headers = {
-    'x-rapidapi-key': API_KEY,
-    'x-rapidapi-host': API_HOST
-};
-
-// Cache helper - kullanıcı başına günde 1 kere API çağrısı
-const fetchWithCache = async (key, fetchFn, cacheTime = 24 * 60 * 60 * 1000) => {
-    const cached = localStorage.getItem(key);
-    if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < cacheTime) {
-            console.log(`📦 Cache'den yüklendi: ${key}`);
-            return data;
-        }
-    }
-
-    console.log(`🌐 API'dan çekiliyor: ${key}`);
-    const data = await fetchFn();
-    if (data) {
-        localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
-    }
-    return data;
-};
-
+// Fetch next match from backend
 export const fetchNextMatch = async () => {
-    return fetchWithCache('fb_next_match', async () => {
-        try {
-            const response = await fetch(`https://${API_HOST}/teams/get-next-matches?teamId=${FENERBAHCE_ID}`, { headers });
-            const data = await response.json();
-            return data.events && data.events.length > 0 ? data.events[0] : null;
-        } catch (error) {
-            console.error("Error fetching next match:", error);
-            return null;
-        }
-    }, 6 * 60 * 60 * 1000); // 6 saat cache (maç bilgisi sık değişmez)
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/next-match`);
+        if (!response.ok) throw new Error('Backend fetch failed');
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching next match from backend:", error);
+        return null;
+    }
 };
 
+// Fetch squad from backend
 export const fetchSquad = async () => {
-    return fetchWithCache('fb_squad', async () => {
-        try {
-            const response = await fetch(`https://${API_HOST}/teams/get-squad?teamId=${FENERBAHCE_ID}`, { headers });
-            const data = await response.json();
-            return data.players.map(item => ({
-                id: item.player.id,
-                name: item.player.name,
-                position: item.player.position,
-                number: item.player.jerseyNumber,
-                photo: `https://api.sofascore.app/api/v1/player/${item.player.id}/image`,
-                country: item.player.country?.name,
-                marketValue: item.player.proposedMarketValue,
-                status: null
-            })) || [];
-        } catch (error) {
-            console.error("Error fetching squad:", error);
-            return [];
-        }
-    }, 24 * 60 * 60 * 1000); // 24 saat cache
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/squad`);
+        if (!response.ok) throw new Error('Backend fetch failed');
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching squad from backend:", error);
+        return [];
+    }
 };
 
+// Fetch next 3 matches from backend
 export const fetchNext3Matches = async () => {
-    return fetchWithCache('fb_next_3_matches', async () => {
-        try {
-            const response = await fetch(`https://${API_HOST}/teams/get-next-matches?teamId=${FENERBAHCE_ID}`, { headers });
-            const data = await response.json();
-            return data.events && data.events.length > 0 ? data.events.slice(0, 3) : [];
-        } catch (error) {
-            console.error("Error fetching next 3 matches:", error);
-            return [];
-        }
-    }, 6 * 60 * 60 * 1000); // 6 saat cache
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/next-3-matches`);
+        if (!response.ok) throw new Error('Backend fetch failed');
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching next 3 matches from backend:", error);
+        return [];
+    }
 };
 
+// Injuries - not implemented yet
 export const fetchInjuries = async () => {
     return [];
 };
+
