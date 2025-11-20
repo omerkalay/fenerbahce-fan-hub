@@ -1,6 +1,22 @@
 // Backend API URL (Render)
 export const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
 
+const ensureAbsolutePhoto = (player = {}) => {
+    const fallbackPath = `/api/player-image/${player.id ?? ''}`;
+    const value = player.photo || fallbackPath;
+
+    if (value.startsWith('http://') && !value.includes('localhost')) {
+        return value.replace(/^http:\/\//i, 'https://');
+    }
+
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+        return value;
+    }
+
+    const normalizedPath = value.startsWith('/') ? value : `/${value}`;
+    return `${BACKEND_URL}${normalizedPath}`;
+};
+
 // Fetch next match from backend
 export const fetchNextMatch = async () => {
     try {
@@ -18,7 +34,11 @@ export const fetchSquad = async () => {
     try {
         const response = await fetch(`${BACKEND_URL}/api/squad`);
         if (!response.ok) throw new Error('Backend fetch failed');
-        return await response.json();
+        const squad = await response.json();
+        return squad.map(player => ({
+            ...player,
+            photo: ensureAbsolutePhoto(player)
+        }));
     } catch (error) {
         console.error("Error fetching squad from backend:", error);
         return [];

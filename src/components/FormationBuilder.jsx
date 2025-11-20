@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchSquad } from '../services/api';
+import html2canvas from 'html2canvas';
 
 const FormationBuilder = () => {
     const [squad, setSquad] = useState([]);
@@ -8,6 +9,7 @@ const FormationBuilder = () => {
     const [loading, setLoading] = useState(true);
     const [showPlayerModal, setShowPlayerModal] = useState(false);
     const [selectedPosition, setSelectedPosition] = useState(null);
+    const pitchRef = useRef(null);
 
     useEffect(() => {
         const loadSquad = async () => {
@@ -169,6 +171,29 @@ const FormationBuilder = () => {
     };
 
     const currentPositions = formations[formation];
+    const filledSpots = Object.keys(pitchPlayers).length;
+    const totalSpots = Object.keys(currentPositions).length;
+    const isFormationComplete = filledSpots === totalSpots;
+
+    const downloadLineupCard = async () => {
+        if (!pitchRef.current || !filledSpots) return;
+
+        try {
+            const canvas = await html2canvas(pitchRef.current, {
+                backgroundColor: '#04151f',
+                useCORS: true,
+                scale: window.devicePixelRatio > 1 ? window.devicePixelRatio : 2
+            });
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            const date = new Date().toISOString().split('T')[0];
+            link.href = dataUrl;
+            link.download = `fenerbahce-${formation.replace(/[^0-9a-z-]/gi, '')}-lineup-${date}.png`;
+            link.click();
+        } catch (error) {
+            console.error('Kadro kartı indirilirken hata oluştu:', error);
+        }
+    };
 
     return (
         <div className="h-full flex flex-col pb-20">
@@ -192,30 +217,57 @@ const FormationBuilder = () => {
                     </button>
                 </div>
 
-                <div className="glass-panel rounded-xl p-3 flex items-center justify-between gap-3 border border-white/5">
-                    <div>
-                        <p className="text-sm font-semibold text-white">Takımı indir</p>
-                        <p className="text-[11px] text-slate-400">Şu anki dizilişi JSON olarak kaydet</p>
+                <div className="glass-panel rounded-xl p-4 flex flex-col gap-3 border border-white/5">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <p className="text-sm font-semibold text-white">JSON olarak kaydet</p>
+                            <p className="text-[11px] text-slate-400">Şu anki dizilişi yedekle</p>
+                        </div>
+                        <button
+                            onClick={downloadFormation}
+                            disabled={!filledSpots}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${
+                                filledSpots
+                                    ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-400/30'
+                                    : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
+                            }`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 10l5 5m0 0 5-5m-5 5V4"/>
+                            </svg>
+                            JSON İndir
+                        </button>
                     </div>
-                    <button
-                        onClick={downloadFormation}
-                        disabled={!Object.keys(pitchPlayers).length}
-                        className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${
-                            Object.keys(pitchPlayers).length
-                                ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-400/30'
-                                : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
-                        }`}
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2M7 10l5 5m0 0 5-5m-5 5V4"/>
-                        </svg>
-                        İndir
-                    </button>
+                    <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <p className="text-sm font-semibold text-white">Kart olarak indir</p>
+                            <p className="text-[11px] text-slate-400">
+                                Tamamlanan kadro: <span className="font-semibold text-white">{filledSpots}/{totalSpots}</span>
+                            </p>
+                        </div>
+                        <button
+                            onClick={downloadLineupCard}
+                            disabled={!isFormationComplete}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${
+                                isFormationComplete
+                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                    : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
+                            }`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 17h16M7 4v3m0 10v3m10-16v3m0 10v3" />
+                            </svg>
+                            Kart İndir
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Pitch - Using SVG background */}
-            <div className="relative w-full aspect-[2/3] rounded-xl border-2 border-white/20 overflow-hidden shadow-2xl mb-6 mx-auto max-w-sm" style={{
+            <div
+                ref={pitchRef}
+                className="relative w-full aspect-[2/3] rounded-xl border-2 border-white/20 overflow-hidden shadow-2xl mb-6 mx-auto max-w-sm"
+                style={{
                 backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grass' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23166534'/%3E%3Cstop offset='100%25' style='stop-color:%231e7e34'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='150' fill='url(%23grass)'/%3E%3Cg stroke='white' stroke-width='0.5' fill='none' opacity='0.4'%3E%3Crect x='5' y='5' width='90' height='140'/%3E%3Cline x1='5' x2='95' y1='75' y2='75'/%3E%3Ccircle cx='50' cy='75' r='10'/%3E%3Ccircle cx='50' cy='75' r='0.5' fill='white'/%3E%3Crect x='30' y='5' width='40' height='18'/%3E%3Crect x='40' y='5' width='20' height='7'/%3E%3Ccircle cx='50' cy='0.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 23 A 10 10 0 0 0 65 23' /%3E%3Crect x='30' y='127' width='40' height='18'/%3E%3Crect x='40' y='138' width='20' height='7'/%3E%3Ccircle cx='50' cy='149.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 127 A 10 10 0 0 1 65 127' /%3E%3Cpath d='M 5 5 Q 7 7 5 9' /%3E%3Cpath d='M 95 5 Q 93 7 95 9' /%3E%3Cpath d='M 5 145 Q 7 143 5 141' /%3E%3Cpath d='M 95 145 Q 93 143 95 141' /%3E%3C/g%3E%3C/svg%3E")`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
@@ -237,7 +289,7 @@ const FormationBuilder = () => {
                                 <div className="relative w-full h-full flex flex-col items-center group">
                                     <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-pointer">
                                         {player.photo ? (
-                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
+                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
                                         )}
@@ -282,7 +334,7 @@ const FormationBuilder = () => {
                                 >
                                     <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-white/10">
                                         {player.photo ? (
-                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
+                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
                                                 {player.number}
@@ -333,7 +385,7 @@ const FormationBuilder = () => {
                                         >
                                             <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden border border-white/10">
                                                 {player.photo ? (
-                                                    <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
+                                                    <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
                                                         {player.number}
