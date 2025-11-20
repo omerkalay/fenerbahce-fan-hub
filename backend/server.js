@@ -29,6 +29,26 @@ const headers = {
     'x-rapidapi-host': API_HOST
 };
 
+const sanitizeBaseUrl = (url = '') => {
+    if (!url) return '';
+    if (url.includes('localhost') || url.includes('127.0.0.1')) {
+        return url.replace(/\/$/, '');
+    }
+    return url.replace(/^http:\/\//i, 'https://').replace(/\/$/, '');
+};
+
+const getAbsoluteBaseUrl = (req = null) => {
+    const normalizedEnvUrl = sanitizeBaseUrl(PUBLIC_BASE_URL);
+    if (normalizedEnvUrl) {
+        return normalizedEnvUrl;
+    }
+    if (!req) {
+        return '';
+    }
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    return `${protocol}://${req.get('host')}`.replace(/\/$/, '');
+};
+
 // Fetch data from SofaScore API
 async function fetchDataFromAPI() {
     console.log('🔄 Fetching data from SofaScore API...');
@@ -49,19 +69,16 @@ async function fetchDataFromAPI() {
         const squadData = await squadResponse.json();
 
         if (squadData.players) {
-            cache.squad = squadData.players.map(item => {
-                return {
-                    id: item.player.id,
-                    name: item.player.name,
-                    position: item.player.position,
-                    number: item.player.jerseyNumber,
-                    // Serve images via backend proxy so HTTPS frontend can load them
-                    photo: `${PUBLIC_BASE_URL}/api/player-image/${item.player.id}`,
-                    country: item.player.country?.name,
-                    marketValue: item.player.proposedMarketValue,
-                    status: null
-                };
-            });
+            cache.squad = squadData.players.map(item => ({
+                id: item.player.id,
+                name: item.player.name,
+                position: item.player.position,
+                number: item.player.jerseyNumber,
+                photoPath: `/api/player-image/${item.player.id}`,
+                country: item.player.country?.name,
+                marketValue: item.player.proposedMarketValue,
+                status: null
+            }));
             console.log('✅ Squad fetched successfully');
         }
 
@@ -103,7 +120,20 @@ app.get('/api/next-3-matches', (req, res) => {
 });
 
 app.get('/api/squad', (req, res) => {
-    res.json(cache.squad);
+    const baseUrl = getAbsoluteBaseUrl(req);
+    const squad = cache.squad.map(player => {
+        const { photoPath, ...rest } = player;
+        const resolvedPath = photoPath || `/api/player-image/${player.id}`;
+        const absolutePhoto = resolvedPath.startsWith('http')
+            ? resolvedPath
+            : `${baseUrl}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
+
+        return {
+            ...rest,
+            photo: absolutePhoto
+        };
+    });
+    res.json(squad);
 });
 
 app.get('/api/health', (req, res) => {

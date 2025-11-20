@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BACKEND_URL } from '../services/api';
-
-const getTeamLogo = (teamId) => `${BACKEND_URL}/api/team-image/${teamId}`;
+import TeamLogo from './TeamLogo';
 
 const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -32,11 +30,9 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     if (!matchData) return <div className="text-center text-slate-400 mt-10">Maç bilgisi bulunamadı.</div>;
 
     const matchDate = new Date(matchData.startTimestamp * 1000);
+    const FENERBAHCE_ID = 3052;
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
-
-    const fbLogo = getTeamLogo(3052);
-    const opponentLogo = getTeamLogo(opponent.id);
 
     return (
         <div className="space-y-6 pb-20">
@@ -56,7 +52,12 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                 <div className="flex items-center justify-between relative z-10">
                     <div className="flex flex-col items-center gap-3 w-1/3">
                         <div className="w-16 h-16 rounded-full bg-white/5 p-2 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                            <img src={isHome ? fbLogo : opponentLogo} alt="Home" className="w-full h-full object-contain" />
+                            <TeamLogo
+                                teamId={isHome ? FENERBAHCE_ID : opponent.id}
+                                name={isHome ? 'Fenerbahçe' : opponent.name}
+                                wrapperClassName="w-full h-full"
+                                imageClassName="object-contain"
+                            />
                         </div>
                         <span className="text-sm font-bold text-center leading-tight">
                             {isHome ? "Fenerbahçe" : opponent.name}
@@ -74,7 +75,12 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
 
                     <div className="flex flex-col items-center gap-3 w-1/3">
                         <div className="w-16 h-16 rounded-full bg-white/5 p-2 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
-                            <img src={!isHome ? fbLogo : opponentLogo} alt="Away" className="w-full h-full object-contain" />
+                            <TeamLogo
+                                teamId={!isHome ? FENERBAHCE_ID : opponent.id}
+                                name={!isHome ? 'Fenerbahçe' : opponent.name}
+                                wrapperClassName="w-full h-full"
+                                imageClassName="object-contain"
+                            />
                         </div>
                         <span className="text-sm font-bold text-center leading-tight">
                             {!isHome ? "Fenerbahçe" : opponent.name}
@@ -114,18 +120,17 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         const date = new Date(match.startTimestamp * 1000);
                         const homeTeam = match.homeTeam;
                         const awayTeam = match.awayTeam;
-                        const isFbHome = homeTeam.id === 3052;
+                        const isFbHome = homeTeam.id === FENERBAHCE_ID;
 
                         return (
                             <div key={idx} className="glass-panel rounded-xl p-3 flex items-center justify-between">
                                 <div className="flex items-center gap-2 flex-1">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0">
-                                        <img
-                                            src={isFbHome ? fbLogo : getTeamLogo(homeTeam.id)}
-                                            alt={homeTeam.name}
-                                            className="w-full h-full object-contain"
-                                        />
-                                    </div>
+                                    <TeamLogo
+                                        teamId={isFbHome ? FENERBAHCE_ID : homeTeam.id}
+                                        name={homeTeam.name}
+                                        wrapperClassName="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0 border border-white/10"
+                                        imageClassName="object-contain"
+                                    />
                                     <span className="text-xs font-medium truncate">{homeTeam.name}</span>
                                 </div>
                                 <div className="flex flex-col items-center px-3">
@@ -134,13 +139,12 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                                 </div>
                                 <div className="flex items-center gap-2 flex-1 justify-end">
                                     <span className="text-xs font-medium truncate text-right">{awayTeam.name}</span>
-                                    <div className="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0">
-                                        <img
-                                            src={!isFbHome ? fbLogo : getTeamLogo(awayTeam.id)}
-                                            alt={awayTeam.name}
-                                            className="w-full h-full object-contain"
-                                        />
-                                    </div>
+                                    <TeamLogo
+                                        teamId={!isFbHome ? FENERBAHCE_ID : awayTeam.id}
+                                        name={awayTeam.name}
+                                        wrapperClassName="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0 border border-white/10"
+                                        imageClassName="object-contain"
+                                    />
                                 </div>
                             </div>
                         );
