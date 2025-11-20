@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { BACKEND_URL } from '../services/api';
 
-const SOFASCORE_IMAGE_BASE = 'https://img.sofascore.com/api/v1';
-const getTeamLogo = (teamId) => `${SOFASCORE_IMAGE_BASE}/team/${teamId}/image`;
+const getTeamLogo = (teamId) => `${BACKEND_URL}/api/team-image/${teamId}`;
 
 const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });

@@ -1,5 +1,5 @@
 // Backend API URL (Render)
-const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
+export const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
 
 // Fetch next match from backend
 export const fetchNextMatch = async () => {
