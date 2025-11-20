@@ -21,6 +21,8 @@ const API_HOST = process.env.RAPIDAPI_HOST || 'sofascore.p.rapidapi.com';
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
 const SOFASCORE_IMAGE_BASE_HTTP = 'http://img.sofascore.com/api/v1';
 const IMAGE_USER_AGENT = process.env.IMAGE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 6 * * *';
+const ENABLE_CRON = process.env.DISABLE_CRON !== 'true';
 
 const headers = {
     'x-rapidapi-key': API_KEY,
@@ -70,14 +72,17 @@ async function fetchDataFromAPI() {
     }
 }
 
-// Cron job: Fetch data every day at 6:00 AM
-// TODO: Re-enable after testing or upgrade Node.js version
-// cron.schedule('0 6 * * *', () => {
-//   console.log('⏰ Scheduled fetch triggered');
-//   fetchDataFromAPI();
-// }, {
-//   timezone: "Europe/Istanbul"
-// });
+// Cron job: Fetch data every day at configured time (default 06:00 TR)
+if (ENABLE_CRON) {
+    cron.schedule(CRON_SCHEDULE, () => {
+        console.log('⏰ Scheduled fetch triggered');
+        fetchDataFromAPI();
+    }, {
+        timezone: "Europe/Istanbul"
+    });
+} else {
+    console.log('⚠️ Cron disabled via DISABLE_CRON env');
+}
 
 // Initial fetch on server start
 fetchDataFromAPI();
