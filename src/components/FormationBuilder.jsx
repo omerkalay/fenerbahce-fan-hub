@@ -238,7 +238,7 @@ const FormationBuilder = () => {
                             onClick={() => handlePositionClick(posKey)}
                         >
                             {player ? (
-                                <div className="relative w-full h-full flex flex-col items-center group">
+                                <div className="relative w-full h-full flex flex-col items-center">
                                     <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-pointer">
                                         {player.photo ? (
                                             <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
@@ -246,13 +246,15 @@ const FormationBuilder = () => {
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
                                         )}
                                         <button
+                                            type="button"
+                                            aria-label={`${player.name} pozisyonundan çıkar`}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 removePlayer(posKey);
                                             }}
-                                            className="absolute inset-0 bg-black/50 hidden group-hover:flex items-center justify-center text-white text-xs font-bold"
+                                            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg active:scale-95"
                                         >
-                                            X
+                                            ×
                                         </button>
                                     </div>
                                     <div className="mt-1 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] text-white font-medium truncate w-20 text-center border border-white/10 backdrop-blur-sm shadow-sm">
