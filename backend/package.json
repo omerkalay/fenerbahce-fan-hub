@@ -1,0 +1,24 @@
+{
+  "name": "fenerbahce-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Fenerbahçe Fan Hub with daily caching",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "fenerbahce",
+    "football",
+    "api",
+    "backend"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "node-cron": "^4.2.1"
+  }
+}
