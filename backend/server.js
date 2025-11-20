@@ -18,6 +18,7 @@ let cache = {
 const FENERBAHCE_ID = 3052;
 const API_KEY = process.env.RAPIDAPI_KEY;
 const API_HOST = process.env.RAPIDAPI_HOST || 'sofascore.p.rapidapi.com';
+const SOFASCORE_IMAGE_BASE = 'https://img.sofascore.com/api/v1';
 
 const headers = {
     'x-rapidapi-key': API_KEY,
@@ -50,8 +51,8 @@ async function fetchDataFromAPI() {
                     name: item.player.name,
                     position: item.player.position,
                     number: item.player.jerseyNumber,
-                    // Direct SofaScore URL - browser will handle CORS
-                    photo: `https://api.sofascore.app/api/v1/player/${item.player.id}/image`,
+                    // Direct SofaScore image CDN URL (public)
+                    photo: `${SOFASCORE_IMAGE_BASE}/player/${item.player.id}/image`,
                     country: item.player.country?.name,
                     marketValue: item.player.proposedMarketValue,
                     status: null
@@ -114,7 +115,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/player-image/:playerId', async (req, res) => {
     try {
         const { playerId } = req.params;
-        const imageUrl = `https://api.sofascore.app/api/v1/player/${playerId}/image`;
+        const imageUrl = `${SOFASCORE_IMAGE_BASE}/player/${playerId}/image`;
 
         const response = await fetch(imageUrl);
         if (!response.ok) {

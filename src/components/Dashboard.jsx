@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 
+const SOFASCORE_IMAGE_BASE = 'https://img.sofascore.com/api/v1';
+const getTeamLogo = (teamId) => `${SOFASCORE_IMAGE_BASE}/team/${teamId}/image`;
+
 const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -32,8 +35,8 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
 
-    const fbLogo = "https://media.api-sports.io/football/teams/611.png";
-    const opponentLogo = `https://api.sofascore.app/api/v1/team/${opponent.id}/image`;
+    const fbLogo = getTeamLogo(3052);
+    const opponentLogo = getTeamLogo(opponent.id);
 
     return (
         <div className="space-y-6 pb-20">
@@ -118,7 +121,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                                 <div className="flex items-center gap-2 flex-1">
                                     <div className="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0">
                                         <img
-                                            src={isFbHome ? fbLogo : `https://api.sofascore.app/api/v1/team/${homeTeam.id}/image`}
+                                            src={isFbHome ? fbLogo : getTeamLogo(homeTeam.id)}
                                             alt={homeTeam.name}
                                             className="w-full h-full object-contain"
                                         />
@@ -133,7 +136,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                                     <span className="text-xs font-medium truncate text-right">{awayTeam.name}</span>
                                     <div className="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0">
                                         <img
-                                            src={!isFbHome ? fbLogo : `https://api.sofascore.app/api/v1/team/${awayTeam.id}/image`}
+                                            src={!isFbHome ? fbLogo : getTeamLogo(awayTeam.id)}
                                             alt={awayTeam.name}
                                             className="w-full h-full object-contain"
                                         />
