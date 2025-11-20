@@ -12,12 +12,12 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ## ✨ Features
 
-### 📊 Dashboard (Pano)
+### 📊 Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Premium UI**: Glassmorphic design with smooth animations
 
-### 🎮 Formation Builder (Kadro Kur)
+### 🎮 Formation Builder
 - **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
 - **Realistic Pitch**: SVG-based football field with accurate markings
 - **Drag & Drop**: Intuitive player placement from squad pool
@@ -167,10 +167,6 @@ User Browser → Backend (Render) → SofaScore API (1x/day)
 - Squad data: 24 hours
 - Next 3 matches: 6 hours
 
-Console logs:
-- `📦 Cache'den yüklendi` - Data from cache
-- `🌐 API'dan çekiliyor` - Fresh API call
-
 ## 🛠️ Development Scripts
 
 ```bash
@@ -185,16 +181,6 @@ npm run lint         # Run ESLint
 - ⚠️ SofaScore API endpoints may return 404 (endpoint discovery needed)
 - ⏳ API key has daily quota limits
 - 🔄 Backend integration pending (Render deployment)
-
-## 📈 Roadmap
-
-- [ ] Deploy backend to Render
-- [ ] Connect frontend to backend API
-- [ ] Add real standings data
-- [ ] Add real top scorers data
-- [ ] Implement player injury/suspension status
-- [ ] Add match statistics & highlights
-- [ ] User authentication for saving formations
 
 ## 👨‍💻 Contributing
 
