@@ -1,62 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchSquad } from '../services/api';
-
-const CANVAS_WIDTH = 1080;
-const CANVAS_HEIGHT = 1680;
+import { toPng } from 'html-to-image';
 
 const parsePercent = (value = '0') => {
     const numeric = parseFloat(String(value).replace('%', ''));
     if (Number.isNaN(numeric)) return 0;
     return numeric / 100;
-};
-
-const getPlayerLabel = (name = '') => {
-    if (!name) return '';
-    const parts = name.trim().split(' ');
-    return parts[parts.length - 1] || name;
-};
-
-const loadImage = async (src) => {
-    if (!src) return null;
-    try {
-        const response = await fetch(src, { mode: 'cors' });
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = url;
-        });
-        return { img, url }; // Return both image and url to revoke later
-    } catch (error) {
-        console.error('Error loading image:', src, error);
-        return null;
-    }
-};
-
-const drawRoundedRect = (ctx, x, y, width, height, radius = 12, fillStyle = 'rgba(15,23,42,0.9)', strokeStyle = null, lineWidth = 1) => {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + width - r, y);
-    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
-    ctx.lineTo(x + width, y + height - r);
-    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-    ctx.lineTo(x + r, y + height);
-    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-    if (fillStyle) {
-        ctx.fillStyle = fillStyle;
-        ctx.fill();
-    }
-    if (strokeStyle) {
-        ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = lineWidth;
-        ctx.stroke();
-    }
 };
 
 const FormationBuilder = () => {
@@ -68,6 +17,7 @@ const FormationBuilder = () => {
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [playerSearch, setPlayerSearch] = useState('');
     const [isExporting, setIsExporting] = useState(false);
+    const pitchRef = useRef(null);
 
     useEffect(() => {
         const loadSquad = async () => {
@@ -204,189 +154,27 @@ const FormationBuilder = () => {
     const totalSpots = Object.keys(currentPositions).length;
 
     const downloadLineupCard = async () => {
-        if (!filledSpots || isExporting) return;
+        if (!filledSpots || isExporting || !pitchRef.current) return;
         setIsExporting(true);
 
-        let objectUrlsToRevoke = [];
-
         try {
-            const lineupEntries = Object.entries(currentPositions)
-                .map(([posKey, style]) => {
-                    const player = pitchPlayers[posKey];
-                    if (!player) return null;
-                    return { style, player };
-                })
-                .filter(Boolean);
-
-            if (!lineupEntries.length) {
-                window.alert('Önce sahaya oyuncu yerleştirmelisin.');
-                return;
-            }
-
-            const uniquePlayers = [];
-            const mapped = new Map();
-            lineupEntries.forEach(({ player }) => {
-                if (!mapped.has(player.id)) {
-                    mapped.set(player.id, true);
-                    uniquePlayers.push(player);
-                }
-            });
-
-            const imageEntries = await Promise.all(
-                uniquePlayers.map(async (player) => {
-                    const result = await loadImage(player.photo);
-                    if (result) {
-                        objectUrlsToRevoke.push(result.url);
-                        return [player.id, result.img];
-                    }
-                    return [player.id, null];
-                })
-            );
-            const imageMap = new Map(imageEntries);
-
-            const canvas = document.createElement('canvas');
-            canvas.width = CANVAS_WIDTH;
-            canvas.height = CANVAS_HEIGHT;
-            const ctx = canvas.getContext('2d');
-            ctx.imageSmoothingQuality = 'high';
-
-            const backgroundGradient = ctx.createLinearGradient(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-            backgroundGradient.addColorStop(0, '#030712');
-            backgroundGradient.addColorStop(1, '#050f24');
-            ctx.fillStyle = backgroundGradient;
-            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#facc15';
-            ctx.font = '700 72px "Inter", "SF Pro Display", sans-serif';
-            ctx.fillText('Fenerbahçe Hub', CANVAS_WIDTH / 2, 110);
-            ctx.fillStyle = '#cbd5f5';
-            ctx.font = '500 32px "Inter", "SF Pro Display", sans-serif';
-            ctx.fillText('Efsane 11 Kadrom', CANVAS_WIDTH / 2, 170);
-
-            const pitch = {
-                x: CANVAS_WIDTH * 0.1,
-                y: CANVAS_HEIGHT * 0.22,
-                width: CANVAS_WIDTH * 0.8,
-                height: CANVAS_HEIGHT * 0.66
-            };
-
-            const pitchGradient = ctx.createLinearGradient(0, pitch.y, 0, pitch.y + pitch.height);
-            pitchGradient.addColorStop(0, '#15803d');
-            pitchGradient.addColorStop(1, '#0c7530');
-            drawRoundedRect(ctx, pitch.x, pitch.y, pitch.width, pitch.height, 60, pitchGradient);
-
-            drawRoundedRect(
-                ctx,
-                pitch.x + 30,
-                pitch.y + 30,
-                pitch.width - 60,
-                pitch.height - 60,
-                40,
-                null,
-                'rgba(255,255,255,0.65)',
-                6
-            );
-
-            ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-            ctx.lineWidth = 6;
-            ctx.beginPath();
-            ctx.moveTo(pitch.x + pitch.width / 2, pitch.y + 30);
-            ctx.lineTo(pitch.x + pitch.width / 2, pitch.y + pitch.height - 30);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(pitch.x + pitch.width / 2, pitch.y + pitch.height / 2, pitch.width * 0.12, 0, Math.PI * 2);
-            ctx.stroke();
-
-            const penaltyHeight = pitch.height * 0.18;
-            const penaltyWidth = pitch.width * 0.36;
-            ctx.strokeRect(pitch.x + pitch.width / 2 - penaltyWidth / 2, pitch.y + 30, penaltyWidth, penaltyHeight);
-            ctx.strokeRect(
-                pitch.x + pitch.width / 2 - penaltyWidth / 2,
-                pitch.y + pitch.height - penaltyHeight - 30,
-                penaltyWidth,
-                penaltyHeight
-            );
-
-            const circleRadius = pitch.width * 0.07;
-            ctx.font = '600 36px "Inter", "SF Pro Display", sans-serif';
-
-            lineupEntries.forEach(({ player, style }) => {
-                const leftRatio = parsePercent(style.left);
-                const topRatio = parsePercent(style.top);
-                const centerX = pitch.x + pitch.width * leftRatio;
-                const centerY = pitch.y + pitch.height * topRatio;
-
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, circleRadius + 12, 0, Math.PI * 2);
-                ctx.fillStyle = 'rgba(15,23,42,0.6)';
-                ctx.fill();
-
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, circleRadius + 12, 0, Math.PI * 2);
-                ctx.lineWidth = 10;
-                ctx.strokeStyle = '#facc15';
-                ctx.stroke();
-
-                const image = imageMap.get(player.id);
-                if (image) {
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
-                    ctx.closePath();
-                    ctx.clip();
-                    ctx.drawImage(
-                        image,
-                        centerX - circleRadius,
-                        centerY - circleRadius,
-                        circleRadius * 2,
-                        circleRadius * 2
-                    );
-                    ctx.restore();
-                } else {
-                    ctx.fillStyle = '#fff';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.font = '700 48px "Inter", "SF Pro Display", sans-serif';
-                    ctx.fillText(player.number || '?', centerX, centerY);
-                }
-
-                const label = getPlayerLabel(player.name);
-                ctx.font = '600 34px "Inter", "SF Pro Display", sans-serif';
-                const textWidth = ctx.measureText(label).width;
-                const labelWidth = textWidth + 48;
-                const labelHeight = 54;
-                const labelX = centerX - labelWidth / 2;
-                const labelY = centerY + circleRadius + 24;
-                drawRoundedRect(ctx, labelX, labelY, labelWidth, labelHeight, 20, 'rgba(15,23,42,0.9)');
-                ctx.fillStyle = '#fff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(label, centerX, labelY + labelHeight / 2);
-            });
-
             const date = new Date().toISOString().split('T')[0];
-            const blob = await new Promise((resolve, reject) => {
-                canvas.toBlob((result) => {
-                    if (result) resolve(result);
-                    else reject(new Error('Kart oluşturulamadı'));
-                }, 'image/png', 0.95);
+            const dataUrl = await toPng(pitchRef.current, {
+                quality: 0.95,
+                backgroundColor: '#030712', // Match the dark background
+                style: {
+                    transform: 'scale(1)', // Ensure no scaling issues
+                }
             });
 
-            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.href = url;
             link.download = `fenerbahce-${formation.replace(/[^0-9a-z-]/gi, '')}-lineup-${date}.png`;
+            link.href = dataUrl;
             link.click();
-            URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Kadro kartı indirilirken hata oluştu:', error);
             window.alert(`Kart indirilirken bir hata oluştu: ${error.message}`);
         } finally {
-            // Cleanup object URLs
-            objectUrlsToRevoke.forEach(url => URL.revokeObjectURL(url));
             setIsExporting(false);
         }
     };
@@ -440,6 +228,7 @@ const FormationBuilder = () => {
 
             {/* Pitch - Using SVG background */}
             <div
+                ref={pitchRef}
                 className="relative w-full aspect-[2/3] rounded-xl border-2 border-white/20 overflow-hidden shadow-2xl mb-6 mx-auto max-w-sm"
                 style={{
                     backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grass' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23166534'/%3E%3Cstop offset='100%25' style='stop-color:%231e7e34'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='150' fill='url(%23grass)'/%3E%3Cg stroke='white' stroke-width='0.5' fill='none' opacity='0.4'%3E%3Crect x='5' y='5' width='90' height='140'/%3E%3Cline x1='5' x2='95' y1='75' y2='75'/%3E%3Ccircle cx='50' cy='75' r='10'/%3E%3Ccircle cx='50' cy='75' r='0.5' fill='white'/%3E%3Crect x='30' y='5' width='40' height='18'/%3E%3Crect x='40' y='5' width='20' height='7'/%3E%3Ccircle cx='50' cy='0.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 23 A 10 10 0 0 0 65 23' /%3E%3Crect x='30' y='127' width='40' height='18'/%3E%3Crect x='40' y='138' width='20' height='7'/%3E%3Ccircle cx='50' cy='149.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 127 A 10 10 0 0 1 65 127' /%3E%3Cpath d='M 5 5 Q 7 7 5 9' /%3E%3Cpath d='M 95 5 Q 93 7 95 9' /%3E%3Cpath d='M 5 145 Q 7 143 5 141' /%3E%3Cpath d='M 95 145 Q 93 143 95 141' /%3E%3C/g%3E%3C/svg%3E")`,
@@ -467,17 +256,26 @@ const FormationBuilder = () => {
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
                                         )}
-                                        <button
-                                            type="button"
-                                            aria-label={`${player.name} pozisyonundan çıkar`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                removePlayer(posKey);
-                                            }}
-                                            className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg active:scale-95"
-                                        >
-                                            ×
-                                        </button>
+                                        {/* Hide delete button during export if needed, but html-to-image captures DOM as is. 
+                                            Usually we want to hide controls. We can add a class 'no-export' and filter it in toPng if needed, 
+                                            or just accept it. For now, let's keep it simple. 
+                                            Actually, the delete button is small, maybe okay. 
+                                            But better to hide it if we can. 
+                                            Let's add a condition: !isExporting && ... 
+                                        */}
+                                        {!isExporting && (
+                                            <button
+                                                type="button"
+                                                aria-label={`${player.name} pozisyonundan çıkar`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removePlayer(posKey);
+                                                }}
+                                                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg active:scale-95"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="mt-1 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] text-white font-medium truncate w-20 text-center border border-white/10 backdrop-blur-sm shadow-sm">
                                         {player.name.split(' ').pop()}
