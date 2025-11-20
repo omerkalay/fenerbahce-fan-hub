@@ -49,8 +49,8 @@ async function fetchDataFromAPI() {
                 name: item.player.name,
                 position: item.player.position,
                 number: item.player.jerseyNumber,
-                // Fallback to generic player icon if SofaScore images have CORS issues
-                photo: null, // Will show jersey number instead
+                // Use backend proxy to avoid CORS issues
+                photo: `https://fenerbahce-backend.onrender.com/api/player-image/${item.player.id}`,
                 country: item.player.country?.name,
                 marketValue: item.player.proposedMarketValue,
                 status: null
@@ -108,6 +108,27 @@ app.get('/api/health', (req, res) => {
     });
 });
 
+// Image proxy endpoint to bypass CORS
+app.get('/api/player-image/:playerId', async (req, res) => {
+    try {
+        const { playerId } = req.params;
+        const imageUrl = `https://api.sofascore.app/api/v1/player/${playerId}/image`;
+
+        const response = await fetch(imageUrl);
+        if (!response.ok) {
+            return res.status(404).send('Image not found');
+        }
+
+        const imageBuffer = await response.arrayBuffer();
+        res.set('Content-Type', 'image/png');
+        res.set('Cache-Control', 'public, max-age=86400'); // Cache for 24h
+        res.send(Buffer.from(imageBuffer));
+    } catch (error) {
+        console.error('Error proxying image:', error);
+        res.status(500).send('Error loading image');
+    }
+});
+
 app.get('/', (req, res) => {
     res.json({
         message: 'Fenerbahçe Fan Hub API',
@@ -116,7 +137,8 @@ app.get('/', (req, res) => {
             '/api/next-match',
             '/api/next-3-matches',
             '/api/squad',
-            '/api/health'
+            '/api/health',
+            '/api/player-image/:playerId'
         ]
     });
 });
