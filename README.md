@@ -2,6 +2,10 @@
 
 Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, squad management, and formation builder.
 
+[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_Site-yellow?style=for-the-badge)](https://omerkalay.com/fenerbahce-fan-hub/)
+
+**🔗 Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
+
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-18.3.1-blue)
 ![Vite](https://img.shields.io/badge/Vite-6.0.5-purple)
