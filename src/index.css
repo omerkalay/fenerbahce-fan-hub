@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+
+@layer base {
+    body {
+        @apply bg-slate-950 text-white font-['Outfit'];
+    }
+}
+
+@layer components {
+    .glass-panel {
+        @apply bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-xl;
+    }
+
+    .glass-card {
+        @apply bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-lg border border-white/10 shadow-lg;
+    }
+
+    .premium-gradient {
+        @apply bg-gradient-to-r from-yellow-400 via-yellow-500 to-yellow-600;
+    }
+
+    .text-glow {
+        text-shadow: 0 0 20px rgba(234, 179, 8, 0.5);
+    }
+
+    .nav-item-active {
+        @apply text-yellow-400 relative;
+    }
+
+    .nav-item-active::after {
+        content: '';
+        position: absolute;
+        bottom: -0.5rem;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 0.25rem;
+        height: 0.25rem;
+        background-color: #facc15;
+        /* yellow-400 */
+        border-radius: 9999px;
+        box-shadow: 0 0 10px rgba(234, 179, 8, 0.8);
+    }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    @apply bg-slate-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-600;
+}
