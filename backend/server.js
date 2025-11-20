@@ -44,17 +44,19 @@ async function fetchDataFromAPI() {
         const squadData = await squadResponse.json();
 
         if (squadData.players) {
-            cache.squad = squadData.players.map(item => ({
-                id: item.player.id,
-                name: item.player.name,
-                position: item.player.position,
-                number: item.player.jerseyNumber,
-                // Use backend proxy to avoid CORS issues
-                photo: `https://fenerbahce-backend.onrender.com/api/player-image/${item.player.id}`,
-                country: item.player.country?.name,
-                marketValue: item.player.proposedMarketValue,
-                status: null
-            }));
+            cache.squad = squadData.players.map(item => {
+                return {
+                    id: item.player.id,
+                    name: item.player.name,
+                    position: item.player.position,
+                    number: item.player.jerseyNumber,
+                    // Direct SofaScore URL - browser will handle CORS
+                    photo: `https://api.sofascore.app/api/v1/player/${item.player.id}/image`,
+                    country: item.player.country?.name,
+                    marketValue: item.player.proposedMarketValue,
+                    status: null
+                };
+            });
             console.log('✅ Squad fetched successfully');
         }
 
