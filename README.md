@@ -1,202 +1,278 @@
-# ⚽ Fenerbahçe Fan Hub
+# Fenerbahçe Fan Hub
 
 Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, squad management, formation builder, and full PWA (Progressive Web App) support.
 
-[![Live Demo](https://img.shields.io/badge/🌐_Live_Demo-Visit_Site-yellow?style=for-the-badge)](https://omerkalay.com/fenerbahce-fan-hub/)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Visit_Site-yellow?style=for-the-badge)](https://omerkalay.com/fenerbahce-fan-hub/)
 
-**🔗 Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
+**Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
 ![Status](https://img.shields.io/badge/status-active-success)
-![React](https://img.shields.io/badge/React-18.3.1-blue)
-![Vite](https://img.shields.io/badge/Vite-6.0.5-purple)
+![React](https://img.shields.io/badge/React-19.2.0-blue)
+![Vite](https://img.shields.io/badge/Vite-5.4.21-purple)
 
-## ✨ Features
+## Features
 
-### 📊 Dashboard
+### Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Premium UI**: Glassmorphic design with smooth animations
 
-### 🎮 Formation Builder
+### Formation Builder
 - **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
 - **Realistic Pitch**: SVG-based football field with accurate markings
 - **Drag & Drop**: Intuitive player placement from squad pool
 - **Click to Add**: Modal-based player selection for empty positions
 - **Player Photos**: Dynamic player images from SofaScore API
+- **Share Feature**: Export formation as image
 
-## 🚀 Tech Stack
+## Tech Stack
 
-- **Frontend**: React 18 + Vite
+- **Frontend**: React 19.2 + Vite 5.4
 - **Styling**: Tailwind CSS v4
+- **Backend**: Express.js with daily cron job
 - **API**: SofaScore (via RapidAPI)
-- **Caching**: localStorage (6-24h per user)
-- **Deployment**: GitHub Pages (frontend, PWA) + Render (backend)
+- **Caching**: Backend cache (24h) + Service Worker
+- **PWA**: Installable app with offline support
+- **Deployment**: GitHub Pages (frontend) + Render (backend)
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-football/
+fenerbahce-fan-hub/
+├── backend/
+│   ├── server.js                  # Express API with cron job
+│   └── package.json               # Backend dependencies
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.jsx          # Main dashboard with matches
 │   │   ├── FormationBuilder.jsx   # Interactive pitch & formations
 │   │   ├── SquadBuilder.jsx       # Squad management (legacy)
-│   │   └── SquadList.jsx          # Player list view
+│   │   ├── SquadList.jsx          # Player list view
+│   │   ├── ProbableLineup.jsx     # Lineup component
+│   │   └── TeamLogo.jsx           # Logo component
 │   ├── services/
-│   │   └── api.js                 # API calls with caching
+│   │   └── api.js                 # Backend API integration
+│   ├── data/
+│   │   └── mockData.js            # Mock data for development
 │   ├── App.jsx                    # Main app & routing
 │   ├── index.css                  # Global styles & glassmorphism
 │   └── main.jsx                   # React entry point
-├── public/                        # Static assets
-├── .env                           # API credentials (gitignored)
-├── vite.config.js                 # Vite configuration
-└── tailwind.config.js             # Tailwind theme
+├── public/                        # Static assets & PWA icons
+├── vite.config.js                 # Vite + PWA configuration
+└── tailwind.config.js             # Tailwind v4 theme
 ```
 
-## 🔧 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
-- RapidAPI key for SofaScore
+- RapidAPI key for SofaScore (for backend only)
 
-### Local Development
+### Frontend Setup
 
 1. **Clone the repository**
+
 ```bash
-git clone https://github.com/yourusername/football.git
-cd football
+git clone https://github.com/yourusername/fenerbahce-fan-hub.git
+cd fenerbahce-fan-hub
 ```
 
-2. **Install dependencies**
+2. **Install frontend dependencies**
+
+```bash
+npm install
+```
+
+3. **Run development server**
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173)
+
+4. **Build for production**
+
+```bash
+npm run build
+```
+
+### Backend Setup (Optional for local development)
+
+1. **Navigate to backend directory**
+
+```bash
+cd backend
+```
+
+2. **Install backend dependencies**
+
 ```bash
 npm install
 ```
 
 3. **Configure environment**
-Create `.env` file:
+
+Create `backend/.env` file:
+
 ```env
-VITE_RAPIDAPI_KEY=your_rapidapi_key_here
-VITE_RAPIDAPI_HOST=sofascore.p.rapidapi.com
+RAPIDAPI_KEY=your_rapidapi_key_here
+RAPIDAPI_HOST=sofascore.p.rapidapi.com
+PORT=3000
+CRON_SCHEDULE=0 6 * * *
 ```
 
-4. **Run development server**
+4. **Run backend server**
+
 ```bash
-npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173)
-
-5. **Build for production**
-```bash
-npm run build
+npm start
 ```
 
-## 🌐 Deployment
+Backend will run on [http://localhost:3000](http://localhost:3000)
 
-### GitHub Pages (Frontend)
+## Deployment
+
+### Frontend (GitHub Pages)
 
 1. Update `vite.config.js` base path:
+
 ```js
 export default defineConfig({
-  base: '/repository-name/',
+  base: '/fenerbahce-fan-hub/',
   // ...
 })
 ```
 
 2. Build and deploy:
+
 ```bash
 npm run build
 npm run deploy
 ```
 
-### Backend Setup (Render)
+### Backend (Render)
 
-The backend caches API data to minimize RapidAPI quota usage:
+The backend is deployed on Render with automatic daily data fetching.
+
+**Backend Architecture:**
+- Express.js server
+- Cron job (daily 06:00 TR time)
+- In-memory cache
+- Image proxy for SofaScore photos
+- REST API endpoints
+
+**Environment Variables (Render):**
+
+```env
+RAPIDAPI_KEY=your_api_key
+RAPIDAPI_HOST=sofascore.p.rapidapi.com
+PORT=3000
+CRON_SCHEDULE=0 6 * * *
+PUBLIC_BASE_URL=https://fenerbahce-backend.onrender.com
+```
+
+## API Integration
+
+### Architecture
 
 ```
-📦 Backend Architecture
-├── Express.js server
-├── Cron job (daily API fetch)
-├── In-memory cache (24h)
-└── REST endpoints for frontend
+User Browser → Backend (Render) → SofaScore API
+                ↑
+           In-Memory Cache
+         (Updates daily via cron)
 ```
-
-**Endpoints:**
-- `GET /api/next-match` - Next match data
-- `GET /api/next-3-matches` - Upcoming 3 matches
-- `GET /api/squad` - Team squad list
 
 **Benefits:**
 - 1000 users = 1 API call per day
-- ~1000x reduction in API usage
-- Free Render tier sufficient
+- ~1000x reduction in API quota usage
+- Free Render tier is sufficient
+- Automatic daily updates
+- Image proxy for player photos
 
-## 📊 API Integration
+**API Endpoints:**
+- `GET /api/next-match` - Next match data
+- `GET /api/next-3-matches` - Upcoming 3 matches
+- `GET /api/squad` - Team squad with player photos
+- `GET /api/player-image/:id` - Player photo proxy
+- `GET /api/team-image/:id` - Team logo proxy
+- `GET /api/health` - Backend health check
+- `GET /api/refresh` - Manual cache refresh
 
-### Current (Direct Client Calls)
-```
-User Browser → SofaScore API
-❌ High API usage (1 call per user)
-```
+## Design Features
 
-### Planned (Backend Cache)
-```
-User Browser → Backend (Render) → SofaScore API (1x/day)
-✅ Low API usage (1 call total)
-```
-
-## 🎨 Design Features
-
-- **Glassmorphism**: Modern frosted glass aesthetic
-- **Gradient Backgrounds**: Dynamic yellow/blue theme
-- **Smooth Animations**: 200-300ms transitions
+- **Glassmorphism**: Modern frosted glass aesthetic with backdrop blur
+- **Gradient Backgrounds**: Dynamic yellow/blue Fenerbahçe theme
+- **Smooth Animations**: 200-300ms transitions throughout
 - **Mobile-First**: Optimized for phone screens
 - **Dark Mode**: Premium dark theme by default
+- **PWA Support**: Installable app with offline capabilities
 
-## 🔐 Environment Variables
+## PWA Features
 
-| Variable | Description | Example |
+- **Installable**: Add to home screen on mobile and desktop
+- **Offline Support**: Service worker caching for API calls
+- **App-like Experience**: Standalone display mode
+- **Custom Icons**: Fenerbahçe-themed app icons
+- **Smart Caching**: NetworkFirst for API, CacheFirst for images
+
+## Environment Variables
+
+### Backend (.env in backend/)
+
+| Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_RAPIDAPI_KEY` | RapidAPI key for SofaScore | `abc123...` |
-| `VITE_RAPIDAPI_HOST` | API host endpoint | `sofascore.p.rapidapi.com` |
+| `RAPIDAPI_KEY` | RapidAPI key for SofaScore | Required |
+| `RAPIDAPI_HOST` | API host endpoint | `sofascore.p.rapidapi.com` |
+| `PORT` | Server port | `3000` |
+| `CRON_SCHEDULE` | Cron schedule for data fetch | `0 6 * * *` (06:00 daily) |
+| `PUBLIC_BASE_URL` | Backend URL for image proxying | Auto-detected |
+| `DISABLE_CRON` | Disable automatic cron job | `false` |
 
-## 📝 Cache Strategy
+### Frontend (No .env needed)
 
-**localStorage Implementation:**
-- Match data: 6 hours
-- Squad data: 24 hours
-- Next 3 matches: 6 hours
+Frontend connects directly to deployed backend at `https://fenerbahce-backend.onrender.com`
 
-## 🛠️ Development Scripts
+## Development Scripts
+
+### Frontend
 
 ```bash
-npm run dev          # Start dev server
+npm run dev          # Start dev server (localhost:5173)
 npm run build        # Production build
 npm run preview      # Preview production build
 npm run lint         # Run ESLint
+npm run deploy       # Deploy to GitHub Pages
 ```
 
-## 🐛 Known Issues & Limitations
+### Backend
 
-- ⚠️ SofaScore API endpoints may return 404 (endpoint discovery needed)
-- ⏳ API key has daily quota limits
-- 🔄 Backend integration pending (Render deployment)
+```bash
+npm start            # Start backend server (localhost:3000)
+npm run dev          # Start backend (development mode)
+```
 
-## 👨‍💻 Contributing
+## Known Issues & Limitations
 
-This is a personal fan project. Suggestions and feedback welcome!
+- SofaScore API has daily quota limits (mitigated by backend caching)
+- Backend cold starts on Render free tier (~1 minute on first request)
+- Player photos depend on SofaScore availability
 
-## 📄 License
+## Contributing
+
+This is a personal fan project. Suggestions and feedback are welcome!
+
+## License
 
 MIT License - Free to use and modify
 
-## 🙏 Credits
+## Credits
 
 - **API**: SofaScore via RapidAPI
 - **Design Inspiration**: Modern sports apps
-- **Icons**: Heroicons
+- **Icons**: Lucide React
 - **Team**: Fenerbahçe SK
 
 ---
 
-Made with 💛💙 for Fenerbahçe fans
+Made with passion for Fenerbahçe fans
