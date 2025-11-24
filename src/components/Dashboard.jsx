@@ -35,6 +35,18 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
         return () => clearInterval(timer);
     }, [matchData]);
 
+    // Modal açıkken arka plan scroll'unu engelle
+    useEffect(() => {
+        if (showNotificationModal) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [showNotificationModal]);
+
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
     if (!matchData) return <div className="text-center text-slate-400 mt-10">Maç bilgisi bulunamadı.</div>;
 
@@ -306,7 +318,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
             {/* Bildirim Modal */}
             {showNotificationModal && (
                 <div 
-                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn"
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
                     onClick={() => setShowNotificationModal(false)}
                 >
                     <div 
@@ -446,7 +458,10 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         {/* Butonlar */}
                         <div className="flex gap-3">
                             <button
-                                onClick={() => setShowNotificationModal(false)}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowNotificationModal(false);
+                                }}
                                 className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 font-medium border border-white/10 hover:border-white/20"
                             >
                                 İptal
