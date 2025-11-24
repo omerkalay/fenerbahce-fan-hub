@@ -35,16 +35,39 @@ const FormationBuilder = () => {
     const handleDrop = (e, positionKey) => {
         e.preventDefault();
         const player = JSON.parse(e.dataTransfer.getData('player'));
+        const sourcePosition = e.dataTransfer.getData('sourcePosition');
 
-        const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
-        if (isAlreadyOnPitch) {
-            return;
+        // Eğer saha içinden geliyorsa
+        if (sourcePosition) {
+            const targetPlayer = pitchPlayers[positionKey];
+            
+            setPitchPlayers(prev => {
+                const newState = { ...prev };
+                
+                // Hedef pozisyonda oyuncu varsa yer değiştir
+                if (targetPlayer) {
+                    newState[sourcePosition] = targetPlayer;
+                    newState[positionKey] = player;
+                } else {
+                    // Hedef pozisyon boşsa sadece taşı
+                    delete newState[sourcePosition];
+                    newState[positionKey] = player;
+                }
+                
+                return newState;
+            });
+        } else {
+            // Oyuncu havuzundan geliyorsa
+            const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
+            if (isAlreadyOnPitch) {
+                return;
+            }
+
+            setPitchPlayers(prev => ({
+                ...prev,
+                [positionKey]: player
+            }));
         }
-
-        setPitchPlayers(prev => ({
-            ...prev,
-            [positionKey]: player
-        }));
     };
 
     const handleDragOver = (e) => {
@@ -264,25 +287,36 @@ const FormationBuilder = () => {
                             onClick={() => handlePositionClick(posKey)}
                         >
                             {player ? (
-                                <div className="relative w-full h-full flex flex-col items-center group">
-                                    <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-pointer z-10 group-hover:scale-110 transition-transform">
+                                <div 
+                                    className="relative w-full h-full flex flex-col items-center group"
+                                    draggable={!isExporting}
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.setData('player', JSON.stringify(player));
+                                        e.dataTransfer.setData('sourcePosition', posKey);
+                                    }}
+                                >
+                                    <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-move z-10 group-hover:scale-110 transition-transform">
                                         {player.photo ? (
                                             <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
                                         )}
                                         {!isExporting && (
-                                            <button
-                                                type="button"
-                                                aria-label={`${player.name} pozisyonundan çıkar`}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    removePlayer(posKey);
-                                                }}
-                                                className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-lg active:scale-95 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                ×
-                                            </button>
+                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
+                                                <button
+                                                    type="button"
+                                                    aria-label={`${player.name} pozisyonundan çıkar`}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        removePlayer(posKey);
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 md:group-hover:opacity-100 touch-manipulation active:opacity-100 transition-opacity pointer-events-auto"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                    </svg>
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <div className="mt-1 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] text-white font-medium truncate w-20 text-center border border-white/10 backdrop-blur-sm shadow-sm z-20">
