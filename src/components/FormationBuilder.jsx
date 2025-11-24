@@ -17,6 +17,7 @@ const FormationBuilder = () => {
     const [selectedPosition, setSelectedPosition] = useState(null);
     const [playerSearch, setPlayerSearch] = useState('');
     const [isExporting, setIsExporting] = useState(false);
+    const [isTouchDevice, setIsTouchDevice] = useState(false);
     const pitchRef = useRef(null);
 
     useEffect(() => {
@@ -26,6 +27,13 @@ const FormationBuilder = () => {
             setLoading(false);
         };
         loadSquad();
+    }, []);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0;
+            setIsTouchDevice(hasTouch);
+        }
     }, []);
 
     const handleDragStart = (e, player) => {
@@ -289,7 +297,7 @@ const FormationBuilder = () => {
                             {player ? (
                                 <div 
                                     className="relative w-full h-full flex flex-col items-center group"
-                                    draggable={!isExporting}
+                                    draggable={!isExporting && !isTouchDevice}
                                     onDragStart={(e) => {
                                         e.dataTransfer.setData('player', JSON.stringify(player));
                                         e.dataTransfer.setData('sourcePosition', posKey);
@@ -334,7 +342,7 @@ const FormationBuilder = () => {
             {/* Player Pool */}
             <div className="flex-1 overflow-hidden flex flex-col">
                 <h3 className="text-sm font-bold text-slate-400 mb-2 px-2 uppercase tracking-wider">Oyuncular</h3>
-                <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-20">
+                <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-20 touch-pan-y">
                     <div className="grid grid-cols-4 gap-2">
                         {loading ? (
                             <div className="col-span-4 text-center text-slate-500 py-4">Yükleniyor...</div>
@@ -342,7 +350,7 @@ const FormationBuilder = () => {
                             squad.map(player => (
                                 <div
                                     key={player.id}
-                                    draggable
+                                    draggable={!isTouchDevice}
                                     onDragStart={(e) => handleDragStart(e, player)}
                                     className="glass-panel rounded-lg p-2 flex flex-col items-center gap-1 cursor-move active:scale-95 transition-transform hover:bg-white/5"
                                 >
