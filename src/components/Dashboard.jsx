@@ -11,7 +11,11 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
         fifteenMinutes: false,
         dailyCheck: false
     });
-    const [hasActiveNotifications, setHasActiveNotifications] = useState(false);
+    const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
+        // localStorage'dan oku
+        const saved = localStorage.getItem('fb_has_notifications');
+        return saved === 'true';
+    });
 
     useEffect(() => {
         if (!matchData) return;
@@ -128,6 +132,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
             if (data.success) {
                 const count = Object.values(selectedOptions).filter(v => v).length;
                 setHasActiveNotifications(true);
+                localStorage.setItem('fb_has_notifications', 'true'); // localStorage'a kaydet
                 setShowNotificationModal(false);
                 alert(`✅ ${count} bildirim ayarlandı!`);
             } else {
