@@ -109,10 +109,12 @@ if (ENABLE_CRON && CRON_SCHEDULE) {
 }
 
 // Cron job: Check and send notifications every minute
-// Temporarily disabled for testing
-// cron.schedule('* * * * *', () => {
-//     checkAndSendNotifications();
-// });
+cron.schedule('* * * * *', () => {
+    checkAndSendNotifications();
+}, {
+    timezone: "Europe/Istanbul"
+});
+console.log('✅ Notification check cron scheduled: Every minute');
 
 // Function to check and send notifications
 function checkAndSendNotifications() {
@@ -132,28 +134,28 @@ function checkAndSendNotifications() {
         // Check each notification type
         if (options.threeHours && !sentNotifications.includes('threeHours')) {
             if (timeDiff <= threeHoursInMs && timeDiff > (threeHoursInMs - 60000)) {
-                sendNotification(playerId, matchData, 'threeHours', '3 saat önce');
+                sendNotification(playerId, matchData, 'threeHours', '3 saat kaldı');
                 sentNotifications.push('threeHours');
             }
         }
         
         if (options.oneHour && !sentNotifications.includes('oneHour')) {
             if (timeDiff <= oneHourInMs && timeDiff > (oneHourInMs - 60000)) {
-                sendNotification(playerId, matchData, 'oneHour', '1 saat önce');
+                sendNotification(playerId, matchData, 'oneHour', '1 saat kaldı');
                 sentNotifications.push('oneHour');
             }
         }
         
         if (options.thirtyMinutes && !sentNotifications.includes('thirtyMinutes')) {
             if (timeDiff <= thirtyMinInMs && timeDiff > (thirtyMinInMs - 60000)) {
-                sendNotification(playerId, matchData, 'thirtyMinutes', '30 dakika önce');
+                sendNotification(playerId, matchData, 'thirtyMinutes', '30 dakika kaldı');
                 sentNotifications.push('thirtyMinutes');
             }
         }
         
         if (options.fifteenMinutes && !sentNotifications.includes('fifteenMinutes')) {
             if (timeDiff <= fifteenMinInMs && timeDiff > (fifteenMinInMs - 60000)) {
-                sendNotification(playerId, matchData, 'fifteenMinutes', '15 dakika önce');
+                sendNotification(playerId, matchData, 'fifteenMinutes', '15 dakika kaldı');
                 sentNotifications.push('fifteenMinutes');
             }
         }
@@ -166,40 +168,45 @@ function checkAndSendNotifications() {
     });
 }
 
-// Daily check for matches (Günlük Maç Kontrolü) - 06:00 UTC = 09:00 TR
-// Temporarily disabled for testing
-// cron.schedule('0 6 * * *', () => {
-//     console.log('⏰ Daily match check triggered (09:00 TR / 06:00 UTC)');
-//     
-//     // Get all players with dailyCheck enabled
-//     const dailyCheckPlayers = reminders.filter(r => r.options.dailyCheck);
-//     
-//     if (cache.nextMatch) {
-//         const matchTime = new Date(cache.nextMatch.startTimestamp * 1000);
-//         const today = new Date();
-//         
-//         // Check if match is today
-//         if (matchTime.toDateString() === today.toDateString()) {
-//             dailyCheckPlayers.forEach(reminder => {
-//                 sendNotification(
-//                     reminder.playerId, 
-//                     cache.nextMatch, 
-//                     'dailyCheck', 
-//                     'Bugün maç var!'
-//                 );
-//             });
-//         }
-//     }
-// });
+// Daily check for matches (Günlük Maç Kontrolü) - 09:00 TR
+cron.schedule('0 9 * * *', () => {
+    console.log('⏰ Daily match check triggered (09:00 TR)');
+    
+    // Get all players with dailyCheck enabled
+    const dailyCheckPlayers = reminders.filter(r => r.options.dailyCheck);
+    
+    if (cache.nextMatch && dailyCheckPlayers.length > 0) {
+        const matchTime = new Date(cache.nextMatch.startTimestamp * 1000);
+        const today = new Date();
+        
+        // Check if match is today
+        if (matchTime.toDateString() === today.toDateString()) {
+            dailyCheckPlayers.forEach(reminder => {
+                sendNotification(
+                    reminder.playerId, 
+                    cache.nextMatch, 
+                    'dailyCheck', 
+                    'Bugün maç günü'
+                );
+            });
+        }
+    }
+}, {
+    timezone: "Europe/Istanbul"
+});
+console.log('✅ Daily match check cron scheduled: 09:00 TR');
 
 // Send notification function with OneSignal
 async function sendNotification(playerId, matchData, type, timeText) {
-    const homeTeam = matchData.homeTeam?.name || 'Fenerbahçe';
-    const awayTeam = matchData.awayTeam?.name || 'Rakip';
+    const FENERBAHCE_ID = 3052;
+    const isHome = matchData.homeTeam?.id === FENERBAHCE_ID;
+    const opponent = isHome ? matchData.awayTeam?.name : matchData.homeTeam?.name;
     const matchTime = new Date(matchData.startTimestamp * 1000);
     const timeString = matchTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
     
-    const message = `${homeTeam} vs ${awayTeam} - ${timeString} (${timeText})`;
+    // Format: "Fenerbahçe - Rakip\n20:45 · 1 saat kaldı"
+    const heading = `💛💙 Fenerbahçe - ${opponent}`;
+    const message = `${timeString} · ${timeText}`;
     
     // OneSignal integration
     if (process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY) {
@@ -212,17 +219,17 @@ async function sendNotification(playerId, matchData, type, timeText) {
             
             const notification = {
                 contents: { 'tr': message },
-                headings: { 'tr': '⚽ Fenerbahçe Maç Hatırlatma' },
+                headings: { 'tr': heading },
                 include_player_ids: [playerId]
             };
             
             await client.createNotification(notification);
-            console.log(`📢 Notification sent to player ${playerId}: ${message}`);
+            console.log(`📢 Notification sent to player ${playerId}: ${heading} - ${message}`);
         } catch (err) {
             console.error('OneSignal error:', err.message);
         }
     } else {
-        console.log(`📢 [TEST MODE] Notification: ${message} (Player: ${playerId})`);
+        console.log(`📢 [TEST MODE] ${heading}\n${message} (Player: ${playerId})`);
     }
 }
 
