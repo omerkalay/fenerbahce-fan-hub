@@ -211,16 +211,19 @@ npm run deploy
 The backend is deployed on Render with automatic daily data fetching and push notification management.
 
 **Backend Architecture:**
-- Express.js server
+- Express.js server with CORS and rate limiting
 - **3 Cron Jobs**:
   - Data fetch: `0 6 * * *` (06:00 TR daily)
-  - Notification check: `* * * * *` (every minute)
-  - Daily match check: `0 9 * * *` (09:00 TR daily)
-- In-memory cache for match/squad data
-- In-memory storage for notification reminders
-- OneSignal integration for push notifications
-- Image proxy for SofaScore photos
-- REST API endpoints
+  - Notification check: `* * * * *` (every minute - checks time-based reminders)
+  - Daily match check: `0 9 * * *` (09:00 TR daily - checks if match today)
+- In-memory cache for match/squad data (updated daily)
+- In-memory notification storage:
+  - `matchReminders` array (time-based, per match)
+  - `dailyCheckSubscribers` Set (global subscribers)
+  - `sentDailyNotifications` Map (deduplication)
+- OneSignal REST API integration (modern, no SDK needed)
+- Image proxy for SofaScore photos (CORS bypass)
+- Rate limiting: 100 req/15min (general), 20 req/15min (reminders)
 
 **Environment Variables (Render):**
 
@@ -261,13 +264,14 @@ User Browser → Backend (Render) → SofaScore API
 - `GET /api/next-match` - Next match data
 - `GET /api/next-3-matches` - Upcoming 3 matches
 - `GET /api/squad` - Team squad with player photos
-- `GET /api/player-image/:id` - Player photo proxy
-- `GET /api/team-image/:id` - Team logo proxy
-- `GET /api/health` - Backend health check & reminder count
+- `GET /api/player-image/:id` - Player photo proxy (CORS bypass)
+- `GET /api/team-image/:id` - Team logo proxy (CORS bypass)
+- `GET /api/health` - Backend health check & notification stats
 - `GET /api/refresh` - Manual cache refresh
-- `POST /api/reminder` - Save notification preferences
-- `GET /api/reminder/:playerId` - Get user's reminders
-- `DELETE /api/reminder/:playerId/:matchId` - Delete reminder
+- `POST /api/reminder` - Save/update notification preferences (body: `{playerId, matchId?, options}`)
+- `GET /api/reminder/:playerId` - Get user's reminders (returns `{matchReminders, dailyCheckActive}`)
+- `DELETE /api/reminder/:playerId` - Delete all reminders for user
+- `DELETE /api/reminder/:playerId/:matchId` - Delete specific match reminder
 
 ## Design Features
 
@@ -292,30 +296,37 @@ User Browser → Backend (Render) → SofaScore API
 ### User Flow
 
 1. **First Visit**
-   - OneSignal SDK requests notification permission
-   - User grants permission → Unique `Player ID` is created
-   - Player ID is stored by OneSignal
+   - OneSignal SDK v16 initializes automatically
+   - User clicks notification bell icon
+   - Browser requests notification permission
+   - User grants permission → OneSignal generates unique `Player ID` (device identifier)
 
 2. **User Sets Reminder**
-   - User clicks bell icon on match card
-   - Selects notification times (e.g., "1 hour before")
-   - Frontend sends: `{ playerId, options, matchData }` → Backend
-   - Backend saves reminder in memory
+   - User clicks bell icon (🔔) on match card
+   - Selects notification options (3h, 1h, 30min, 15min, daily check)
+   - Frontend sends: `{ playerId, matchId, options }` → Backend
+   - Backend saves:
+     - **Time-based reminders** → `matchReminders` array (tied to specific match)
+     - **Daily check** → `dailyCheckSubscribers` Set (global, applies to all matches)
 
 3. **Backend Sends Notifications**
-   - **Every Minute**: Backend checks all reminders
-     - Is it 3 hours before match? → Send notification
-     - Is it 1 hour before? → Send notification
-     - Is it 30 minutes before? → Send notification
-     - Is it 15 minutes before? → Send notification
-   - **Every Day at 09:00 TR**: Check if today has a match
-     - If yes → Send "Bugün maç günü" notification
+   - **Every Minute (Time-based reminders)**:
+     - Backend checks all `matchReminders`
+     - For each reminder, fetches **CURRENT** match data from cache (always up-to-date!)
+     - Calculates time until match
+     - If reminder time matches (e.g., 1h before), sends notification via OneSignal REST API
+     - Marks as sent to prevent duplicates
+   
+   - **Every Day at 09:00 TR (Daily check)**:
+     - Backend checks if there's a Fenerbahçe match TODAY
+     - If yes, sends notification to all `dailyCheckSubscribers`
+     - Uses deduplication to prevent multiple notifications per day per match
 
 4. **User Receives Notification**
-   - Notification appears on phone/desktop (native-like)
+   - Notification appears on phone/desktop (native OS notification)
    - Works even if:
      - ✅ App is closed
-     - ✅ Browser is closed (PWA mode)
+     - ✅ Browser is closed (PWA/Service Worker mode)
      - ✅ Phone is locked
    - Format: `💛💙 Fenerbahçe - Opponent | 20:45 · 1 saat kaldı`
 
@@ -401,8 +412,9 @@ npm run dev          # Start backend (development mode)
 - SofaScore API has daily quota limits (mitigated by backend caching)
 - Backend cold starts on Render free tier (~30-60 seconds on first request)
 - Player photos depend on SofaScore availability
-- Notification reminders are stored in-memory (lost on backend restart)
-- For production, consider using a database (MongoDB, Redis) for reminder persistence
+- Notification reminders are stored in-memory (lost on backend restart - acceptable for free tier)
+- Match data is fetched from cache (updated daily), so notifications use real-time data
+- For production with 10K+ users, consider using Redis/MongoDB for reminder persistence
 
 ## Contributing
 
