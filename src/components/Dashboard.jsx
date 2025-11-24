@@ -59,6 +59,23 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
         }
 
         try {
+            // Request OneSignal Permission
+            if (window.OneSignal) {
+                try {
+                    const permission = await window.OneSignal.Notifications.permission;
+                    if (permission === false) {
+                        // Request permission
+                        const result = await window.OneSignal.Notifications.requestPermission();
+                        if (!result) {
+                            alert('⚠️ Bildirim izni verilmedi. Lütfen tarayıcı ayarlarından bildirimlere izin verin.');
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    console.error('OneSignal permission error:', err);
+                }
+            }
+
             // Get OneSignal Player ID
             let playerId = null;
             
