@@ -15,6 +15,10 @@ let cache = {
     lastUpdate: null
 };
 
+// Reminders storage (in-memory)
+let reminders = [];
+// Format: { playerId, options: {threeHours, oneHour, ...}, matchData, createdAt }
+
 const FENERBAHCE_ID = 3052;
 const API_KEY = process.env.RAPIDAPI_KEY;
 const API_HOST = process.env.RAPIDAPI_HOST || 'sofascore.p.rapidapi.com';
@@ -89,16 +93,137 @@ async function fetchDataFromAPI() {
     }
 }
 
-// Cron job: Fetch data every day at configured time (default 06:00 TR)
-if (ENABLE_CRON) {
-    cron.schedule(CRON_SCHEDULE, () => {
-        console.log('⏰ Scheduled fetch triggered');
-        fetchDataFromAPI();
-    }, {
-        timezone: "Europe/Istanbul"
-    });
+// Cron job: Fetch data every day at configured time (default 03:00 UTC = 06:00 TR)
+if (ENABLE_CRON && CRON_SCHEDULE) {
+    try {
+        cron.schedule(CRON_SCHEDULE, () => {
+            console.log('⏰ Scheduled fetch triggered');
+            fetchDataFromAPI();
+        });
+        console.log(`✅ Data fetch cron scheduled: ${CRON_SCHEDULE}`);
+    } catch (error) {
+        console.error('❌ Cron schedule error:', error.message);
+    }
 } else {
-    console.log('⚠️ Cron disabled via DISABLE_CRON env');
+    console.log('⚠️ Cron disabled via DISABLE_CRON env or invalid CRON_SCHEDULE');
+}
+
+// Cron job: Check and send notifications every minute
+// Temporarily disabled for testing
+// cron.schedule('* * * * *', () => {
+//     checkAndSendNotifications();
+// });
+
+// Function to check and send notifications
+function checkAndSendNotifications() {
+    const now = new Date();
+    
+    reminders.forEach(reminder => {
+        const { playerId, options, matchData, sentNotifications } = reminder;
+        const matchTime = new Date(matchData.startTimestamp * 1000);
+        const timeDiff = matchTime - now; // milliseconds until match
+        
+        // Calculate time differences
+        const threeHoursInMs = 3 * 60 * 60 * 1000;
+        const oneHourInMs = 1 * 60 * 60 * 1000;
+        const thirtyMinInMs = 30 * 60 * 1000;
+        const fifteenMinInMs = 15 * 60 * 1000;
+        
+        // Check each notification type
+        if (options.threeHours && !sentNotifications.includes('threeHours')) {
+            if (timeDiff <= threeHoursInMs && timeDiff > (threeHoursInMs - 60000)) {
+                sendNotification(playerId, matchData, 'threeHours', '3 saat önce');
+                sentNotifications.push('threeHours');
+            }
+        }
+        
+        if (options.oneHour && !sentNotifications.includes('oneHour')) {
+            if (timeDiff <= oneHourInMs && timeDiff > (oneHourInMs - 60000)) {
+                sendNotification(playerId, matchData, 'oneHour', '1 saat önce');
+                sentNotifications.push('oneHour');
+            }
+        }
+        
+        if (options.thirtyMinutes && !sentNotifications.includes('thirtyMinutes')) {
+            if (timeDiff <= thirtyMinInMs && timeDiff > (thirtyMinInMs - 60000)) {
+                sendNotification(playerId, matchData, 'thirtyMinutes', '30 dakika önce');
+                sentNotifications.push('thirtyMinutes');
+            }
+        }
+        
+        if (options.fifteenMinutes && !sentNotifications.includes('fifteenMinutes')) {
+            if (timeDiff <= fifteenMinInMs && timeDiff > (fifteenMinInMs - 60000)) {
+                sendNotification(playerId, matchData, 'fifteenMinutes', '15 dakika önce');
+                sentNotifications.push('fifteenMinutes');
+            }
+        }
+    });
+    
+    // Clean up old reminders (matches that already happened)
+    reminders = reminders.filter(r => {
+        const matchTime = new Date(r.matchData.startTimestamp * 1000);
+        return matchTime > now;
+    });
+}
+
+// Daily check for matches (Günlük Maç Kontrolü) - 06:00 UTC = 09:00 TR
+// Temporarily disabled for testing
+// cron.schedule('0 6 * * *', () => {
+//     console.log('⏰ Daily match check triggered (09:00 TR / 06:00 UTC)');
+//     
+//     // Get all players with dailyCheck enabled
+//     const dailyCheckPlayers = reminders.filter(r => r.options.dailyCheck);
+//     
+//     if (cache.nextMatch) {
+//         const matchTime = new Date(cache.nextMatch.startTimestamp * 1000);
+//         const today = new Date();
+//         
+//         // Check if match is today
+//         if (matchTime.toDateString() === today.toDateString()) {
+//             dailyCheckPlayers.forEach(reminder => {
+//                 sendNotification(
+//                     reminder.playerId, 
+//                     cache.nextMatch, 
+//                     'dailyCheck', 
+//                     'Bugün maç var!'
+//                 );
+//             });
+//         }
+//     }
+// });
+
+// Send notification function with OneSignal
+async function sendNotification(playerId, matchData, type, timeText) {
+    const homeTeam = matchData.homeTeam?.name || 'Fenerbahçe';
+    const awayTeam = matchData.awayTeam?.name || 'Rakip';
+    const matchTime = new Date(matchData.startTimestamp * 1000);
+    const timeString = matchTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    
+    const message = `${homeTeam} vs ${awayTeam} - ${timeString} (${timeText})`;
+    
+    // OneSignal integration
+    if (process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY) {
+        try {
+            const OneSignal = require('onesignal-node');
+            const client = new OneSignal.Client(
+                process.env.ONESIGNAL_APP_ID,
+                process.env.ONESIGNAL_REST_API_KEY
+            );
+            
+            const notification = {
+                contents: { 'tr': message },
+                headings: { 'tr': '⚽ Fenerbahçe Maç Hatırlatma' },
+                include_player_ids: [playerId]
+            };
+            
+            await client.createNotification(notification);
+            console.log(`📢 Notification sent to player ${playerId}: ${message}`);
+        } catch (err) {
+            console.error('OneSignal error:', err.message);
+        }
+    } else {
+        console.log(`📢 [TEST MODE] Notification: ${message} (Player: ${playerId})`);
+    }
 }
 
 // Initial fetch on server start
@@ -144,8 +269,64 @@ app.get('/api/health', (req, res) => {
             nextMatch: cache.nextMatch ? 'loaded' : 'empty',
             next3Matches: cache.next3Matches.length,
             squad: cache.squad.length
-        }
+        },
+        reminders: reminders.length
     });
+});
+
+// POST /api/reminder - Save user notification preferences
+app.post('/api/reminder', (req, res) => {
+    const { playerId, options, matchData } = req.body;
+
+    if (!playerId || !options || !matchData) {
+        return res.status(400).json({ error: 'Missing required fields: playerId, options, matchData' });
+    }
+
+    // Check if reminder already exists for this player and match
+    const existingIndex = reminders.findIndex(r => 
+        r.playerId === playerId && 
+        r.matchData.id === matchData.id
+    );
+
+    const reminder = {
+        playerId,
+        options,
+        matchData,
+        createdAt: new Date(),
+        sentNotifications: []
+    };
+
+    if (existingIndex >= 0) {
+        reminders[existingIndex] = reminder;
+    } else {
+        reminders.push(reminder);
+    }
+
+    res.json({ 
+        success: true, 
+        message: 'Reminder saved successfully',
+        activeCount: Object.values(options).filter(v => v).length
+    });
+});
+
+// GET /api/reminder/:playerId - Get reminders for a player
+app.get('/api/reminder/:playerId', (req, res) => {
+    const { playerId } = req.params;
+    const playerReminders = reminders.filter(r => r.playerId === playerId);
+    res.json(playerReminders);
+});
+
+// DELETE /api/reminder/:playerId/:matchId - Delete a specific reminder
+app.delete('/api/reminder/:playerId/:matchId', (req, res) => {
+    const { playerId, matchId } = req.params;
+    const initialLength = reminders.length;
+    reminders = reminders.filter(r => !(r.playerId === playerId && r.matchData.id == matchId));
+    
+    if (reminders.length < initialLength) {
+        res.json({ success: true, message: 'Reminder deleted' });
+    } else {
+        res.status(404).json({ error: 'Reminder not found' });
+    }
 });
 
 async function proxyImage(req, res, type = 'player') {
@@ -188,12 +369,15 @@ app.get('/', (req, res) => {
             '/api/next-3-matches',
             '/api/squad',
             '/api/health',
-            '/api/player-image/:playerId'
+            '/api/player-image/:playerId',
+            '/api/reminder (POST)',
+            '/api/reminder/:playerId (GET)',
+            '/api/reminder/:playerId/:matchId (DELETE)'
         ]
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`✅ Backend server running on port ${PORT}`);
     console.log(`📍 http://localhost:${PORT}`);

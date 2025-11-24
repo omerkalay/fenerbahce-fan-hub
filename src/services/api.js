@@ -1,4 +1,4 @@
-// Backend API URL (Render)
+// Backend API URL (Render - Production)
 export const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
 
 const ensureAbsolutePhoto = (player = {}) => {

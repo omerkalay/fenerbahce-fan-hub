@@ -3,6 +3,15 @@ import TeamLogo from './TeamLogo';
 
 const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+    const [showNotificationModal, setShowNotificationModal] = useState(false);
+    const [selectedOptions, setSelectedOptions] = useState({
+        threeHours: false,
+        oneHour: false,
+        thirtyMinutes: false,
+        fifteenMinutes: false,
+        dailyCheck: false
+    });
+    const [hasActiveNotifications, setHasActiveNotifications] = useState(false);
 
     useEffect(() => {
         if (!matchData) return;
@@ -34,6 +43,96 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
 
+    const toggleOption = (optionId) => {
+        setSelectedOptions(prev => ({
+            ...prev,
+            [optionId]: !prev[optionId]
+        }));
+    };
+
+    const saveNotifications = async () => {
+        const hasSelection = Object.values(selectedOptions).some(val => val === true);
+        
+        if (!hasSelection) {
+            alert('❌ En az 1 seçenek işaretleyin!');
+            return;
+        }
+
+        try {
+            // Get OneSignal Player ID
+            let playerId = null;
+            
+            if (window.OneSignal) {
+                try {
+                    const userId = await window.OneSignal.User.PushSubscription.id;
+                    if (userId) {
+                        playerId = userId;
+                    }
+                } catch (err) {
+                    // OneSignal not ready or not subscribed
+                }
+            }
+            
+            // Fallback: localStorage
+            if (!playerId) {
+                playerId = localStorage.getItem('fb_player_id');
+                if (!playerId) {
+                    playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+                    localStorage.setItem('fb_player_id', playerId);
+                }
+            }
+
+            // Save to backend
+            const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
+            const response = await fetch(`${BACKEND_URL}/api/reminder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    playerId,
+                    options: selectedOptions,
+                    matchData
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const count = Object.values(selectedOptions).filter(v => v).length;
+                setHasActiveNotifications(true);
+                setShowNotificationModal(false);
+                alert(`✅ ${count} bildirim ayarlandı!`);
+            } else {
+                alert('❌ Bir hata oluştu: ' + (data.error || 'Bilinmeyen hata'));
+            }
+        } catch (error) {
+            console.error('Error saving reminder:', error);
+            alert('❌ Backend bağlantı hatası: ' + error.message);
+        }
+    };
+
+    const notificationOptions = [
+        { 
+            id: 'threeHours', 
+            label: 'Maçtan 3 saat önce', 
+            description: 'Hazırlık yapmaya zamanın olsun'
+        },
+        { 
+            id: 'oneHour', 
+            label: 'Maçtan 1 saat önce', 
+            description: 'Heyecan zamanı!'
+        },
+        { 
+            id: 'thirtyMinutes', 
+            label: 'Maçtan 30 dakika önce', 
+            description: 'Son hazırlık'
+        },
+        { 
+            id: 'fifteenMinutes', 
+            label: 'Maçtan 15 dakika önce', 
+            description: 'Maç başlıyor!'
+        }
+    ];
+
     return (
         <div className="space-y-6 pb-20">
             {/* Hero Section: Next Match Card */}
@@ -44,9 +143,42 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                     <span className="text-xs font-bold tracking-wider text-yellow-400 uppercase bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20">
                         {matchData.tournament.name}
                     </span>
-                    <span className="text-xs text-slate-400 font-medium">
-                        {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
-                    </span>
+                    
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-400 font-medium">
+                            {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                        </span>
+                        
+                        {/* Bildirim İkonu */}
+                        <button
+                            onClick={() => setShowNotificationModal(true)}
+                            className={`relative p-2.5 rounded-full transition-all duration-300 group ${
+                                hasActiveNotifications 
+                                    ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]' 
+                                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110'
+                            }`}
+                            title="Bildirim ayarları"
+                        >
+                            {hasActiveNotifications ? (
+                                // Zil aktif (dolu)
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M10 20h4c0 1.1-.9 2-2 2s-2-.9-2-2zm8-6V9c0-3.07-1.64-5.64-4.5-6.32V2c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 3.36 6 5.92 6 9v5l-2 2v1h16v-1l-2-2z"/>
+                                </svg>
+                            ) : (
+                                // Zil kapalı (kontur)
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                            )}
+                            
+                            {/* Badge - Aktif bildirim sayısı */}
+                            {hasActiveNotifications && (
+                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse">
+                                    {Object.values(selectedOptions).filter(v => v).length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex items-center justify-between relative z-10">
@@ -153,6 +285,170 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                     )}
                 </div>
             </div>
+
+            {/* Bildirim Modal */}
+            {showNotificationModal && (
+                <div 
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn"
+                    onClick={() => setShowNotificationModal(false)}
+                >
+                    <div 
+                        className="glass-card rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <span className="text-2xl">🔔</span>
+                                    <span>Bildirim Ayarları</span>
+                                </h2>
+                                <p className="text-sm text-slate-400 mt-2">
+                                    Ne zaman hatırlatmak istersin?
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowNotificationModal(false)}
+                                className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Maç Bilgisi */}
+                        <div className="glass-panel rounded-xl p-4 mb-6 border border-yellow-400/20">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex flex-col gap-2">
+                                        <div className="w-10 h-10 rounded-full bg-white/5 p-2 flex-shrink-0">
+                                            <TeamLogo
+                                                teamId={FENERBAHCE_ID}
+                                                name="Fenerbahçe"
+                                                wrapperClassName="w-full h-full"
+                                                imageClassName="object-contain"
+                                            />
+                                        </div>
+                                        <div className="w-10 h-10 rounded-full bg-white/5 p-2 flex-shrink-0">
+                                            <TeamLogo
+                                                teamId={opponent.id}
+                                                name={opponent.name}
+                                                wrapperClassName="w-full h-full"
+                                                imageClassName="object-contain"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-yellow-400 font-semibold">
+                                            Fenerbahçe
+                                        </p>
+                                        <p className="text-[10px] text-slate-400">vs</p>
+                                        <p className="text-xs text-white font-semibold">
+                                            {opponent.name}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs text-slate-400">
+                                        {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
+                                    </p>
+                                    <p className="text-lg font-bold text-yellow-400">
+                                        {matchDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Seçenekler */}
+                        <div className="space-y-3 mb-6">
+                            {notificationOptions.map((option) => (
+                                <label
+                                    key={option.id}
+                                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
+                                        selectedOptions[option.id]
+                                            ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
+                                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                                    }`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedOptions[option.id]}
+                                        onChange={() => toggleOption(option.id)}
+                                        className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-semibold text-white">{option.label}</span>
+                                            {option.time && (
+                                                <span className="text-xs text-slate-400">({option.time})</span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-slate-400">{option.description}</p>
+                                    </div>
+                                </label>
+                            ))}
+
+                            {/* Günlük Kontrol - ÖZEL */}
+                            <div className="pt-3 border-t border-white/10">
+                                <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
+                                    selectedOptions.dailyCheck
+                                        ? 'bg-blue-400/20 border-blue-400 scale-[1.02]'
+                                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                                }`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedOptions.dailyCheck}
+                                        onChange={() => toggleOption('dailyCheck')}
+                                        className="mt-1 w-5 h-5 rounded border-2 border-blue-400 bg-transparent checked:bg-blue-400 cursor-pointer accent-blue-400"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-semibold text-white">Günlük Maç Kontrolü</span>
+                                            <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">ÖZEL</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400">
+                                            Her sabah 09:00'da kontrol et, o gün maç varsa bildir
+                                        </p>
+                                        <p className="text-[10px] text-blue-300/60 mt-1 italic">
+                                            * Tüm maçlar için geçerli (sadece bu maça özel değil)
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        {/* Seçim Özeti */}
+                        {Object.values(selectedOptions).some(v => v) && (
+                            <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4 animate-fadeIn">
+                                <p className="text-xs text-yellow-200 flex items-center gap-2">
+                                    <span className="text-lg">✨</span>
+                                    <span>
+                                        <strong className="text-yellow-400">{Object.values(selectedOptions).filter(v => v).length}</strong> bildirim seçtiniz
+                                    </span>
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Butonlar */}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowNotificationModal(false)}
+                                className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 font-medium border border-white/10 hover:border-white/20"
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={saveNotifications}
+                                className="flex-1 py-3 rounded-lg bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 transition-all duration-200 font-bold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105"
+                            >
+                                <span>Kaydet</span>
+                                <span className="text-lg">🔔</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
