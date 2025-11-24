@@ -12,6 +12,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Fenerbahçe Hub">
   <title>Fenerbahçe Fan Hub</title>
+  
+  <!-- OneSignal Web Push Notifications -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <script>
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    OneSignalDeferred.push(async function(OneSignal) {
+      await OneSignal.init({
+        appId: "25104d87-07ab-4c4c-b429-2f5f37d18cdb",
+        safari_web_id: "web.onesignal.auto.3a850f03-75f9-40a0-acb5-2bc8b318c823",
+        notifyButton: {
+          enable: true,
+        },
+      });
+    });
+  </script>
 </head>
 
 <body>
