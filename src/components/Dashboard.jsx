@@ -421,11 +421,8 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         {/* Seçim Özeti */}
                         {Object.values(selectedOptions).some(v => v) && (
                             <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4 animate-fadeIn">
-                                <p className="text-xs text-yellow-200 flex items-center gap-2">
-                                    <span className="text-lg">✨</span>
-                                    <span>
-                                        <strong className="text-yellow-400">{Object.values(selectedOptions).filter(v => v).length}</strong> bildirim seçtiniz
-                                    </span>
+                                <p className="text-xs text-yellow-200">
+                                    <strong className="text-yellow-400">{Object.values(selectedOptions).filter(v => v).length}</strong> bildirim seçtiniz
                                 </p>
                             </div>
                         )}

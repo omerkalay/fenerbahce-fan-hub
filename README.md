@@ -1,6 +1,6 @@
-# Fenerbahçe Fan Hub
+# Fenerbahçe Fan Hub 💛💙
 
-Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, squad management, formation builder, and full PWA (Progressive Web App) support.
+Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, squad management, formation builder, **push notifications**, and full PWA (Progressive Web App) support.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Visit_Site-yellow?style=for-the-badge)](https://omerkalay.com/fenerbahce-fan-hub/)
 
@@ -9,13 +9,27 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Vite](https://img.shields.io/badge/Vite-5.4.21-purple)
+![OneSignal](https://img.shields.io/badge/OneSignal-Push_Notifications-red)
 
 ## Features
 
 ### Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
+- **Push Notifications**: 💛💙 Real-time match reminders via OneSignal
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Premium UI**: Glassmorphic design with smooth animations
+
+### Push Notification System 🔔
+- **5 Notification Types**:
+  - 3 hours before match
+  - 1 hour before match
+  - 30 minutes before match
+  - 15 minutes before match
+  - Daily match check (09:00 TR every day)
+- **Smart Scheduling**: Automatic notification delivery via cron jobs
+- **OneSignal Integration**: Professional push notification service
+- **Cross-Platform**: Works on mobile & desktop (even when app is closed)
+- **Beautiful Format**: `💛💙 Fenerbahçe - Opponent | 20:45 · 1 saat kaldı`
 
 ### Formation Builder
 - **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
@@ -29,9 +43,10 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 - **Frontend**: React 19.2 + Vite 5.4
 - **Styling**: Tailwind CSS v4
-- **Backend**: Express.js with daily cron job
+- **Backend**: Express.js with cron jobs
 - **API**: SofaScore (via RapidAPI)
-- **Caching**: Backend cache (24h) + Service Worker
+- **Push Notifications**: OneSignal Web Push SDK
+- **Caching**: Backend in-memory cache + Service Worker
 - **PWA**: Installable app with offline support
 - **Deployment**: GitHub Pages (frontend) + Render (backend)
 
@@ -117,10 +132,18 @@ npm install
 Create `backend/.env` file:
 
 ```env
+# RapidAPI (Required)
 RAPIDAPI_KEY=your_rapidapi_key_here
 RAPIDAPI_HOST=sofascore.p.rapidapi.com
-PORT=3000
+
+# OneSignal (Required for push notifications)
+ONESIGNAL_APP_ID=your_onesignal_app_id
+ONESIGNAL_REST_API_KEY=your_onesignal_rest_api_key
+
+# Server Configuration
+PORT=3001
 CRON_SCHEDULE=0 6 * * *
+PUBLIC_BASE_URL=http://localhost:3001
 ```
 
 4. **Run backend server**
@@ -129,7 +152,39 @@ CRON_SCHEDULE=0 6 * * *
 npm start
 ```
 
-Backend will run on [http://localhost:3000](http://localhost:3000)
+Backend will run on [http://localhost:3001](http://localhost:3001)
+
+### OneSignal Setup (For Push Notifications)
+
+1. **Create OneSignal Account**
+   - Visit [https://onesignal.com/](https://onesignal.com/)
+   - Sign up for free account
+
+2. **Create Web App**
+   - Dashboard → New App/Project
+   - Select "Web" platform
+   - Enter **your site URL** (e.g., `https://yourusername.github.io`)
+
+3. **Get Credentials**
+   - Go to Settings → Keys & IDs
+   - Copy **App ID**
+   - Copy **REST API Key**
+
+4. **Add to Backend .env**
+   ```env
+   ONESIGNAL_APP_ID=your_app_id_here
+   ONESIGNAL_REST_API_KEY=your_rest_api_key_here
+   ```
+
+5. **Update Frontend**
+   - Edit `index.html` → Find OneSignal init code
+   - Replace `appId` with your App ID
+   - Replace `safari_web_id` if provided by OneSignal
+
+**Free Tier Limits:**
+- ✅ 10,000 subscribers
+- ✅ Unlimited notifications
+- ✅ Perfect for fan apps!
 
 ## Deployment
 
@@ -153,21 +208,33 @@ npm run deploy
 
 ### Backend (Render)
 
-The backend is deployed on Render with automatic daily data fetching.
+The backend is deployed on Render with automatic daily data fetching and push notification management.
 
 **Backend Architecture:**
 - Express.js server
-- Cron job (daily 06:00 TR time)
-- In-memory cache
+- **3 Cron Jobs**:
+  - Data fetch: `0 6 * * *` (06:00 TR daily)
+  - Notification check: `* * * * *` (every minute)
+  - Daily match check: `0 9 * * *` (09:00 TR daily)
+- In-memory cache for match/squad data
+- In-memory storage for notification reminders
+- OneSignal integration for push notifications
 - Image proxy for SofaScore photos
 - REST API endpoints
 
 **Environment Variables (Render):**
 
 ```env
-RAPIDAPI_KEY=your_api_key
+# RapidAPI
+RAPIDAPI_KEY=your_rapidapi_key
 RAPIDAPI_HOST=sofascore.p.rapidapi.com
-PORT=3000
+
+# OneSignal
+ONESIGNAL_APP_ID=your_onesignal_app_id
+ONESIGNAL_REST_API_KEY=your_onesignal_rest_api_key
+
+# Server
+PORT=3001
 CRON_SCHEDULE=0 6 * * *
 PUBLIC_BASE_URL=https://fenerbahce-backend.onrender.com
 ```
@@ -196,8 +263,11 @@ User Browser → Backend (Render) → SofaScore API
 - `GET /api/squad` - Team squad with player photos
 - `GET /api/player-image/:id` - Player photo proxy
 - `GET /api/team-image/:id` - Team logo proxy
-- `GET /api/health` - Backend health check
+- `GET /api/health` - Backend health check & reminder count
 - `GET /api/refresh` - Manual cache refresh
+- `POST /api/reminder` - Save notification preferences
+- `GET /api/reminder/:playerId` - Get user's reminders
+- `DELETE /api/reminder/:playerId/:matchId` - Delete reminder
 
 ## Design Features
 
@@ -212,26 +282,100 @@ User Browser → Backend (Render) → SofaScore API
 
 - **Installable**: Add to home screen on mobile and desktop
 - **Offline Support**: Service worker caching for API calls
+- **Push Notifications**: Work even when app is closed (via Service Worker)
 - **App-like Experience**: Standalone display mode
 - **Custom Icons**: Fenerbahçe-themed app icons
 - **Smart Caching**: NetworkFirst for API, CacheFirst for images
+
+## How Push Notifications Work
+
+### User Flow
+
+1. **First Visit**
+   - OneSignal SDK requests notification permission
+   - User grants permission → Unique `Player ID` is created
+   - Player ID is stored by OneSignal
+
+2. **User Sets Reminder**
+   - User clicks bell icon on match card
+   - Selects notification times (e.g., "1 hour before")
+   - Frontend sends: `{ playerId, options, matchData }` → Backend
+   - Backend saves reminder in memory
+
+3. **Backend Sends Notifications**
+   - **Every Minute**: Backend checks all reminders
+     - Is it 3 hours before match? → Send notification
+     - Is it 1 hour before? → Send notification
+     - Is it 30 minutes before? → Send notification
+     - Is it 15 minutes before? → Send notification
+   - **Every Day at 09:00 TR**: Check if today has a match
+     - If yes → Send "Bugün maç günü" notification
+
+4. **User Receives Notification**
+   - Notification appears on phone/desktop (native-like)
+   - Works even if:
+     - ✅ App is closed
+     - ✅ Browser is closed (PWA mode)
+     - ✅ Phone is locked
+   - Format: `💛💙 Fenerbahçe - Opponent | 20:45 · 1 saat kaldı`
+
+### Technical Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│  User Browser (PWA)                             │
+│  ├─ React App                                   │
+│  ├─ OneSignal SDK (get Player ID)              │
+│  └─ Service Worker (receive push notifications)│
+└─────────────────────────────────────────────────┘
+                    ↓ (save reminder)
+┌─────────────────────────────────────────────────┐
+│  Backend (Render)                               │
+│  ├─ Express API                                 │
+│  ├─ In-memory reminders storage                 │
+│  ├─ Cron: Check every minute                    │
+│  └─ Cron: Daily match check (09:00 TR)         │
+└─────────────────────────────────────────────────┘
+                    ↓ (send notification)
+┌─────────────────────────────────────────────────┐
+│  OneSignal Service                              │
+│  ├─ Manages Player IDs                          │
+│  ├─ Delivers push notifications                 │
+│  └─ Cross-platform (Web, Android, iOS)         │
+└─────────────────────────────────────────────────┘
+                    ↓
+          User's Device (Notification!)
+```
+
+### Cron Jobs
+
+| Schedule | Purpose | Timezone |
+|----------|---------|----------|
+| `0 6 * * *` | Fetch match/squad data from SofaScore | Europe/Istanbul |
+| `* * * * *` | Check and send match reminders | Europe/Istanbul |
+| `0 9 * * *` | Daily match check (Günlük Maç Kontrolü) | Europe/Istanbul |
 
 ## Environment Variables
 
 ### Backend (.env in backend/)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `RAPIDAPI_KEY` | RapidAPI key for SofaScore | Required |
-| `RAPIDAPI_HOST` | API host endpoint | `sofascore.p.rapidapi.com` |
-| `PORT` | Server port | `3000` |
-| `CRON_SCHEDULE` | Cron schedule for data fetch | `0 6 * * *` (06:00 daily) |
-| `PUBLIC_BASE_URL` | Backend URL for image proxying | Auto-detected |
-| `DISABLE_CRON` | Disable automatic cron job | `false` |
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `RAPIDAPI_KEY` | RapidAPI key for SofaScore | - | ✅ Yes |
+| `RAPIDAPI_HOST` | API host endpoint | `sofascore.p.rapidapi.com` | No |
+| `ONESIGNAL_APP_ID` | OneSignal App ID for push notifications | - | ✅ Yes |
+| `ONESIGNAL_REST_API_KEY` | OneSignal REST API Key | - | ✅ Yes |
+| `PORT` | Server port | `3001` | No |
+| `CRON_SCHEDULE` | Cron schedule for data fetch | `0 6 * * *` | No |
+| `PUBLIC_BASE_URL` | Backend URL for image proxying | Auto-detected | No |
+| `DISABLE_CRON` | Disable automatic data fetch cron | `false` | No |
 
-### Frontend (No .env needed)
+### Frontend (Hardcoded)
 
-Frontend connects directly to deployed backend at `https://fenerbahce-backend.onrender.com`
+- **Backend API URL**: `https://fenerbahce-backend.onrender.com` (in `src/services/api.js`)
+- **OneSignal App ID**: `25104d87-07ab-4c4c-b429-2f5f37d18cdb` (in `index.html`)
+
+No `.env` file needed for frontend.
 
 ## Development Scripts
 
@@ -248,15 +392,17 @@ npm run deploy       # Deploy to GitHub Pages
 ### Backend
 
 ```bash
-npm start            # Start backend server (localhost:3000)
+npm start            # Start backend server (localhost:3001)
 npm run dev          # Start backend (development mode)
 ```
 
 ## Known Issues & Limitations
 
 - SofaScore API has daily quota limits (mitigated by backend caching)
-- Backend cold starts on Render free tier (~1 minute on first request)
+- Backend cold starts on Render free tier (~30-60 seconds on first request)
 - Player photos depend on SofaScore availability
+- Notification reminders are stored in-memory (lost on backend restart)
+- For production, consider using a database (MongoDB, Redis) for reminder persistence
 
 ## Contributing
 
