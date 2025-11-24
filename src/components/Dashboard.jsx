@@ -4,12 +4,29 @@ import TeamLogo from './TeamLogo';
 const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
     const [showNotificationModal, setShowNotificationModal] = useState(false);
-    const [selectedOptions, setSelectedOptions] = useState({
-        threeHours: false,
-        oneHour: false,
-        thirtyMinutes: false,
-        fifteenMinutes: false,
-        dailyCheck: false
+    const [selectedOptions, setSelectedOptions] = useState(() => {
+        // localStorage'dan oku
+        const saved = localStorage.getItem('fb_notification_options');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                return {
+                    threeHours: false,
+                    oneHour: false,
+                    thirtyMinutes: false,
+                    fifteenMinutes: false,
+                    dailyCheck: false
+                };
+            }
+        }
+        return {
+            threeHours: false,
+            oneHour: false,
+            thirtyMinutes: false,
+            fifteenMinutes: false,
+            dailyCheck: false
+        };
     });
     const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
         // localStorage'dan oku
@@ -132,7 +149,8 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
             if (data.success) {
                 const count = Object.values(selectedOptions).filter(v => v).length;
                 setHasActiveNotifications(true);
-                localStorage.setItem('fb_has_notifications', 'true'); // localStorage'a kaydet
+                localStorage.setItem('fb_has_notifications', 'true');
+                localStorage.setItem('fb_notification_options', JSON.stringify(selectedOptions)); // Seçenekleri de kaydet
                 setShowNotificationModal(false);
                 alert(`✅ ${count} bildirim ayarlandı!`);
             } else {
