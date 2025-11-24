@@ -301,24 +301,22 @@ const FormationBuilder = () => {
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
                                         )}
-                                        {!isExporting && (
-                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center pointer-events-none group-hover:pointer-events-auto">
-                                                <button
-                                                    type="button"
-                                                    aria-label={`${player.name} pozisyonundan çıkar`}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        removePlayer(posKey);
-                                                    }}
-                                                    className="opacity-0 group-hover:opacity-100 md:group-hover:opacity-100 touch-manipulation active:opacity-100 transition-opacity pointer-events-auto"
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                    </svg>
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
+                                    {!isExporting && (
+                                        <button
+                                            type="button"
+                                            aria-label={`${player.name} pozisyonundan çıkar`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removePlayer(posKey);
+                                            }}
+                                            className="absolute top-0 right-0 w-4 h-4 rounded-full bg-slate-900/90 backdrop-blur-sm border border-slate-600/50 flex items-center justify-center shadow-md active:scale-90 transition-all z-20 hover:border-yellow-400/60 hover:bg-slate-800"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5 text-slate-400 group-hover:text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    )}
                                     <div className="mt-1 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] text-white font-medium truncate w-20 text-center border border-white/10 backdrop-blur-sm shadow-sm z-20">
                                         {player.name.split(' ').pop()}
                                     </div>
