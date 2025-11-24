@@ -1,5 +1,6 @@
-// Backend API URL (Render - Production)
+// Backend API URL - Use production for now (local backend has API issues)
 export const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
+// TODO: Fix local API issues and use: import.meta.env.DEV ? 'http://localhost:3001' : 'https://fenerbahce-backend.onrender.com'
 
 const ensureAbsolutePhoto = (player = {}) => {
     const fallbackPath = `/api/player-image/${player.id ?? ''}`;

@@ -28,6 +28,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
             dailyCheck: false
         };
     });
+    const [initialOptions, setInitialOptions] = useState({}); // Modal açıldığında başlangıç değerleri
     const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
         // localStorage'dan oku
         const saved = localStorage.getItem('fb_has_notifications');
@@ -84,81 +85,87 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     };
 
     const saveNotifications = async () => {
-        const hasSelection = Object.values(selectedOptions).some(val => val === true);
+        const count = Object.values(selectedOptions).filter(v => v).length;
         
-        if (!hasSelection) {
-            alert('❌ En az 1 seçenek işaretleyin!');
+        // OneSignal kontrolü
+        if (!window.OneSignal) {
+            alert('❌ Bildirim sistemi yükleniyor, lütfen birkaç saniye bekleyip tekrar deneyin.');
             return;
         }
 
         try {
-            // Request OneSignal Permission
-            if (window.OneSignal) {
-                try {
-                    const permission = await window.OneSignal.Notifications.permission;
-                    if (permission === false) {
-                        // Request permission
-                        const result = await window.OneSignal.Notifications.requestPermission();
-                        if (!result) {
-                            alert('⚠️ Bildirim izni verilmedi. Lütfen tarayıcı ayarlarından bildirimlere izin verin.');
-                            return;
-                        }
-                    }
-                } catch (err) {
-                    console.error('OneSignal permission error:', err);
-                }
-            }
-
-            // Get OneSignal Player ID
+            // 1. Player ID'yi al (OneSignal subscription ID)
             let playerId = null;
             
-            if (window.OneSignal) {
-                try {
-                    const userId = await window.OneSignal.User.PushSubscription.id;
-                    if (userId) {
-                        playerId = userId;
-                    }
-                } catch (err) {
-                    // OneSignal not ready or not subscribed
-                }
+            try {
+                playerId = await window.OneSignal.User.PushSubscription.id;
+            } catch (err) {
+                console.error('Player ID alınamadı:', err);
             }
-            
-            // Fallback: localStorage
+
+            // Player ID yoksa (henüz subscribe olmamış)
             if (!playerId) {
-                playerId = localStorage.getItem('fb_player_id');
+                // Bildirim izni iste
+                const permission = await window.OneSignal.Notifications.permission;
+                
+                if (permission === false) {
+                    const granted = await window.OneSignal.Notifications.requestPermission();
+                    if (!granted) {
+                        alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
+                        return;
+                    }
+                    
+                    // İzin verildikten sonra Player ID'yi tekrar al
+                    playerId = await window.OneSignal.User.PushSubscription.id;
+                }
+                
                 if (!playerId) {
-                    playerId = 'player_' + Math.random().toString(36).substr(2, 9);
-                    localStorage.setItem('fb_player_id', playerId);
+                    alert('❌ OneSignal bağlantısı kurulamadı. Lütfen sayfayı yenileyin ve tekrar deneyin.');
+                    return;
                 }
             }
 
-            // Save to backend
+            // 2. Backend'e KAYDET (count === 0 olsa bile!)
             const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
             const response = await fetch(`${BACKEND_URL}/api/reminder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     playerId,
-                    options: selectedOptions,
-                    matchData
+                    matchId: matchData.id, // Sadece matchId gönder (backend cache'den alır)
+                    options: selectedOptions
                 })
             });
+
+            if (!response.ok) {
+                throw new Error(`Backend hatası: ${response.status}`);
+            }
 
             const data = await response.json();
 
             if (data.success) {
-                const count = Object.values(selectedOptions).filter(v => v).length;
-                setHasActiveNotifications(true);
-                localStorage.setItem('fb_has_notifications', 'true');
-                localStorage.setItem('fb_notification_options', JSON.stringify(selectedOptions)); // Seçenekleri de kaydet
+                // 3. Başarılı! localStorage güncelle
+                if (count === 0) {
+                    // Tüm bildirimler temizlendi
+                    setHasActiveNotifications(false);
+                    localStorage.removeItem('fb_has_notifications');
+                    localStorage.removeItem('fb_notification_options');
+                    alert('✅ Tüm bildirimler temizlendi!');
+                } else {
+                    // Bildirimler ayarlandı
+                    setHasActiveNotifications(true);
+                    localStorage.setItem('fb_has_notifications', 'true');
+                    localStorage.setItem('fb_notification_options', JSON.stringify(selectedOptions));
+                    alert(`✅ ${count} bildirim ayarlandı!`);
+                }
+                
                 setShowNotificationModal(false);
-                alert(`✅ ${count} bildirim ayarlandı!`);
             } else {
                 alert('❌ Bir hata oluştu: ' + (data.error || 'Bilinmeyen hata'));
             }
         } catch (error) {
-            console.error('Error saving reminder:', error);
-            alert('❌ Backend bağlantı hatası: ' + error.message);
+            console.error('Bildirim kaydetme hatası:', error);
+            alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
         }
     };
 
@@ -203,7 +210,10 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         
                         {/* Bildirim İkonu */}
                         <button
-                            onClick={() => setShowNotificationModal(true)}
+                            onClick={() => {
+                                setInitialOptions({...selectedOptions}); // Başlangıç değerlerini kaydet
+                                setShowNotificationModal(true);
+                            }}
                             className={`relative p-2.5 rounded-full transition-all duration-300 group ${
                                 hasActiveNotifications 
                                     ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]' 
@@ -224,11 +234,14 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                             )}
                             
                             {/* Badge - Aktif bildirim sayısı */}
-                            {hasActiveNotifications && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse">
-                                    {Object.values(selectedOptions).filter(v => v).length}
-                                </span>
-                            )}
+                            {(() => {
+                                const count = Object.values(selectedOptions).filter(v => v).length;
+                                return hasActiveNotifications && count > 0 && (
+                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse">
+                                        {count}
+                                    </span>
+                                );
+                            })()}
                         </button>
                     </div>
                 </div>
@@ -491,7 +504,12 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                             </button>
                             <button
                                 onClick={saveNotifications}
-                                className="flex-1 py-3 rounded-lg bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 transition-all duration-200 font-bold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105"
+                                disabled={JSON.stringify(selectedOptions) === JSON.stringify(initialOptions)}
+                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${
+                                    JSON.stringify(selectedOptions) === JSON.stringify(initialOptions)
+                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                        : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'
+                                }`}
                             >
                                 Kaydet
                             </button>
