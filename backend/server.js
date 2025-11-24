@@ -325,6 +325,7 @@ async function sendNotification(playerId, matchData, type, timeText) {
                     include_player_ids: [playerId],
                     headings: { tr: heading, en: heading },
                     contents: { tr: message, en: message },
+                    url: 'https://omerkalay.com/fenerbahce-fan-hub/',
                     priority: 10,
                     ttl: 86400, // 24 hours
                     data: {
