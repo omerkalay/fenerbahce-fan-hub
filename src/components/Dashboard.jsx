@@ -316,9 +316,8 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         {/* Header */}
                         <div className="flex justify-between items-start mb-6">
                             <div>
-                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                    <span className="text-2xl">🔔</span>
-                                    <span>Bildirim Ayarları</span>
+                                <h2 className="text-xl font-bold text-white">
+                                    Bildirim Ayarları
                                 </h2>
                                 <p className="text-sm text-slate-400 mt-2">
                                     Ne zaman hatırlatmak istersin?
@@ -456,8 +455,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                                 onClick={saveNotifications}
                                 className="flex-1 py-3 rounded-lg bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 transition-all duration-200 font-bold flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105"
                             >
-                                <span>Kaydet</span>
-                                <span className="text-lg">🔔</span>
+                                Kaydet
                             </button>
                         </div>
                     </div>
