@@ -1,11 +1,54 @@
 const express = require('express');
 const cron = require('node-cron');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// CORS Configuration - Only allow specific origins
+const allowedOrigins = [
+    'https://omerkalay.com',
+    'https://www.omerkalay.com',
+    'https://omerkalay.github.io',
+    'http://localhost:5173', // Dev mode
+    'http://localhost:3000'  // Dev mode
+];
+
+app.use(cors({
+    origin: function(origin, callback) {
+        // Allow requests with no origin (mobile apps, Postman, etc.)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
+
+// Rate Limiting - Prevent DDOS attacks
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
+    standardHeaders: true, // Return rate limit info in headers
+    legacyHeaders: false,
+});
+
+// Stricter rate limit for POST endpoints (like /api/reminder)
+const strictLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20, // Limit each IP to 20 POST requests per windowMs
+    message: 'Too many requests, please try again later.',
+});
+
+// Apply rate limiting to all requests
+app.use(limiter);
+
+app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
 
 // Cache for API data
 let cache = {
@@ -282,7 +325,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // POST /api/reminder - Save user notification preferences
-app.post('/api/reminder', (req, res) => {
+app.post('/api/reminder', strictLimiter, (req, res) => {
     const { playerId, options, matchData } = req.body;
 
     if (!playerId || !options || !matchData) {

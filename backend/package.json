@@ -20,6 +20,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "express-rate-limit": "^7.1.5",
     "node-cron": "^4.2.1",
     "onesignal-node": "^3.4.0"
   }
