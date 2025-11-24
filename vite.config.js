@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: 'autoUpdate',
       includeAssets: ['pwa-192.png', 'pwa-512.png', 'pwa-maskable.png', 'vite.svg'],
       manifest: {
         name: 'Fenerbahçe Fan Hub',
