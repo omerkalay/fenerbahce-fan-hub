@@ -1,27 +1,87 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
 import { fetchNextMatch, fetchNext3Matches } from './services/api';
 
+const readCachedMatchData = () => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('fb_last_match');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn('fb_last_match parse error:', err);
+    return null;
+  }
+};
+
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [matchData, setMatchData] = useState(null);
-  const [next3Matches, setNext3Matches] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cachedData = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    return readCachedMatchData();
+  }, []);
+  const [matchData, setMatchData] = useState(cachedData?.nextMatch ?? null);
+  const [next3Matches, setNext3Matches] = useState(cachedData?.next3Matches ?? []);
+  const [lastUpdated, setLastUpdated] = useState(cachedData?.timestamp ?? null);
+  const [loading, setLoading] = useState(!cachedData);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
+  useEffect(() => {
+    hasDataRef.current = Boolean(matchData);
+  }, [matchData]);
 
   // Fetch match data once when app loads
-  useEffect(() => {
-    const loadMatchData = async () => {
+  const loadMatchData = useCallback(async () => {
+    const hasCached = hasDataRef.current;
+    setErrorMessage(null);
+    if (hasCached) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
       const [nextMatch, upcomingMatches] = await Promise.all([
         fetchNextMatch(),
         fetchNext3Matches()
       ]);
-      setMatchData(nextMatch);
-      setNext3Matches(upcomingMatches);
+
+      const normalizedUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches : [];
+      setNext3Matches(normalizedUpcoming);
+
+      if (nextMatch) {
+        setMatchData(nextMatch);
+        const payload = {
+          nextMatch,
+          next3Matches: normalizedUpcoming,
+          timestamp: Date.now()
+        };
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fb_last_match', JSON.stringify(payload));
+        }
+
+        setLastUpdated(payload.timestamp);
+      } else {
+        setMatchData(null);
+        setErrorMessage('Maç verisi alınamadı. Lütfen bağlantını kontrol edip tekrar dene.');
+      }
+    } catch (err) {
+      console.error('loadMatchData error:', err);
+      setMatchData(null);
+      setNext3Matches([]);
+      setErrorMessage('Beklenmeyen bir hata oluştu. Tekrar dene veya biraz sonra gel.');
+    } finally {
       setLoading(false);
-    };
-    loadMatchData();
+      setIsRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadMatchData();
+  }, [loadMatchData]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-24 relative overflow-hidden">
@@ -49,7 +109,17 @@ function App() {
 
         {/* Main Content */}
         <main className="flex-1 px-4 overflow-y-auto no-scrollbar">
-          {activeTab === 'dashboard' && <Dashboard matchData={matchData} next3Matches={next3Matches} loading={loading} />}
+          {activeTab === 'dashboard' && (
+            <Dashboard
+              matchData={matchData}
+              next3Matches={next3Matches}
+              loading={loading && !matchData}
+              onRetry={loadMatchData}
+              errorMessage={errorMessage}
+              lastUpdated={lastUpdated}
+              isRefreshing={isRefreshing}
+            />
+          )}
           {activeTab === 'builder' && <FormationBuilder />}
         </main>
 

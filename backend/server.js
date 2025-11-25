@@ -61,7 +61,7 @@ let cache = {
 // Notification system storage (in-memory)
 // Time-based reminders: per match, per player
 let matchReminders = [];
-// Format: { playerId, matchId, options: {threeHours, oneHour, ...}, createdAt, sentNotifications: [] }
+// Format: { playerId, matchId, options, createdAt, sentNotifications, scheduledNotifications }
 
 // Daily check subscribers: not tied to a specific match
 let dailyCheckSubscribers = new Set();
@@ -70,6 +70,30 @@ let dailyCheckSubscribers = new Set();
 // Track sent daily notifications to prevent duplicates
 let sentDailyNotifications = new Map();
 // Format: Map(playerId => { matchId, date })
+
+const USE_ONESIGNAL_SCHEDULER = process.env.USE_ONESIGNAL_SCHEDULER !== 'false';
+const MATCH_NOTIFICATION_CONFIG = {
+    threeHours: {
+        offsetMs: 3 * 60 * 60 * 1000,
+        timeText: '3 saat kaldı',
+        badge: '⏳ 3 Saat'
+    },
+    oneHour: {
+        offsetMs: 1 * 60 * 60 * 1000,
+        timeText: '1 saat kaldı',
+        badge: '⌛️ 1 Saat'
+    },
+    thirtyMinutes: {
+        offsetMs: 30 * 60 * 1000,
+        timeText: '30 dakika kaldı',
+        badge: '🕒 30dk'
+    },
+    fifteenMinutes: {
+        offsetMs: 15 * 60 * 1000,
+        timeText: '15 dakika kaldı',
+        badge: '⚡️ 15dk'
+    }
+};
 
 const FENERBAHCE_ID = 3052;
 const API_KEY = process.env.RAPIDAPI_KEY;
@@ -162,14 +186,18 @@ if (ENABLE_CRON) {
     console.log('⚠️ Cron disabled via DISABLE_CRON env');
 }
 
-// Cron job: Check and send notifications every minute
-try {
-    cron.schedule('* * * * *', () => {
-        checkAndSendNotifications();
-    });
-    console.log('✅ Notification check cron scheduled: Every minute (UTC)');
-} catch (error) {
-    console.error('❌ Notification cron error:', error.message);
+// Cron job: Check and send notifications every minute (legacy fallback)
+if (!USE_ONESIGNAL_SCHEDULER) {
+    try {
+        cron.schedule('* * * * *', () => {
+            checkAndSendNotifications();
+        });
+        console.log('✅ Notification check cron scheduled: Every minute (UTC)');
+    } catch (error) {
+        console.error('❌ Notification cron error:', error.message);
+    }
+} else {
+    console.log('ℹ️ Legacy match reminder cron disabled (using OneSignal scheduling)');
 }
 
 // Function to check and send notifications
@@ -207,7 +235,7 @@ function checkAndSendNotifications() {
         // Check each notification type (1-minute window)
         if (options.threeHours && !sentNotifications.includes('threeHours')) {
             if (timeDiff <= threeHoursInMs && timeDiff > (threeHoursInMs - 60000)) {
-                sendNotification(playerId, matchData, 'threeHours', '3 saat kaldı');
+                sendNotification({ playerId, matchData, type: 'threeHours', timeText: '3 saat kaldı' });
                 sentNotifications.push('threeHours');
                 console.log(`✅ Sent 3h reminder to ${playerId} for match ${matchId}`);
             }
@@ -215,7 +243,7 @@ function checkAndSendNotifications() {
         
         if (options.oneHour && !sentNotifications.includes('oneHour')) {
             if (timeDiff <= oneHourInMs && timeDiff > (oneHourInMs - 60000)) {
-                sendNotification(playerId, matchData, 'oneHour', '1 saat kaldı');
+                sendNotification({ playerId, matchData, type: 'oneHour', timeText: '1 saat kaldı' });
                 sentNotifications.push('oneHour');
                 console.log(`✅ Sent 1h reminder to ${playerId} for match ${matchId}`);
             }
@@ -223,7 +251,7 @@ function checkAndSendNotifications() {
         
         if (options.thirtyMinutes && !sentNotifications.includes('thirtyMinutes')) {
             if (timeDiff <= thirtyMinInMs && timeDiff > (thirtyMinInMs - 60000)) {
-                sendNotification(playerId, matchData, 'thirtyMinutes', '30 dakika kaldı');
+                sendNotification({ playerId, matchData, type: 'thirtyMinutes', timeText: '30 dakika kaldı' });
                 sentNotifications.push('thirtyMinutes');
                 console.log(`✅ Sent 30min reminder to ${playerId} for match ${matchId}`);
             }
@@ -231,7 +259,7 @@ function checkAndSendNotifications() {
         
         if (options.fifteenMinutes && !sentNotifications.includes('fifteenMinutes')) {
             if (timeDiff <= fifteenMinInMs && timeDiff > (fifteenMinInMs - 60000)) {
-                sendNotification(playerId, matchData, 'fifteenMinutes', '15 dakika kaldı');
+                sendNotification({ playerId, matchData, type: 'fifteenMinutes', timeText: '15 dakika kaldı' });
                 sentNotifications.push('fifteenMinutes');
                 console.log(`✅ Sent 15min reminder to ${playerId} for match ${matchId}`);
             }
@@ -275,12 +303,12 @@ try {
                 }
                 
                 // Send notification
-                sendNotification(
-                    playerId, 
-                    cache.nextMatch, 
-                    'dailyCheck', 
-                    'Bugün maç günü'
-                );
+                sendNotification({
+                    playerId,
+                    matchData: cache.nextMatch,
+                    type: 'dailyCheck',
+                    timeText: 'Bugün maç günü'
+                });
                 
                 // Record that we sent this notification
                 sentDailyNotifications.set(playerId, {
@@ -300,7 +328,7 @@ try {
 }
 
 // Send notification function with OneSignal REST API
-async function sendNotification(playerId, matchData, type, timeText) {
+async function sendNotification({ playerId, matchData, type, timeText, sendAfter = null, externalId = null }) {
     const FENERBAHCE_ID = 3052;
     const isHome = matchData.homeTeam?.id === FENERBAHCE_ID;
     const opponent = isHome ? matchData.awayTeam?.name : matchData.homeTeam?.name;
@@ -314,26 +342,36 @@ async function sendNotification(playerId, matchData, type, timeText) {
     // OneSignal REST API integration (modern approach)
     if (process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY) {
         try {
+            const body = {
+                app_id: process.env.ONESIGNAL_APP_ID,
+                include_player_ids: [playerId],
+                headings: { tr: heading, en: heading },
+                contents: { tr: message, en: message },
+                url: 'https://omerkalay.com/fenerbahce-fan-hub/',
+                priority: 10,
+                ttl: 86400, // 24 hours
+                data: {
+                    matchId: matchData.id,
+                    type: type,
+                    tournament: matchData.tournament?.name
+                }
+            };
+
+            if (sendAfter) {
+                body.send_after = new Date(sendAfter).toUTCString();
+            }
+
+            if (externalId) {
+                body.external_id = externalId;
+            }
+
             const response = await fetch('https://onesignal.com/api/v1/notifications', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
                 },
-                body: JSON.stringify({
-                    app_id: process.env.ONESIGNAL_APP_ID,
-                    include_player_ids: [playerId],
-                    headings: { tr: heading, en: heading },
-                    contents: { tr: message, en: message },
-                    url: 'https://omerkalay.com/fenerbahce-fan-hub/',
-                    priority: 10,
-                    ttl: 86400, // 24 hours
-                    data: {
-                        matchId: matchData.id,
-                        type: type,
-                        tournament: matchData.tournament?.name
-                    }
-                })
+                body: JSON.stringify(body)
             });
             
             if (!response.ok) {
@@ -343,13 +381,97 @@ async function sendNotification(playerId, matchData, type, timeText) {
             }
             
             const result = await response.json();
-            console.log(`📢 Notification sent to player ${playerId}: ${heading} - ${message} (recipients: ${result.recipients})`);
+            const scheduleInfo = sendAfter ? `scheduled for ${new Date(sendAfter).toISOString()}` : 'sent immediately';
+            console.log(`📢 Notification queued for player ${playerId}: ${heading} - ${message} (${scheduleInfo}, recipients: ${result.recipients})`);
+            return result;
         } catch (err) {
             console.error('❌ OneSignal notification error:', err.message);
+            throw err;
         }
     } else {
-        console.log(`📢 [TEST MODE] ${heading}\n${message} (Player: ${playerId}, Type: ${type})`);
+        const scheduleInfo = sendAfter ? `Scheduled at ${new Date(sendAfter).toISOString()}` : 'Immediate';
+        console.log(`📢 [TEST MODE] ${heading}\n${message} (Player: ${playerId}, Type: ${type}, ${scheduleInfo})`);
+        return { id: `test-${Date.now()}`, recipients: 1 };
     }
+}
+
+async function scheduleMatchNotification(playerId, matchData, optionKey) {
+    if (!USE_ONESIGNAL_SCHEDULER) {
+        return null;
+    }
+
+    const config = MATCH_NOTIFICATION_CONFIG[optionKey];
+
+    if (!config) {
+        console.warn(`⚠️ Unknown notification option: ${optionKey}`);
+        return null;
+    }
+
+    const matchTime = new Date(matchData.startTimestamp * 1000);
+    const sendAfter = new Date(matchTime.getTime() - config.offsetMs);
+
+    if (sendAfter.getTime() <= Date.now()) {
+        console.warn(`⏭️ Skipping ${optionKey} schedule for ${playerId}, send time already passed (${sendAfter.toISOString()})`);
+        return null;
+    }
+
+    const externalId = `${matchData.id}-${playerId}-${optionKey}`;
+
+    const result = await sendNotification({
+        playerId,
+        matchData,
+        type: optionKey,
+        timeText: config.timeText,
+        sendAfter,
+        externalId
+    });
+
+    return {
+        notificationId: result?.id,
+        sendAfter: sendAfter.toISOString(),
+        optionKey,
+        externalId
+    };
+}
+
+async function cancelScheduledNotification(notificationId) {
+    if (!notificationId) {
+        return;
+    }
+
+    if (!(process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY)) {
+        console.warn('⚠️ Cannot cancel OneSignal notification: missing credentials');
+        return;
+    }
+
+    try {
+        const url = `https://onesignal.com/api/v1/notifications/${notificationId}?app_id=${process.env.ONESIGNAL_APP_ID}`;
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
+            }
+        });
+
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            console.error(`❌ Failed to cancel OneSignal notification ${notificationId}`, err);
+        } else {
+            console.log(`🗑️ Cancelled OneSignal notification ${notificationId}`);
+        }
+    } catch (error) {
+        console.error(`❌ Error cancelling OneSignal notification ${notificationId}`, error.message);
+    }
+}
+
+async function cancelReminderSchedules(reminder) {
+    if (!reminder?.scheduledNotifications) return;
+
+    const cancellationPromises = Object.values(reminder.scheduledNotifications)
+        .filter(entry => entry?.notificationId)
+        .map(entry => cancelScheduledNotification(entry.notificationId));
+
+    await Promise.allSettled(cancellationPromises);
 }
 
 // Initial fetch on server start
@@ -405,7 +527,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // POST /api/reminder - Save user notification preferences
-app.post('/api/reminder', strictLimiter, (req, res) => {
+app.post('/api/reminder', strictLimiter, async (req, res) => {
     const { playerId, matchId, options } = req.body;
 
     if (!playerId || !options) {
@@ -413,9 +535,10 @@ app.post('/api/reminder', strictLimiter, (req, res) => {
     }
 
     // Validate that matchId exists in cache (if provided)
+    let matchData = null;
     if (matchId) {
-        const matchExists = cache.next3Matches.some(m => m.id === matchId);
-        if (!matchExists) {
+        matchData = cache.next3Matches.find(m => m.id === matchId);
+        if (!matchData) {
             return res.status(400).json({ error: 'Invalid matchId - match not found in cache' });
         }
     }
@@ -430,16 +553,49 @@ app.post('/api/reminder', strictLimiter, (req, res) => {
     }
 
     // Handle time-based reminders (if matchId provided)
+    const responseMeta = {
+        scheduledCount: 0,
+        scheduledOptions: [],
+        skippedOptions: [],
+        schedulerEnabled: USE_ONESIGNAL_SCHEDULER
+    };
+
     if (matchId) {
         // Check if reminder already exists for this player and match
         const existingIndex = matchReminders.findIndex(r => 
             r.playerId === playerId && r.matchId === matchId
         );
+        const existingReminder = existingIndex >= 0 ? matchReminders[existingIndex] : null;
 
         const hasTimeBasedOptions = options.threeHours || options.oneHour || 
                                      options.thirtyMinutes || options.fifteenMinutes;
 
+        if (existingReminder) {
+            await cancelReminderSchedules(existingReminder);
+        }
+
         if (hasTimeBasedOptions) {
+            const scheduledNotifications = {};
+
+            if (USE_ONESIGNAL_SCHEDULER && matchData) {
+                for (const optionKey of Object.keys(MATCH_NOTIFICATION_CONFIG)) {
+                    if (!options[optionKey]) continue;
+                    try {
+                        const scheduled = await scheduleMatchNotification(playerId, matchData, optionKey);
+                        if (scheduled) {
+                            scheduledNotifications[optionKey] = scheduled;
+                            responseMeta.scheduledCount += 1;
+                            responseMeta.scheduledOptions.push(optionKey);
+                        } else {
+                            responseMeta.skippedOptions.push(optionKey);
+                        }
+                    } catch (error) {
+                        console.error(`❌ Failed to schedule ${optionKey} for ${playerId}`, error.message);
+                        responseMeta.skippedOptions.push(optionKey);
+                    }
+                }
+            }
+
             const reminder = {
                 playerId,
                 matchId,
@@ -450,7 +606,8 @@ app.post('/api/reminder', strictLimiter, (req, res) => {
                     fifteenMinutes: options.fifteenMinutes || false
                 },
                 createdAt: new Date(),
-                sentNotifications: []
+                sentNotifications: existingReminder?.sentNotifications || [],
+                scheduledNotifications
             };
 
             if (existingIndex >= 0) {
@@ -474,7 +631,8 @@ app.post('/api/reminder', strictLimiter, (req, res) => {
         message: 'Notification preferences saved',
         activeCount,
         dailyCheckActive: dailyCheckSubscribers.has(playerId),
-        matchReminderActive: matchId ? matchReminders.some(r => r.playerId === playerId && r.matchId === matchId) : false
+        matchReminderActive: matchId ? matchReminders.some(r => r.playerId === playerId && r.matchId === matchId) : false,
+        schedule: responseMeta
     });
 });
 
@@ -491,10 +649,13 @@ app.get('/api/reminder/:playerId', (req, res) => {
 });
 
 // DELETE /api/reminder/:playerId - Delete ALL reminders for a player
-app.delete('/api/reminder/:playerId', (req, res) => {
+app.delete('/api/reminder/:playerId', async (req, res) => {
     const { playerId } = req.params;
     const initialLength = matchReminders.length;
-    
+
+    const remindersToDelete = matchReminders.filter(r => r.playerId === playerId);
+    await Promise.allSettled(remindersToDelete.map(reminder => cancelReminderSchedules(reminder)));
+
     matchReminders = matchReminders.filter(r => r.playerId !== playerId);
     dailyCheckSubscribers.delete(playerId);
     sentDailyNotifications.delete(playerId);
@@ -508,10 +669,18 @@ app.delete('/api/reminder/:playerId', (req, res) => {
 });
 
 // DELETE /api/reminder/:playerId/:matchId - Delete a specific match reminder
-app.delete('/api/reminder/:playerId/:matchId', (req, res) => {
+app.delete('/api/reminder/:playerId/:matchId', async (req, res) => {
     const { playerId, matchId } = req.params;
     const initialLength = matchReminders.length;
-    
+
+    const targetReminder = matchReminders.find(r => r.playerId === playerId && r.matchId == matchId);
+
+    if (!targetReminder) {
+        return res.status(404).json({ error: 'Match reminder not found' });
+    }
+
+    await cancelReminderSchedules(targetReminder);
+
     matchReminders = matchReminders.filter(r => !(r.playerId === playerId && r.matchId == matchId));
     
     if (matchReminders.length < initialLength) {

@@ -14,7 +14,15 @@ const normalizeOptions = (options = {}) => ({
     ...options
 });
 
-const Dashboard = ({ matchData, next3Matches = [], loading }) => {
+const Dashboard = ({
+    matchData,
+    next3Matches = [],
+    loading,
+    onRetry,
+    errorMessage,
+    lastUpdated,
+    isRefreshing
+}) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
     const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [selectedOptions, setSelectedOptions] = useState(() => {
@@ -71,7 +79,24 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     }, [showNotificationModal]);
 
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
-    if (!matchData) return <div className="text-center text-slate-400 mt-10">Maç bilgisi bulunamadı.</div>;
+    if (!matchData) {
+        return (
+            <div className="text-center text-slate-400 mt-10 space-y-4">
+                <p>Maç bilgisi bulunamadı.</p>
+                {errorMessage && (
+                    <p className="text-sm text-slate-300">{errorMessage}</p>
+                )}
+                {onRetry && (
+                    <button
+                        onClick={onRetry}
+                        className="px-4 py-2 rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/30 hover:bg-yellow-400 hover:text-black transition-colors"
+                    >
+                        Tekrar Dene
+                    </button>
+                )}
+            </div>
+        );
+    }
 
     const matchDate = new Date(matchData.startTimestamp * 1000);
     const FENERBAHCE_ID = 3052;
@@ -261,6 +286,13 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         </button>
                     </div>
                 </div>
+
+                {lastUpdated && (
+                    <p className="text-[10px] text-slate-500 text-center mb-2 flex items-center justify-center gap-2">
+                        <span>Son güncelleme: {new Date(lastUpdated).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
+                        {isRefreshing && <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse"></span>}
+                    </p>
+                )}
 
                 <div className="flex items-center justify-between relative z-10">
                     <div className="flex flex-col items-center gap-3 w-1/3">
