@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
 
+const createEmptyOptions = () => ({
+    threeHours: false,
+    oneHour: false,
+    thirtyMinutes: false,
+    fifteenMinutes: false,
+    dailyCheck: false
+});
+
+const normalizeOptions = (options = {}) => ({
+    ...createEmptyOptions(),
+    ...options
+});
+
 const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
     const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -9,26 +22,14 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
         const saved = localStorage.getItem('fb_notification_options');
         if (saved) {
             try {
-                return JSON.parse(saved);
-            } catch (e) {
-                return {
-                    threeHours: false,
-                    oneHour: false,
-                    thirtyMinutes: false,
-                    fifteenMinutes: false,
-                    dailyCheck: false
-                };
+                return normalizeOptions(JSON.parse(saved));
+            } catch {
+                return createEmptyOptions();
             }
         }
-        return {
-            threeHours: false,
-            oneHour: false,
-            thirtyMinutes: false,
-            fifteenMinutes: false,
-            dailyCheck: false
-        };
+        return createEmptyOptions();
     });
-    const [initialOptions, setInitialOptions] = useState({}); // Modal açıldığında başlangıç değerleri
+    const [draftOptions, setDraftOptions] = useState(null); // Modal içinde düzenlenen taslak değerler
     const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
         // localStorage'dan oku
         const saved = localStorage.getItem('fb_has_notifications');
@@ -78,14 +79,18 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
 
     const toggleOption = (optionId) => {
-        setSelectedOptions(prev => ({
-            ...prev,
-            [optionId]: !prev[optionId]
-        }));
+        setDraftOptions(prev => {
+            const base = prev ?? selectedOptions;
+            return {
+                ...base,
+                [optionId]: !base?.[optionId]
+            };
+        });
     };
 
     const saveNotifications = async () => {
-        const count = Object.values(selectedOptions).filter(v => v).length;
+        const optionsToSave = normalizeOptions(currentDraftOptions);
+        const count = Object.values(optionsToSave).filter(v => v).length;
         
         // OneSignal kontrolü
         if (!window.OneSignal) {
@@ -133,7 +138,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                 body: JSON.stringify({
                     playerId,
                     matchId: matchData.id, // Sadece matchId gönder (backend cache'den alır)
-                    options: selectedOptions
+                    options: optionsToSave
                 })
             });
 
@@ -155,10 +160,12 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                     // Bildirimler ayarlandı
                     setHasActiveNotifications(true);
                     localStorage.setItem('fb_has_notifications', 'true');
-                    localStorage.setItem('fb_notification_options', JSON.stringify(selectedOptions));
+                    localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
                     alert(`✅ ${count} bildirim ayarlandı!`);
                 }
                 
+                setSelectedOptions(optionsToSave);
+                setDraftOptions(null);
                 setShowNotificationModal(false);
             } else {
                 alert('❌ Bir hata oluştu: ' + (data.error || 'Bilinmeyen hata'));
@@ -192,6 +199,21 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
         }
     ];
 
+    const handleOpenNotificationModal = () => {
+        setDraftOptions({ ...selectedOptions });
+        setShowNotificationModal(true);
+    };
+
+    const handleCloseNotificationModal = () => {
+        setDraftOptions(null);
+        setShowNotificationModal(false);
+    };
+
+    const currentDraftOptions = draftOptions ?? selectedOptions;
+    const hasDraftChanges = JSON.stringify(currentDraftOptions) !== JSON.stringify(selectedOptions);
+    const draftSelectionCount = Object.values(currentDraftOptions).filter(Boolean).length;
+    const savedSelectionCount = Object.values(selectedOptions).filter(Boolean).length;
+
     return (
         <div className="space-y-6 pb-20">
             {/* Hero Section: Next Match Card */}
@@ -210,10 +232,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         
                         {/* Bildirim İkonu */}
                         <button
-                            onClick={() => {
-                                setInitialOptions({...selectedOptions}); // Başlangıç değerlerini kaydet
-                                setShowNotificationModal(true);
-                            }}
+                            onClick={handleOpenNotificationModal}
                             className={`relative p-2.5 rounded-full transition-all duration-300 group ${
                                 hasActiveNotifications 
                                     ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]' 
@@ -234,14 +253,11 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                             )}
                             
                             {/* Badge - Aktif bildirim sayısı */}
-                            {(() => {
-                                const count = Object.values(selectedOptions).filter(v => v).length;
-                                return hasActiveNotifications && count > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse">
-                                        {count}
-                                    </span>
-                                );
-                            })()}
+                            {hasActiveNotifications && savedSelectionCount > 0 && (
+                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse">
+                                    {savedSelectionCount}
+                                </span>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -355,7 +371,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
             {showNotificationModal && (
                 <div 
                     className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
-                    onClick={() => setShowNotificationModal(false)}
+                    onClick={handleCloseNotificationModal}
                 >
                     <div 
                         className="glass-card rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp"
@@ -372,7 +388,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                                 </p>
                             </div>
                             <button 
-                                onClick={() => setShowNotificationModal(false)}
+                                onClick={handleCloseNotificationModal}
                                 className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -430,14 +446,14 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                                 <label
                                     key={option.id}
                                     className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
-                                        selectedOptions[option.id]
+                                        currentDraftOptions[option.id]
                                             ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
                                             : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                                     }`}
                                 >
                                     <input
                                         type="checkbox"
-                                        checked={selectedOptions[option.id]}
+                                        checked={currentDraftOptions[option.id]}
                                         onChange={() => toggleOption(option.id)}
                                         className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
                                     />
@@ -456,13 +472,13 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                             {/* Günlük Kontrol - ÖZEL */}
                             <div className="pt-3 border-t border-white/10">
                                 <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
-                                    selectedOptions.dailyCheck
+                                    currentDraftOptions.dailyCheck
                                         ? 'bg-blue-400/20 border-blue-400 scale-[1.02]'
                                         : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                                 }`}>
                                     <input
                                         type="checkbox"
-                                        checked={selectedOptions.dailyCheck}
+                                        checked={currentDraftOptions.dailyCheck}
                                         onChange={() => toggleOption('dailyCheck')}
                                         className="mt-1 w-5 h-5 rounded border-2 border-blue-400 bg-transparent checked:bg-blue-400 cursor-pointer accent-blue-400"
                                     />
@@ -483,10 +499,10 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                         </div>
 
                         {/* Seçim Özeti */}
-                        {Object.values(selectedOptions).some(v => v) && (
+                        {Object.values(currentDraftOptions).some(v => v) && (
                             <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4 animate-fadeIn">
                                 <p className="text-xs text-yellow-200">
-                                    <strong className="text-yellow-400">{Object.values(selectedOptions).filter(v => v).length}</strong> bildirim seçtiniz
+                                    <strong className="text-yellow-400">{draftSelectionCount}</strong> bildirim seçtiniz
                                 </p>
                             </div>
                         )}
@@ -496,7 +512,7 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    setShowNotificationModal(false);
+                                    handleCloseNotificationModal();
                                 }}
                                 className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 font-medium border border-white/10 hover:border-white/20"
                             >
@@ -504,9 +520,9 @@ const Dashboard = ({ matchData, next3Matches = [], loading }) => {
                             </button>
                             <button
                                 onClick={saveNotifications}
-                                disabled={JSON.stringify(selectedOptions) === JSON.stringify(initialOptions)}
+                                disabled={!hasDraftChanges}
                                 className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${
-                                    JSON.stringify(selectedOptions) === JSON.stringify(initialOptions)
+                                    !hasDraftChanges
                                         ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                                         : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'
                                 }`}
