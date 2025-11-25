@@ -212,16 +212,16 @@ The backend is deployed on Render with automatic daily data fetching and push no
 
 **Backend Architecture:**
 - Express.js server with CORS and rate limiting
-- **3 Cron Jobs**:
+- **Cron Jobs**:
   - Data fetch: `0 6 * * *` (06:00 TR daily)
-  - Notification check: `* * * * *` (every minute - checks time-based reminders)
   - Daily match check: `0 9 * * *` (09:00 TR daily - checks if match today)
+  - Legacy reminder cron `* * * * *` only when `USE_ONESIGNAL_SCHEDULER=false`
 - In-memory cache for match/squad data (updated daily)
-- In-memory notification storage:
-  - `matchReminders` array (time-based, per match)
+- Reminder metadata:
+  - `matchReminders` array (per user + match, tracks scheduled OneSignal IDs)
   - `dailyCheckSubscribers` Set (global subscribers)
   - `sentDailyNotifications` Map (deduplication)
-- OneSignal REST API integration (modern, no SDK needed)
+- OneSignal REST API integration (modern, no SDK needed) with **scheduled sends** by default
 - Image proxy for SofaScore photos (CORS bypass)
 - Rate limiting: 100 req/15min (general), 20 req/15min (reminders)
 
@@ -309,14 +309,15 @@ User Browser → Backend (Render) → SofaScore API
      - **Time-based reminders** → `matchReminders` array (tied to specific match)
      - **Daily check** → `dailyCheckSubscribers` Set (global, applies to all matches)
 
-3. **Backend Sends Notifications**
-   - **Every Minute (Time-based reminders)**:
-     - Backend checks all `matchReminders`
-     - For each reminder, fetches **CURRENT** match data from cache (always up-to-date!)
-     - Calculates time until match
-     - If reminder time matches (e.g., 1h before), sends notification via OneSignal REST API
-     - Marks as sent to prevent duplicates
-   
+3. **Backend Schedules/Sends Notifications**
+   - **Match reminders (default)**:
+     - Backend calculates the exact UTC timestamp for each selected option (3h, 1h, 30dk, 15dk)
+     - Uses OneSignal REST API with `send_after` + `external_id` to schedule delivery
+     - OneSignal stores and delivers reminders even if backend sleeps/restarts
+  
+   - **Legacy fallback**:
+     - Set `USE_ONESIGNAL_SCHEDULER=false` to revert to per-minute cron delivery (development/testing)
+
    - **Every Day at 09:00 TR (Daily check)**:
      - Backend checks if there's a Fenerbahçe match TODAY
      - If yes, sends notification to all `dailyCheckSubscribers`
@@ -343,8 +344,8 @@ User Browser → Backend (Render) → SofaScore API
 ┌─────────────────────────────────────────────────┐
 │  Backend (Render)                               │
 │  ├─ Express API                                 │
-│  ├─ In-memory reminders storage                 │
-│  ├─ Cron: Check every minute                    │
+│  ├─ Reminder metadata storage                  │
+│  ├─ OneSignal scheduling (send_after)          │
 │  └─ Cron: Daily match check (09:00 TR)         │
 └─────────────────────────────────────────────────┘
                     ↓ (send notification)
@@ -363,8 +364,8 @@ User Browser → Backend (Render) → SofaScore API
 | Schedule | Purpose | Timezone |
 |----------|---------|----------|
 | `0 6 * * *` | Fetch match/squad data from SofaScore | Europe/Istanbul |
-| `* * * * *` | Check and send match reminders | Europe/Istanbul |
 | `0 9 * * *` | Daily match check (Günlük Maç Kontrolü) | Europe/Istanbul |
+| `* * * * *` | Legacy reminder cron (only if scheduler disabled) | Europe/Istanbul |
 
 ## Environment Variables
 
@@ -376,6 +377,7 @@ User Browser → Backend (Render) → SofaScore API
 | `RAPIDAPI_HOST` | API host endpoint | `sofascore.p.rapidapi.com` | No |
 | `ONESIGNAL_APP_ID` | OneSignal App ID for push notifications | - | ✅ Yes |
 | `ONESIGNAL_REST_API_KEY` | OneSignal REST API Key | - | ✅ Yes |
+| `USE_ONESIGNAL_SCHEDULER` | `true` to schedule reminders inside OneSignal | `true` | No |
 | `PORT` | Server port | `3001` | No |
 | `CRON_SCHEDULE` | Cron schedule for data fetch | `0 6 * * *` | No |
 | `PUBLIC_BASE_URL` | Backend URL for image proxying | Auto-detected | No |
@@ -412,7 +414,7 @@ npm run dev          # Start backend (development mode)
 - SofaScore API has daily quota limits (mitigated by backend caching)
 - Backend cold starts on Render free tier (~30-60 seconds on first request)
 - Player photos depend on SofaScore availability
-- Notification reminders are stored in-memory (lost on backend restart - acceptable for free tier)
+- Reminder metadata is stored in-memory (lost on backend restart), but the actual notifications are scheduled inside OneSignal so they still fire even if the server sleeps
 - Match data is fetched from cache (updated daily), so notifications use real-time data
 - For production with 10K+ users, consider using Redis/MongoDB for reminder persistence
 
