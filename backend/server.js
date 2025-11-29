@@ -286,6 +286,8 @@ if (ENABLE_CRON) {
         cron.schedule(schedule, () => {
             console.log('⏰ Scheduled fetch triggered (03:00 UTC = 06:00 TR)');
             fetchDataFromAPI();
+        }, {
+            timezone: "UTC"
         });
         console.log(`✅ Data fetch cron scheduled: ${schedule} (03:00 UTC = 06:00 TR)`);
     } catch (error) {
@@ -302,54 +304,60 @@ if (ENABLE_CRON) {
 // checkAndSendNotifications function removed - Migrated to Firebase Cloud Functions
 
 // Daily check for matches (Günlük Maç Kontrolü) - 06:00 UTC = 09:00 TR
-try {
-    cron.schedule('0 6 * * *', () => {
-        console.log('⏰ Daily match check triggered (06:00 UTC = 09:00 TR)');
+if (ENABLE_CRON) {
+    try {
+        cron.schedule('0 6 * * *', () => {
+            console.log('⏰ Daily match check triggered (06:00 UTC = 09:00 TR)');
 
-        if (!cache.nextMatch || dailyCheckSubscribers.size === 0) {
-            console.log('ℹ️ No daily check subscribers or no upcoming match');
-            return;
-        }
+            if (!cache.nextMatch || dailyCheckSubscribers.size === 0) {
+                console.log('ℹ️ No daily check subscribers or no upcoming match');
+                return;
+            }
 
-        const matchTime = new Date(cache.nextMatch.startTimestamp * 1000);
-        const today = new Date();
-        const todayStr = today.toDateString();
+            const matchTime = new Date(cache.nextMatch.startTimestamp * 1000);
+            const today = new Date();
+            const todayStr = today.toDateString();
 
-        // Check if match is TODAY
-        if (matchTime.toDateString() === todayStr) {
-            console.log(`🎯 Match today! Notifying ${dailyCheckSubscribers.size} subscribers`);
+            // Check if match is TODAY
+            if (matchTime.toDateString() === todayStr) {
+                console.log(`🎯 Match today! Notifying ${dailyCheckSubscribers.size} subscribers`);
 
-            dailyCheckSubscribers.forEach(playerId => {
-                // Check if already notified today for this match
-                const lastSent = sentDailyNotifications.get(playerId);
-                if (lastSent && lastSent.matchId === cache.nextMatch.id && lastSent.date === todayStr) {
-                    console.log(`⏭️ Already notified ${playerId} today for match ${cache.nextMatch.id}`);
-                    return;
-                }
+                dailyCheckSubscribers.forEach(playerId => {
+                    // Check if already notified today for this match
+                    const lastSent = sentDailyNotifications.get(playerId);
+                    if (lastSent && lastSent.matchId === cache.nextMatch.id && lastSent.date === todayStr) {
+                        console.log(`⏭️ Already notified ${playerId} today for match ${cache.nextMatch.id}`);
+                        return;
+                    }
 
-                // Send notification
-                sendNotification({
-                    playerId,
-                    matchData: cache.nextMatch,
-                    type: 'dailyCheck',
-                    timeText: 'Bugün maç günü'
+                    // Send notification
+                    sendNotification({
+                        playerId,
+                        matchData: cache.nextMatch,
+                        type: 'dailyCheck',
+                        timeText: 'Bugün maç günü'
+                    });
+
+                    // Record that we sent this notification
+                    sentDailyNotifications.set(playerId, {
+                        matchId: cache.nextMatch.id,
+                        date: todayStr
+                    });
+
+                    console.log(`✅ Sent daily check to ${playerId} for match ${cache.nextMatch.id}`);
                 });
-
-                // Record that we sent this notification
-                sentDailyNotifications.set(playerId, {
-                    matchId: cache.nextMatch.id,
-                    date: todayStr
-                });
-
-                console.log(`✅ Sent daily check to ${playerId} for match ${cache.nextMatch.id}`);
-            });
-        } else {
-            console.log('ℹ️ No match today');
-        }
-    });
-    console.log('✅ Daily match check cron scheduled: 06:00 UTC (09:00 TR)');
-} catch (error) {
-    console.error('❌ Daily check cron error:', error.message);
+            } else {
+                console.log('ℹ️ No match today');
+            }
+        }, {
+            timezone: "UTC"
+        });
+        console.log('✅ Daily match check cron scheduled: 06:00 UTC (09:00 TR)');
+    } catch (error) {
+        console.error('❌ Daily check cron error:', error.message);
+    }
+} else {
+    console.log('⚠️ Daily check cron disabled via DISABLE_CRON env');
 }
 
 // Firebase Admin SDK
@@ -457,9 +465,6 @@ async function cancelReminderSchedules(reminder) {
     // Just a placeholder as we manage state in memory/DB
     return;
 }
-
-// Initial fetch on server start
-fetchDataFromAPI();
 
 // Manual refresh endpoint for testing
 app.get('/api/refresh', async (req, res) => {
@@ -703,7 +708,15 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`✅ Backend server running on port ${PORT}`);
-    console.log(`📍 http://localhost:${PORT}`);
+const HOST = '0.0.0.0'; // Bind to all interfaces (required for Render.com)
+
+app.listen(PORT, HOST, () => {
+    console.log(`✅ Backend server running on ${HOST}:${PORT}`);
+    console.log(`📍 Access via: http://localhost:${PORT}`);
+
+    // Fetch initial data after server is ready (non-blocking)
+    console.log('🔄 Starting initial data fetch...');
+    fetchDataFromAPI().catch(err => {
+        console.error('❌ Initial data fetch failed (will retry via cron):', err.message);
+    });
 });
