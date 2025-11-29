@@ -1,0 +1,22 @@
+{
+    "name": "functions",
+    "description": "Cloud Functions for Fenerbahçe Fan Hub",
+    "scripts": {
+        "serve": "firebase emulators:start --only functions",
+        "shell": "firebase functions:shell",
+        "start": "npm run shell",
+        "deploy": "firebase deploy --only functions",
+        "logs": "firebase functions:log"
+    },
+    "engines": {
+        "node": "20"
+    },
+    "main": "index.js",
+    "dependencies": {
+        "dotenv": "^17.2.3",
+        "firebase-admin": "^13.6.0",
+        "firebase-functions": "^7.0.0",
+        "node-fetch": "^2.7.0"
+    },
+    "private": true
+}

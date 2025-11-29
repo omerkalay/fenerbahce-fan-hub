@@ -1,6 +1,7 @@
-// Backend API URL - Use production for now (local backend has API issues)
-export const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
-// TODO: Fix local API issues and use: import.meta.env.DEV ? 'http://localhost:3001' : 'https://fenerbahce-backend.onrender.com'
+// Backend API URL
+export const BACKEND_URL = import.meta.env.DEV
+    ? 'http://localhost:3001'
+    : 'https://fenerbahce-backend.onrender.com';
 
 const ensureAbsolutePhoto = (player = {}) => {
     const fallbackPath = `/api/player-image/${player.id ?? ''}`;
@@ -63,3 +64,14 @@ export const fetchInjuries = async () => {
     return [];
 };
 
+// Fetch standings from backend
+export const fetchStandings = async () => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/standings`);
+        if (!response.ok) throw new Error('Standings fetch failed');
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching standings from backend:", error);
+        return [];
+    }
+};

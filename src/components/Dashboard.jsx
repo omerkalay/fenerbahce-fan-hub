@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
+import Poll from './Poll';
 
 const createEmptyOptions = () => ({
     threeHours: false,
@@ -116,85 +117,78 @@ const Dashboard = ({
     const saveNotifications = async () => {
         const optionsToSave = normalizeOptions(currentDraftOptions);
         const count = Object.values(optionsToSave).filter(v => v).length;
-        
-        // OneSignal kontrolü
-        if (!window.OneSignal) {
-            alert('❌ Bildirim sistemi yükleniyor, lütfen birkaç saniye bekleyip tekrar deneyin.');
-            return;
-        }
 
         try {
-            // 1. Player ID'yi al (OneSignal subscription ID)
-            let playerId = null;
-            
+            // 1. Get Firebase token
+            let token = null;
             try {
-                playerId = await window.OneSignal.User.PushSubscription.id;
-            } catch (err) {
-                console.error('Player ID alınamadı:', err);
-            }
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    const { messaging } = await import('../firebase');
+                    const { getToken } = await import('firebase/messaging');
 
-            // Player ID yoksa (henüz subscribe olmamış)
-            if (!playerId) {
-                // Bildirim izni iste
-                const permission = await window.OneSignal.Notifications.permission;
-                
-                if (permission === false) {
-                    const granted = await window.OneSignal.Notifications.requestPermission();
-                    if (!granted) {
-                        alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
-                        return;
-                    }
-                    
-                    // İzin verildikten sonra Player ID'yi tekrar al
-                    playerId = await window.OneSignal.User.PushSubscription.id;
-                }
-                
-                if (!playerId) {
-                    alert('❌ OneSignal bağlantısı kurulamadı. Lütfen sayfayı yenileyin ve tekrar deneyin.');
+                    // Register service worker first
+                    const registration = await navigator.serviceWorker.register(
+                        '/fenerbahce-fan-hub/firebase-messaging-sw.js',
+                        { scope: '/fenerbahce-fan-hub/' }
+                    );
+
+                    token = await getToken(messaging, {
+                        vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
+                        serviceWorkerRegistration: registration
+                    });
+                } else {
+                    alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
                     return;
                 }
+            } catch (err) {
+                console.error('Token alınamadı:', err);
+                alert('❌ Bildirim servisine bağlanılamadı.');
+                return;
             }
 
-            // 2. Backend'e KAYDET (count === 0 olsa bile!)
-            const BACKEND_URL = 'https://fenerbahce-backend.onrender.com';
+            if (!token) {
+                alert('❌ Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
+                return;
+            }
+
+            // 2. Send to backend
+            const BACKEND_URL = 'http://localhost:3001';
+
             const response = await fetch(`${BACKEND_URL}/api/reminder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    playerId,
-                    matchId: matchData.id, // Sadece matchId gönder (backend cache'den alır)
+                    playerId: token, // Using token as unique player ID
+                    matchId: matchData.id,
                     options: optionsToSave
                 })
             });
 
             if (!response.ok) {
-                throw new Error(`Backend hatası: ${response.status}`);
+                throw new Error(`Backend error: ${response.status}`);
             }
 
-            const data = await response.json();
+            const result = await response.json();
+            console.log('Backend response:', result);
 
-            if (data.success) {
-                // 3. Başarılı! localStorage güncelle
-                if (count === 0) {
-                    // Tüm bildirimler temizlendi
-                    setHasActiveNotifications(false);
-                    localStorage.removeItem('fb_has_notifications');
-                    localStorage.removeItem('fb_notification_options');
-                    alert('✅ Tüm bildirimler temizlendi!');
-                } else {
-                    // Bildirimler ayarlandı
-                    setHasActiveNotifications(true);
-                    localStorage.setItem('fb_has_notifications', 'true');
-                    localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
-                    alert(`✅ ${count} bildirim ayarlandı!`);
-                }
-                
-                setSelectedOptions(optionsToSave);
-                setDraftOptions(null);
-                setShowNotificationModal(false);
+            // 3. Update UI
+            if (count === 0) {
+                setHasActiveNotifications(false);
+                localStorage.removeItem('fb_has_notifications');
+                localStorage.removeItem('fb_notification_options');
+                alert('✅ Tüm bildirimler temizlendi!');
             } else {
-                alert('❌ Bir hata oluştu: ' + (data.error || 'Bilinmeyen hata'));
+                setHasActiveNotifications(true);
+                localStorage.setItem('fb_has_notifications', 'true');
+                localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
+                alert(`✅ ${count} bildirim ayarlandı!`);
             }
+
+            setSelectedOptions(optionsToSave);
+            setDraftOptions(null);
+            setShowNotificationModal(false);
+
         } catch (error) {
             console.error('Bildirim kaydetme hatası:', error);
             alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
@@ -202,24 +196,24 @@ const Dashboard = ({
     };
 
     const notificationOptions = [
-        { 
-            id: 'threeHours', 
-            label: 'Maçtan 3 saat önce', 
+        {
+            id: 'threeHours',
+            label: 'Maçtan 3 saat önce',
             description: 'Hazırlık yapmaya zamanın olsun'
         },
-        { 
-            id: 'oneHour', 
-            label: 'Maçtan 1 saat önce', 
+        {
+            id: 'oneHour',
+            label: 'Maçtan 1 saat önce',
             description: 'Heyecan zamanı!'
         },
-        { 
-            id: 'thirtyMinutes', 
-            label: 'Maçtan 30 dakika önce', 
+        {
+            id: 'thirtyMinutes',
+            label: 'Maçtan 30 dakika önce',
             description: 'Son hazırlık'
         },
-        { 
-            id: 'fifteenMinutes', 
-            label: 'Maçtan 15 dakika önce', 
+        {
+            id: 'fifteenMinutes',
+            label: 'Maçtan 15 dakika önce',
             description: 'Maç başlıyor!'
         }
     ];
@@ -249,26 +243,25 @@ const Dashboard = ({
                     <span className="text-xs font-bold tracking-wider text-yellow-400 uppercase bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20">
                         {matchData.tournament.name}
                     </span>
-                    
+
                     <div className="flex items-center gap-3">
                         <span className="text-xs text-slate-400 font-medium">
                             {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
                         </span>
-                        
+
                         {/* Bildirim İkonu */}
                         <button
                             onClick={handleOpenNotificationModal}
-                            className={`relative p-2.5 rounded-full transition-all duration-300 group ${
-                                hasActiveNotifications 
-                                    ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]' 
-                                    : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110'
-                            }`}
+                            className={`relative p-2.5 rounded-full transition-all duration-300 group ${hasActiveNotifications
+                                ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]'
+                                : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110'
+                                }`}
                             title="Bildirim ayarları"
                         >
                             {hasActiveNotifications ? (
                                 // Zil aktif (dolu)
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
-                                    <path d="M10 20h4c0 1.1-.9 2-2 2s-2-.9-2-2zm8-6V9c0-3.07-1.64-5.64-4.5-6.32V2c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 3.36 6 5.92 6 9v5l-2 2v1h16v-1l-2-2z"/>
+                                    <path d="M10 20h4c0 1.1-.9 2-2 2s-2-.9-2-2zm8-6V9c0-3.07-1.64-5.64-4.5-6.32V2c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 3.36 6 5.92 6 9v5l-2 2v1h16v-1l-2-2z" />
                                 </svg>
                             ) : (
                                 // Zil kapalı (kontur)
@@ -276,7 +269,7 @@ const Dashboard = ({
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                                 </svg>
                             )}
-                            
+
                             {/* Badge - Aktif bildirim sayısı */}
                             {hasActiveNotifications && savedSelectionCount > 0 && (
                                 <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950 animate-pulse">
@@ -287,12 +280,7 @@ const Dashboard = ({
                     </div>
                 </div>
 
-                {lastUpdated && (
-                    <p className="text-[10px] text-slate-500 text-center mb-2 flex items-center justify-center gap-2">
-                        <span>Son güncelleme: {new Date(lastUpdated).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {isRefreshing && <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse"></span>}
-                    </p>
-                )}
+
 
                 <div className="flex items-center justify-between relative z-10">
                     <div className="flex flex-col items-center gap-3 w-1/3">
@@ -399,14 +387,23 @@ const Dashboard = ({
                 </div>
             </div>
 
+            {/* Standings */}
+            {/* Poll */}
+            <div className="mb-6">
+                <div className="mb-6">
+                    <Poll opponentName={opponent.name} />
+                </div>
+            </div>
+
+
             {/* Bildirim Modal */}
             {showNotificationModal && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
                     onClick={handleCloseNotificationModal}
                 >
-                    <div 
-                        className="glass-card rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp"
+                    <div
+                        className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -419,7 +416,7 @@ const Dashboard = ({
                                     Ne zaman hatırlatmak istersin?
                                 </p>
                             </div>
-                            <button 
+                            <button
                                 onClick={handleCloseNotificationModal}
                                 className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
                             >
@@ -477,11 +474,10 @@ const Dashboard = ({
                             {notificationOptions.map((option) => (
                                 <label
                                     key={option.id}
-                                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
-                                        currentDraftOptions[option.id]
-                                            ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
-                                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                                    }`}
+                                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id]
+                                        ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
+                                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                                        }`}
                                 >
                                     <input
                                         type="checkbox"
@@ -503,11 +499,10 @@ const Dashboard = ({
 
                             {/* Günlük Kontrol - ÖZEL */}
                             <div className="pt-3 border-t border-white/10">
-                                <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${
-                                    currentDraftOptions.dailyCheck
-                                        ? 'bg-blue-400/20 border-blue-400 scale-[1.02]'
-                                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                                }`}>
+                                <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.dailyCheck
+                                    ? 'bg-blue-400/20 border-blue-400 scale-[1.02]'
+                                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                                    }`}>
                                     <input
                                         type="checkbox"
                                         checked={currentDraftOptions.dailyCheck}
@@ -553,11 +548,10 @@ const Dashboard = ({
                             <button
                                 onClick={saveNotifications}
                                 disabled={!hasDraftChanges}
-                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${
-                                    !hasDraftChanges
-                                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                        : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'
-                                }`}
+                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${!hasDraftChanges
+                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
+                                    : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'
+                                    }`}
                             >
                                 Kaydet
                             </button>
