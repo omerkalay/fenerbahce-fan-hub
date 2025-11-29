@@ -14,45 +14,7 @@
   <meta name="apple-mobile-web-app-title" content="Fenerbahçe Hub">
   <title>Fenerbahçe Fan Hub</title>
   
-  <!-- OneSignal Web Push Notifications -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script>
-    // Suppress noisy OneSignal worker warnings (does not affect functionality)
-    (function() {
-      const noisyText = '[Worker Messenger]';
-      const originalWarn = console.warn;
-      const originalError = console.error;
 
-      console.warn = function(...args) {
-        if (args[0] && typeof args[0] === 'string' && args[0].includes(noisyText)) {
-          return;
-        }
-        return originalWarn.apply(console, args);
-      };
-
-      console.error = function(...args) {
-        if (args[0] && typeof args[0] === 'string' && args[0].includes(noisyText)) {
-          return;
-        }
-        return originalError.apply(console, args);
-      };
-    })();
-
-    window.OneSignalDeferred = window.OneSignalDeferred || [];
-    OneSignalDeferred.push(async function(OneSignal) {
-      await OneSignal.init({
-        appId: "e7ac36a1-985c-436d-9b2c-d1a07c8cb279",
-        serviceWorkerPath: "/fenerbahce-fan-hub/OneSignalSDKWorker.js",
-        serviceWorkerUpdaterPath: "/fenerbahce-fan-hub/OneSignalSDKUpdaterWorker.js",
-        serviceWorkerParam: { scope: "/fenerbahce-fan-hub/" }
-      });
-
-      // Verbose logları sustur
-      if (OneSignal.log && typeof OneSignal.log.setLevel === 'function') {
-        OneSignal.log.setLevel('error');
-      }
-    });
-  </script>
 </head>
 
 <body>

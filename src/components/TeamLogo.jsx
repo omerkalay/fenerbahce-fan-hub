@@ -53,20 +53,20 @@ const TeamLogo = ({
                     alt={`${name} logosu`}
                     crossOrigin="anonymous"
                     className={clsx(
-                        'w-full h-full object-contain transition-opacity duration-200',
-                        status === 'loading' ? 'opacity-0' : 'opacity-100',
+                        'w-full h-full object-contain transition-opacity duration-300',
                         imageClassName
                     )}
                     onLoad={() => setStatus('ready')}
                     onError={handleError}
                 />
             ) : (
-                <div className="w-full h-full flex items-center justify-center text-[11px] text-slate-400 uppercase font-semibold bg-white/5">
+                <div className="w-full h-full flex items-center justify-center text-xs text-slate-400 uppercase font-bold bg-white/5 rounded-full">
                     {initials}
                 </div>
             )}
             {status === 'loading' && (
-                <div className="absolute inset-0 animate-pulse bg-white/5 rounded-full" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer rounded-full"
+                    style={{ backgroundSize: '200% 100%' }} />
             )}
         </div>
     );

@@ -10,13 +10,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true
+      },
       includeAssets: [
-        'pwa-192.png', 
-        'pwa-512.png', 
-        'pwa-maskable.png', 
-        'vite.svg',
-        'OneSignalSDKWorker.js',
-        'OneSignalSDKUpdaterWorker.js'
+        'pwa-192.png',
+        'pwa-512.png',
+        'pwa-maskable.png',
+        'vite.svg'
       ],
       manifest: {
         name: 'Fenerbahçe Fan Hub',

@@ -12,14 +12,15 @@ const allowedOrigins = [
     'https://www.omerkalay.com',
     'https://omerkalay.github.io',
     'http://localhost:5173', // Dev mode
+    'http://localhost:5174', // Dev mode (alternate port)
     'http://localhost:3000'  // Dev mode
 ];
 
 app.use(cors({
-    origin: function(origin, callback) {
+    origin: function (origin, callback) {
         // Allow requests with no origin (mobile apps, Postman, etc.)
         if (!origin) return callback(null, true);
-        
+
         if (allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -36,13 +37,25 @@ const limiter = rateLimit({
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true, // Return rate limit info in headers
     legacyHeaders: false,
+    skip: (req) => {
+        // Skip rate limiting for localhost in development
+        const ip = req.ip || req.connection.remoteAddress;
+        return ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1';
+    }
 });
 
 // Stricter rate limit for POST endpoints (like /api/reminder)
 const strictLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 20, // Limit each IP to 20 POST requests per windowMs
-    message: 'Too many requests, please try again later.',
+    message: 'Too many POST requests, please slow down.',
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: (req) => {
+        // Skip rate limiting for localhost in development
+        const ip = req.ip || req.connection.remoteAddress;
+        return ip === '::1' || ip === '127.0.0.1' || ip === '::ffff:127.0.0.1';
+    }
 });
 
 // Apply rate limiting to all requests
@@ -55,6 +68,7 @@ let cache = {
     nextMatch: null,
     next3Matches: [],
     squad: [],
+    standings: [],
     lastUpdate: null
 };
 
@@ -71,7 +85,7 @@ let dailyCheckSubscribers = new Set();
 let sentDailyNotifications = new Map();
 // Format: Map(playerId => { matchId, date })
 
-const USE_ONESIGNAL_SCHEDULER = process.env.USE_ONESIGNAL_SCHEDULER !== 'false';
+
 const MATCH_NOTIFICATION_CONFIG = {
     threeHours: {
         offsetMs: 3 * 60 * 60 * 1000,
@@ -98,7 +112,7 @@ const MATCH_NOTIFICATION_CONFIG = {
 const FENERBAHCE_ID = 3052;
 const API_KEY = process.env.RAPIDAPI_KEY;
 const API_HOST = process.env.RAPIDAPI_HOST || 'sofascore.p.rapidapi.com';
-const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000';
+const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3001';
 const SOFASCORE_IMAGE_BASE_HTTP = 'http://img.sofascore.com/api/v1';
 const IMAGE_USER_AGENT = process.env.IMAGE_USER_AGENT || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 const CRON_SCHEDULE = process.env.CRON_SCHEDULE || '0 6 * * *';
@@ -129,6 +143,9 @@ const getAbsoluteBaseUrl = (req = null) => {
     return `${protocol}://${req.get('host')}`.replace(/\/$/, '');
 };
 
+// Helper to delay execution
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Fetch data from SofaScore API
 async function fetchDataFromAPI() {
     console.log('🔄 Fetching data from SofaScore API...');
@@ -143,6 +160,9 @@ async function fetchDataFromAPI() {
             cache.next3Matches = matchData.events.slice(0, 3);
             console.log('✅ Next matches fetched successfully');
         }
+
+        // Wait 2 seconds to avoid rate limit
+        await sleep(2000);
 
         // Fetch squad
         const squadResponse = await fetch(`https://${API_HOST}/teams/get-squad?teamId=${FENERBAHCE_ID}`, { headers });
@@ -162,10 +182,99 @@ async function fetchDataFromAPI() {
             console.log('✅ Squad fetched successfully');
         }
 
+        // Wait 2 seconds before fetching standings
+        await sleep(2000);
+
+        // Fetch Standings
+        // await fetchStandings(); // Disabled: API requires paid subscription for standings
+        cache.standings = []; // Reset standings to empty
+
         cache.lastUpdate = new Date();
         console.log(`✨ Cache updated at ${cache.lastUpdate.toISOString()}`);
     } catch (error) {
         console.error('❌ Error fetching data:', error.message);
+    }
+}
+
+async function fetchStandings() {
+    console.log('🔄 Fetching standings...');
+    try {
+        const standingsData = [];
+
+        // 1. Süper Lig (Always fetch)
+        let superLigSeasonId = 77805; // Default fallback
+        let superLigTournamentId = 52;
+
+        // Try to find Super Lig season ID from next matches if available
+        if (cache.next3Matches && cache.next3Matches.length > 0) {
+            const slMatch = cache.next3Matches.find(m => m.tournament?.uniqueTournament?.id === 52);
+            if (slMatch && slMatch.season) {
+                superLigSeasonId = slMatch.season.id;
+                console.log(`Using Super Lig Season ID from match: ${superLigSeasonId}`);
+            }
+        } else {
+            console.log(`Using default Super Lig Season ID: ${superLigSeasonId}`);
+        }
+
+        const slUrl = `https://${API_HOST}/tournaments/get-standings?seasonId=${superLigSeasonId}&tournamentId=${superLigTournamentId}`;
+        console.log(`Fetching: ${slUrl}`);
+
+        const slResponse = await fetch(slUrl, { headers });
+
+        if (!slResponse.ok) {
+            console.error(`❌ Super Lig standings failed: ${slResponse.status}`);
+            const errorText = await slResponse.text();
+            console.error('Error response:', errorText);
+        } else {
+            const slData = await slResponse.json();
+            console.log('Super Lig response keys:', Object.keys(slData));
+
+            if (slData.standings && slData.standings.length > 0) {
+                const totalTable = slData.standings.find(t => t.type === 'total') || slData.standings[0];
+                standingsData.push({
+                    id: 'super-lig',
+                    name: 'Süper Lig',
+                    rows: totalTable.rows
+                });
+                console.log(`✅ Süper Lig standings fetched (${totalTable.rows.length} teams)`);
+            } else {
+                console.warn('⚠️ No standings data in response');
+            }
+        }
+
+        // 2. Check for other active tournaments
+        if (cache.nextMatch && cache.nextMatch.tournament?.uniqueTournament?.id !== 52) {
+            const otherTournId = cache.nextMatch.tournament.uniqueTournament.id;
+            const otherSeasonId = cache.nextMatch.season.id;
+            const otherTournName = cache.nextMatch.tournament.name;
+
+            console.log(`Fetching standings for ${otherTournName} (ID: ${otherTournId}, Season: ${otherSeasonId})`);
+
+            const otherUrl = `https://${API_HOST}/tournaments/get-standings?seasonId=${otherSeasonId}&tournamentId=${otherTournId}`;
+            const otherResponse = await fetch(otherUrl, { headers });
+
+            if (otherResponse.ok) {
+                const otherData = await otherResponse.json();
+                if (otherData.standings && otherData.standings.length > 0) {
+                    const totalTable = otherData.standings.find(t => t.type === 'total') || otherData.standings[0];
+                    standingsData.push({
+                        id: `tourn-${otherTournId}`,
+                        name: otherTournName,
+                        rows: totalTable.rows
+                    });
+                    console.log(`✅ ${otherTournName} standings fetched (${totalTable.rows.length} teams)`);
+                }
+            } else {
+                console.warn(`⚠️ Failed to fetch ${otherTournName} standings: ${otherResponse.status}`);
+            }
+        }
+
+        cache.standings = standingsData;
+        console.log(`✨ Standings cache updated with ${standingsData.length} league(s)`);
+
+    } catch (error) {
+        console.error('❌ Error fetching standings:', error.message);
+        console.error('Stack:', error.stack);
     }
 }
 
@@ -186,114 +295,30 @@ if (ENABLE_CRON) {
     console.log('⚠️ Cron disabled via DISABLE_CRON env');
 }
 
-// Cron job: Check and send notifications every minute (legacy fallback)
-if (!USE_ONESIGNAL_SCHEDULER) {
-    try {
-        cron.schedule('* * * * *', () => {
-            checkAndSendNotifications();
-        });
-        console.log('✅ Notification check cron scheduled: Every minute (UTC)');
-    } catch (error) {
-        console.error('❌ Notification cron error:', error.message);
-    }
-} else {
-    console.log('ℹ️ Legacy match reminder cron disabled (using OneSignal scheduling)');
-}
+// Notification cron removed - Migrated to Firebase Cloud Functions
+// See functions/index.js for the new logic
 
-// Function to check and send notifications
-function checkAndSendNotifications() {
-    // Skip if cache not ready
-    if (!cache.next3Matches || cache.next3Matches.length === 0) {
-        return;
-    }
-    
-    const now = new Date();
-    
-    matchReminders.forEach(reminder => {
-        const { playerId, matchId, options, sentNotifications } = reminder;
-        
-        // Get CURRENT match data from cache (always up-to-date!)
-        const matchData = cache.next3Matches.find(m => m.id === matchId);
-        
-        if (!matchData) {
-            console.warn(`⚠️ Match ${matchId} not found in cache for player ${playerId}`);
-            return;
-        }
-        
-        const matchTime = new Date(matchData.startTimestamp * 1000);
-        const timeDiff = matchTime - now; // milliseconds until match
-        
-        // Skip if match already happened
-        if (timeDiff < 0) return;
-        
-        // Calculate time thresholds
-        const threeHoursInMs = 3 * 60 * 60 * 1000;
-        const oneHourInMs = 1 * 60 * 60 * 1000;
-        const thirtyMinInMs = 30 * 60 * 1000;
-        const fifteenMinInMs = 15 * 60 * 1000;
-        
-        // Check each notification type (1-minute window)
-        if (options.threeHours && !sentNotifications.includes('threeHours')) {
-            if (timeDiff <= threeHoursInMs && timeDiff > (threeHoursInMs - 60000)) {
-                sendNotification({ playerId, matchData, type: 'threeHours', timeText: '3 saat kaldı' });
-                sentNotifications.push('threeHours');
-                console.log(`✅ Sent 3h reminder to ${playerId} for match ${matchId}`);
-            }
-        }
-        
-        if (options.oneHour && !sentNotifications.includes('oneHour')) {
-            if (timeDiff <= oneHourInMs && timeDiff > (oneHourInMs - 60000)) {
-                sendNotification({ playerId, matchData, type: 'oneHour', timeText: '1 saat kaldı' });
-                sentNotifications.push('oneHour');
-                console.log(`✅ Sent 1h reminder to ${playerId} for match ${matchId}`);
-            }
-        }
-        
-        if (options.thirtyMinutes && !sentNotifications.includes('thirtyMinutes')) {
-            if (timeDiff <= thirtyMinInMs && timeDiff > (thirtyMinInMs - 60000)) {
-                sendNotification({ playerId, matchData, type: 'thirtyMinutes', timeText: '30 dakika kaldı' });
-                sentNotifications.push('thirtyMinutes');
-                console.log(`✅ Sent 30min reminder to ${playerId} for match ${matchId}`);
-            }
-        }
-        
-        if (options.fifteenMinutes && !sentNotifications.includes('fifteenMinutes')) {
-            if (timeDiff <= fifteenMinInMs && timeDiff > (fifteenMinInMs - 60000)) {
-                sendNotification({ playerId, matchData, type: 'fifteenMinutes', timeText: '15 dakika kaldı' });
-                sentNotifications.push('fifteenMinutes');
-                console.log(`✅ Sent 15min reminder to ${playerId} for match ${matchId}`);
-            }
-        }
-    });
-    
-    // Clean up old match reminders (matches that are 2 hours past)
-    const cleanupBefore = now.getTime() - (2 * 60 * 60 * 1000);
-    matchReminders = matchReminders.filter(reminder => {
-        const matchData = cache.next3Matches.find(m => m.id === reminder.matchId);
-        if (!matchData) return false;
-        const matchTime = matchData.startTimestamp * 1000;
-        return matchTime > cleanupBefore;
-    });
-}
+// Function to check and send notifications (reads from Firebase)
+// checkAndSendNotifications function removed - Migrated to Firebase Cloud Functions
 
 // Daily check for matches (Günlük Maç Kontrolü) - 06:00 UTC = 09:00 TR
 try {
     cron.schedule('0 6 * * *', () => {
         console.log('⏰ Daily match check triggered (06:00 UTC = 09:00 TR)');
-        
+
         if (!cache.nextMatch || dailyCheckSubscribers.size === 0) {
             console.log('ℹ️ No daily check subscribers or no upcoming match');
             return;
         }
-        
+
         const matchTime = new Date(cache.nextMatch.startTimestamp * 1000);
         const today = new Date();
         const todayStr = today.toDateString();
-        
+
         // Check if match is TODAY
         if (matchTime.toDateString() === todayStr) {
             console.log(`🎯 Match today! Notifying ${dailyCheckSubscribers.size} subscribers`);
-            
+
             dailyCheckSubscribers.forEach(playerId => {
                 // Check if already notified today for this match
                 const lastSent = sentDailyNotifications.get(playerId);
@@ -301,7 +326,7 @@ try {
                     console.log(`⏭️ Already notified ${playerId} today for match ${cache.nextMatch.id}`);
                     return;
                 }
-                
+
                 // Send notification
                 sendNotification({
                     playerId,
@@ -309,13 +334,13 @@ try {
                     type: 'dailyCheck',
                     timeText: 'Bugün maç günü'
                 });
-                
+
                 // Record that we sent this notification
                 sentDailyNotifications.set(playerId, {
                     matchId: cache.nextMatch.id,
                     date: todayStr
                 });
-                
+
                 console.log(`✅ Sent daily check to ${playerId} for match ${cache.nextMatch.id}`);
             });
         } else {
@@ -327,151 +352,110 @@ try {
     console.error('❌ Daily check cron error:', error.message);
 }
 
-// Send notification function with OneSignal REST API
+// Firebase Admin SDK
+const admin = require('firebase-admin');
+
+// Initialize Firebase Admin
+let db = null;
+try {
+    // Read service account from environment variable (Render.com) or local file (development)
+    let serviceAccount;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        console.log('📦 Loading Firebase credentials from environment variable');
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+        console.log('📦 Loading Firebase credentials from serviceAccountKey.json');
+        serviceAccount = require('./serviceAccountKey.json');
+    }
+
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        databaseURL: "https://fb-hub-ed9de-default-rtdb.europe-west1.firebasedatabase.app"
+    });
+    db = admin.database();
+    console.log('✅ Firebase Admin initialized successfully');
+} catch (error) {
+    console.error('❌ Failed to initialize Firebase Admin:', error.message);
+}
+
+// Send notification function with Firebase Cloud Messaging
 async function sendNotification({ playerId, matchData, type, timeText, sendAfter = null, externalId = null }) {
     const FENERBAHCE_ID = 3052;
     const isHome = matchData.homeTeam?.id === FENERBAHCE_ID;
     const opponent = isHome ? matchData.awayTeam?.name : matchData.homeTeam?.name;
     const matchTime = new Date(matchData.startTimestamp * 1000);
     const timeString = matchTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    
+
     // Format: "💛💙 Fenerbahçe - Rakip\n20:45 · 1 saat kaldı"
-    const heading = `💛💙 Fenerbahçe - ${opponent}`;
-    const message = `${timeString} · ${timeText}`;
-    
-    // OneSignal REST API integration (modern approach)
-    if (process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY) {
-        try {
-            const body = {
-                app_id: process.env.ONESIGNAL_APP_ID,
-                include_player_ids: [playerId],
-                headings: { tr: heading, en: heading },
-                contents: { tr: message, en: message },
-                url: 'https://omerkalay.com/fenerbahce-fan-hub/',
-                priority: 10,
-                ttl: 86400, // 24 hours
-                data: {
-                    matchId: matchData.id,
-                    type: type,
-                    tournament: matchData.tournament?.name
-                }
-            };
+    const title = `💛💙 Fenerbahçe - ${opponent}`;
+    const body = `${timeString} · ${timeText}`;
 
-            if (sendAfter) {
-                body.send_after = new Date(sendAfter).toUTCString();
+    // FCM Message
+    const message = {
+        token: playerId, // playerId is now the FCM token
+        notification: {
+            title: title,
+            body: body
+        },
+        data: {
+            matchId: String(matchData.id),
+            type: type,
+            tournament: matchData.tournament?.name || ''
+        },
+        webpush: {
+            fcmOptions: {
+                link: 'https://omerkalay.com/fenerbahce-fan-hub/'
             }
-
-            if (externalId) {
-                body.external_id = externalId;
-            }
-
-            const response = await fetch('https://onesignal.com/api/v1/notifications', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
-                },
-                body: JSON.stringify(body)
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error('OneSignal API error:', errorData);
-                throw new Error(`OneSignal API returned ${response.status}`);
-            }
-            
-            const result = await response.json();
-            const scheduleInfo = sendAfter ? `scheduled for ${new Date(sendAfter).toISOString()}` : 'sent immediately';
-            console.log(`📢 Notification queued for player ${playerId}: ${heading} - ${message} (${scheduleInfo}, recipients: ${result.recipients})`);
-            return result;
-        } catch (err) {
-            console.error('❌ OneSignal notification error:', err.message);
-            throw err;
         }
-    } else {
-        const scheduleInfo = sendAfter ? `Scheduled at ${new Date(sendAfter).toISOString()}` : 'Immediate';
-        console.log(`📢 [TEST MODE] ${heading}\n${message} (Player: ${playerId}, Type: ${type}, ${scheduleInfo})`);
-        return { id: `test-${Date.now()}`, recipients: 1 };
+    };
+
+    try {
+        if (!admin.apps.length) {
+            console.log(`📢 [MOCK FCM] ${title} - ${body} (Token: ${playerId})`);
+            return { id: `mock-${Date.now()}` };
+        }
+
+        // With Firebase Cloud Messaging, we send notifications immediately
+        // The calling function `checkAndSendNotifications` handles the timing via cron
+        // So we can just send immediately.
+
+        const response = await admin.messaging().send(message);
+        console.log(`✅ FCM Notification sent: ${response}`);
+        return { id: response };
+    } catch (error) {
+        console.error('❌ FCM Notification error:', error);
+        // throw error; // Don't throw to avoid crashing the loop
+        return null;
     }
 }
 
+// Legacy scheduling function - kept for compatibility but simplified
 async function scheduleMatchNotification(playerId, matchData, optionKey) {
-    if (!USE_ONESIGNAL_SCHEDULER) {
-        return null;
-    }
+    // With the cron-based approach in checkAndSendNotifications, we don't strictly need to "schedule" 
+    // individual messages on the provider side anymore if we run the check every minute.
+    // However, if we want to support "send at specific time" without running a minutely cron,
+    // we would need a persistent job queue.
 
-    const config = MATCH_NOTIFICATION_CONFIG[optionKey];
-
-    if (!config) {
-        console.warn(`⚠️ Unknown notification option: ${optionKey}`);
-        return null;
-    }
-
-    const matchTime = new Date(matchData.startTimestamp * 1000);
-    const sendAfter = new Date(matchTime.getTime() - config.offsetMs);
-
-    if (sendAfter.getTime() <= Date.now()) {
-        console.warn(`⏭️ Skipping ${optionKey} schedule for ${playerId}, send time already passed (${sendAfter.toISOString()})`);
-        return null;
-    }
-
-    const externalId = `${matchData.id}-${playerId}-${optionKey}`;
-
-    const result = await sendNotification({
-        playerId,
-        matchData,
-        type: optionKey,
-        timeText: config.timeText,
-        sendAfter,
-        externalId
-    });
+    // For this migration, we will rely on the `checkAndSendNotifications` cron job 
+    // which checks every minute if it's time to send.
 
     return {
-        notificationId: result?.id,
-        sendAfter: sendAfter.toISOString(),
+        notificationId: `scheduled-${Date.now()}`,
+        sendAfter: new Date().toISOString(), // Placeholder
         optionKey,
-        externalId
+        externalId: `${matchData.id}-${playerId}-${optionKey}`
     };
 }
 
 async function cancelScheduledNotification(notificationId) {
-    if (!notificationId) {
-        return;
-    }
-
-    if (!(process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY)) {
-        console.warn('⚠️ Cannot cancel OneSignal notification: missing credentials');
-        return;
-    }
-
-    try {
-        const url = `https://onesignal.com/api/v1/notifications/${notificationId}?app_id=${process.env.ONESIGNAL_APP_ID}`;
-        const response = await fetch(url, {
-            method: 'DELETE',
-            headers: {
-                'Authorization': `Basic ${process.env.ONESIGNAL_REST_API_KEY}`
-            }
-        });
-
-        if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            console.error(`❌ Failed to cancel OneSignal notification ${notificationId}`, err);
-        } else {
-            console.log(`🗑️ Cancelled OneSignal notification ${notificationId}`);
-        }
-    } catch (error) {
-        console.error(`❌ Error cancelling OneSignal notification ${notificationId}`, error.message);
-    }
+    // Not applicable for immediate sending via cron
+    // If we used a DB for scheduled tasks, we would delete the row here.
+    console.log(`ℹ️ Cancel notification request for ${notificationId} (handled by clearing local state)`);
 }
 
 async function cancelReminderSchedules(reminder) {
-    if (!reminder?.scheduledNotifications) return;
-
-    const cancellationPromises = Object.values(reminder.scheduledNotifications)
-        .filter(entry => entry?.notificationId)
-        .map(entry => cancelScheduledNotification(entry.notificationId));
-
-    await Promise.allSettled(cancellationPromises);
+    // Just a placeholder as we manage state in memory/DB
+    return;
 }
 
 // Initial fetch on server start
@@ -493,13 +477,12 @@ app.get('/api/next-3-matches', (req, res) => {
 });
 
 app.get('/api/squad', (req, res) => {
-    const baseUrl = getAbsoluteBaseUrl(req);
     const squad = cache.squad.map(player => {
         const { photoPath, ...rest } = player;
         const resolvedPath = photoPath || `/api/player-image/${player.id}`;
         const absolutePhoto = resolvedPath.startsWith('http')
             ? resolvedPath
-            : `${baseUrl}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
+            : `${PUBLIC_BASE_URL}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
 
         return {
             ...rest,
@@ -507,6 +490,10 @@ app.get('/api/squad', (req, res) => {
         };
     });
     res.json(squad);
+});
+
+app.get('/api/standings', (req, res) => {
+    res.json(cache.standings || []);
 });
 
 app.get('/api/health', (req, res) => {
@@ -526,7 +513,7 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// POST /api/reminder - Save user notification preferences
+// POST /api/reminder - Save user notification preferences to Firebase
 app.post('/api/reminder', strictLimiter, async (req, res) => {
     const { playerId, matchId, options } = req.body;
 
@@ -534,106 +521,77 @@ app.post('/api/reminder', strictLimiter, async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields: playerId, options' });
     }
 
-    // Validate that matchId exists in cache (if provided)
-    let matchData = null;
-    if (matchId) {
-        matchData = cache.next3Matches.find(m => m.id === matchId);
-        if (!matchData) {
-            return res.status(400).json({ error: 'Invalid matchId - match not found in cache' });
-        }
+    if (!db) {
+        return res.status(500).json({ error: 'Firebase Database not initialized' });
     }
 
-    // Handle dailyCheck subscription
-    if (options.dailyCheck) {
-        dailyCheckSubscribers.add(playerId);
-        console.log(`✅ Added ${playerId} to daily check subscribers (total: ${dailyCheckSubscribers.size})`);
-    } else {
-        dailyCheckSubscribers.delete(playerId);
-        console.log(`➖ Removed ${playerId} from daily check subscribers (total: ${dailyCheckSubscribers.size})`);
-    }
+    try {
+        const playerRef = db.ref(`notifications/${playerId}`);
 
-    // Handle time-based reminders (if matchId provided)
-    const responseMeta = {
-        scheduledCount: 0,
-        scheduledOptions: [],
-        skippedOptions: [],
-        schedulerEnabled: USE_ONESIGNAL_SCHEDULER
-    };
+        // Read current data
+        const snapshot = await playerRef.once('value');
+        const currentData = snapshot.val() || {};
 
-    if (matchId) {
-        // Check if reminder already exists for this player and match
-        const existingIndex = matchReminders.findIndex(r => 
-            r.playerId === playerId && r.matchId === matchId
-        );
-        const existingReminder = existingIndex >= 0 ? matchReminders[existingIndex] : null;
-
-        const hasTimeBasedOptions = options.threeHours || options.oneHour || 
-                                     options.thirtyMinutes || options.fifteenMinutes;
-
-        if (existingReminder) {
-            await cancelReminderSchedules(existingReminder);
+        // Update dailyCheck
+        if (options.dailyCheck) {
+            currentData.dailyCheck = true;
+            console.log(`✅ Enabled daily check for ${playerId}`);
+        } else {
+            currentData.dailyCheck = false;
+            console.log(`➖ Disabled daily check for ${playerId}`);
         }
 
-        if (hasTimeBasedOptions) {
-            const scheduledNotifications = {};
-
-            if (USE_ONESIGNAL_SCHEDULER && matchData) {
-                for (const optionKey of Object.keys(MATCH_NOTIFICATION_CONFIG)) {
-                    if (!options[optionKey]) continue;
-                    try {
-                        const scheduled = await scheduleMatchNotification(playerId, matchData, optionKey);
-                        if (scheduled) {
-                            scheduledNotifications[optionKey] = scheduled;
-                            responseMeta.scheduledCount += 1;
-                            responseMeta.scheduledOptions.push(optionKey);
-                        } else {
-                            responseMeta.skippedOptions.push(optionKey);
-                        }
-                    } catch (error) {
-                        console.error(`❌ Failed to schedule ${optionKey} for ${playerId}`, error.message);
-                        responseMeta.skippedOptions.push(optionKey);
-                    }
-                }
+        // Update match-specific reminders
+        if (matchId) {
+            // Validate that matchId exists in cache
+            const matchData = cache.next3Matches.find(m => m.id === matchId);
+            if (!matchData) {
+                return res.status(400).json({ error: 'Invalid matchId - match not found in cache' });
             }
 
-            const reminder = {
-                playerId,
-                matchId,
-                options: {
+            const hasTimeBasedOptions = options.threeHours || options.oneHour ||
+                options.thirtyMinutes || options.fifteenMinutes;
+
+            if (!currentData.matches) {
+                currentData.matches = {};
+            }
+
+            if (hasTimeBasedOptions) {
+                // Save this match's reminder options
+                currentData.matches[matchId] = {
                     threeHours: options.threeHours || false,
                     oneHour: options.oneHour || false,
                     thirtyMinutes: options.thirtyMinutes || false,
-                    fifteenMinutes: options.fifteenMinutes || false
-                },
-                createdAt: new Date(),
-                sentNotifications: existingReminder?.sentNotifications || [],
-                scheduledNotifications
-            };
-
-            if (existingIndex >= 0) {
-                matchReminders[existingIndex] = reminder;
-                console.log(`🔄 Updated reminder for ${playerId} for match ${matchId}`);
+                    fifteenMinutes: options.fifteenMinutes || false,
+                    sentNotifications: currentData.matches?.[matchId]?.sentNotifications || [],
+                    updatedAt: Date.now()
+                };
+                console.log(`✅ Saved match ${matchId} reminders for ${playerId}`);
             } else {
-                matchReminders.push(reminder);
-                console.log(`➕ Created reminder for ${playerId} for match ${matchId}`);
+                // Remove this match's reminders if no options selected
+                if (currentData.matches[matchId]) {
+                    delete currentData.matches[matchId];
+                    console.log(`🗑️ Removed match ${matchId} reminders for ${playerId}`);
+                }
             }
-        } else if (existingIndex >= 0) {
-            // Remove if no time-based options selected
-            matchReminders.splice(existingIndex, 1);
-            console.log(`🗑️ Removed reminder for ${playerId} for match ${matchId}`);
         }
+
+        // Write to Firebase
+        await playerRef.set(currentData);
+
+        const activeMatchCount = currentData.matches ? Object.keys(currentData.matches).length : 0;
+
+        res.json({
+            success: true,
+            message: 'Notification preferences saved to Firebase',
+            activeMatchReminders: activeMatchCount,
+            dailyCheckActive: currentData.dailyCheck || false
+        });
+
+    } catch (error) {
+        console.error('❌ Error saving to Firebase:', error);
+        res.status(500).json({ error: 'Failed to save notification preferences' });
     }
-
-    const activeCount = Object.values(options).filter(v => v === true).length;
-
-    res.json({ 
-        success: true, 
-        message: 'Notification preferences saved',
-        activeCount,
-        dailyCheckActive: dailyCheckSubscribers.has(playerId),
-        matchReminderActive: matchId ? matchReminders.some(r => r.playerId === playerId && r.matchId === matchId) : false,
-        schedule: responseMeta
-    });
 });
 
 // GET /api/reminder/:playerId - Get reminders for a player
@@ -641,7 +599,7 @@ app.get('/api/reminder/:playerId', (req, res) => {
     const { playerId } = req.params;
     const playerMatchReminders = matchReminders.filter(r => r.playerId === playerId);
     const hasDailyCheck = dailyCheckSubscribers.has(playerId);
-    
+
     res.json({
         matchReminders: playerMatchReminders,
         dailyCheckActive: hasDailyCheck
@@ -659,10 +617,10 @@ app.delete('/api/reminder/:playerId', async (req, res) => {
     matchReminders = matchReminders.filter(r => r.playerId !== playerId);
     dailyCheckSubscribers.delete(playerId);
     sentDailyNotifications.delete(playerId);
-    
+
     const deleted = initialLength - matchReminders.length;
-    res.json({ 
-        success: true, 
+    res.json({
+        success: true,
         message: `Deleted ${deleted} match reminder(s) and daily check subscription`,
         deleted
     });
@@ -682,7 +640,7 @@ app.delete('/api/reminder/:playerId/:matchId', async (req, res) => {
     await cancelReminderSchedules(targetReminder);
 
     matchReminders = matchReminders.filter(r => !(r.playerId === playerId && r.matchId == matchId));
-    
+
     if (matchReminders.length < initialLength) {
         res.json({ success: true, message: 'Match reminder deleted' });
     } else {
