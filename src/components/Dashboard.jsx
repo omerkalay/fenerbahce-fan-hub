@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BACKEND_URL } from '../services/api';
 import TeamLogo from './TeamLogo';
 import Poll from './Poll';
 
@@ -122,28 +123,42 @@ const Dashboard = ({
             // 1. Get Firebase token
             let token = null;
             try {
+                if (!('Notification' in window)) {
+                    alert('❌ Bu tarayıcı bildirimleri desteklemiyor.');
+                    return;
+                }
+
                 const permission = await Notification.requestPermission();
                 if (permission === 'granted') {
                     const { messaging } = await import('../firebase');
                     const { getToken } = await import('firebase/messaging');
 
-                    // Register service worker first
-                    const registration = await navigator.serviceWorker.register(
-                        '/fenerbahce-fan-hub/firebase-messaging-sw.js',
-                        { scope: '/fenerbahce-fan-hub/' }
-                    );
+                    // Register service worker with dynamic base path
+                    const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
+                    console.log('Service Worker registering at:', swUrl);
 
-                    token = await getToken(messaging, {
-                        vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
-                        serviceWorkerRegistration: registration
-                    });
+                    try {
+                        const registration = await navigator.serviceWorker.register(swUrl, {
+                            scope: import.meta.env.BASE_URL
+                        });
+                        console.log('✅ Service Worker registered:', registration);
+
+                        token = await getToken(messaging, {
+                            vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
+                            serviceWorkerRegistration: registration
+                        });
+                    } catch (swError) {
+                        console.error('Service Worker registration failed:', swError);
+                        alert(`❌ Service Worker hatası: ${swError.message}`);
+                        return;
+                    }
                 } else {
                     alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
                     return;
                 }
             } catch (err) {
                 console.error('Token alınamadı:', err);
-                alert('❌ Bildirim servisine bağlanılamadı.');
+                alert(`❌ Bildirim hatası: ${err.message}`);
                 return;
             }
 
@@ -153,8 +168,6 @@ const Dashboard = ({
             }
 
             // 2. Send to backend
-            const BACKEND_URL = 'http://localhost:3001';
-
             const response = await fetch(`${BACKEND_URL}/api/reminder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
