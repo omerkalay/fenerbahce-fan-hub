@@ -9,24 +9,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Vite](https://img.shields.io/badge/Vite-5.4.21-purple)
+![Vite](https://img.io/badge/Vite-5.4.21-purple)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
 ## Features
 
 ### Dashboard
+### Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
-- **Match Poll**: 📊 Interactive "Who will win?" poll with real-time results (Firebase Realtime Database)
-- **Push Notifications**: 💛💙 Reliable match reminders via Firebase Cloud Functions
+- **Live Match Tracking**: Real-time score updates, match events (goals, cards, substitutions), and live statistics (possession, shots, etc.) with custom Fenerbahçe styling (Powered by ESPN API)
+- **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**, fully integrated with custom design
+- **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database)
+- **Push Notifications**: Reliable match reminders via Firebase Cloud Functions
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Premium UI**: Glassmorphic design with smooth animations
 
-### Push Notification System 🔔
+### Push Notification System
 - **5 Notification Types**:
   - 3 hours before match
   - 1 hour before match
   - 30 minutes before match
   - 15 minutes before match
-  - Daily match check (09:00 TR every day)
+  - **Daily Match Check**: Automatically checks at 09:00 TR every morning and notifies if there is a match that day.
 - **Always-On Delivery**: Powered by **Firebase Cloud Functions** (Serverless). Works even if the website is closed or the backend server is sleeping.
 - **Cross-Platform**: Works on mobile & desktop (PWA support).
 - **Beautiful Format**: `💛💙 Fenerbahçe - Opponent | 20:45 · 1 saat kaldı`
@@ -175,6 +179,21 @@ firebase deploy --only functions
    - Scans database for users who want notifications at this time.
    - Sends push notification via FCM.
 4. **Delivery**: Notification arrives on user's device via Service Worker.
+
+### Live Match Tracking
+- **Data Source**: Fetches real-time data from **ESPN API** (via internal proxy) every 30 seconds during matches.
+- **Caching**: Backend implements intelligent caching to prevent rate limits while ensuring fresh data.
+- **Smart Status**: Automatically detects if a match is "Live", "Halftime", or "Finished" to adjust polling frequency.
+
+### Custom Standings
+- **Multi-League**: Fetches standings for both **Süper Lig** and **UEFA Europa League** from ESPN.
+- **Data Processing**: Backend normalizes data from different leagues into a unified format for the frontend.
+- **Performance**: Caches standings data for 1 hour to minimize external API calls.
+
+### Formation Builder
+- **Interactive Pitch**: Uses HTML5 Drag and Drop API for smooth player placement.
+- **Export**: Uses `html-to-image` to generate a high-quality PNG of the user's custom formation.
+- **Dynamic Assets**: Automatically loads player photos from SofaScore based on player IDs.
 
 ## Deployment
 

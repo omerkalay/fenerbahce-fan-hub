@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import TeamLogo from './TeamLogo';
 import Poll from './Poll';
+import CustomStandings from './CustomStandings';
+import LiveMatchScore from './LiveMatchScore';
 
 const createEmptyOptions = () => ({
     threeHours: false,
@@ -27,6 +29,9 @@ const Dashboard = ({
 }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
     const [showNotificationModal, setShowNotificationModal] = useState(false);
+    const [showLiveMatchModal, setShowLiveMatchModal] = useState(false);
+    const [showStandingsModal, setShowStandingsModal] = useState(false);
+    const [standingsLeague, setStandingsLeague] = useState(''); // 'superlig' or 'europa'
     const [selectedOptions, setSelectedOptions] = useState(() => {
         // localStorage'dan oku
         const saved = localStorage.getItem('fb_notification_options');
@@ -70,7 +75,7 @@ const Dashboard = ({
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
-        if (showNotificationModal) {
+        if (showNotificationModal || showLiveMatchModal || showStandingsModal) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
@@ -78,7 +83,7 @@ const Dashboard = ({
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [showNotificationModal]);
+    }, [showNotificationModal, showLiveMatchModal, showStandingsModal]);
 
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
     if (!matchData) {
@@ -104,6 +109,11 @@ const Dashboard = ({
     const FENERBAHCE_ID = 3052;
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
+
+    // Check if match is currently live
+    const now = new Date();
+    const matchEndTime = new Date(matchDate.getTime() + (120 * 60 * 1000)); // 2 hours after start
+    const isMatchLive = now >= matchDate && now <= matchEndTime && matchData.status?.type === 'inprogress';
 
     const toggleOption = (optionId) => {
         setDraftOptions(prev => {
@@ -247,9 +257,9 @@ const Dashboard = ({
     const savedSelectionCount = Object.values(selectedOptions).filter(Boolean).length;
 
     return (
-        <div className="space-y-6 pb-20">
+        <div className="min-h-screen pb-20">
             {/* Hero Section: Next Match Card */}
-            <div className="glass-card rounded-3xl p-6 relative overflow-hidden group">
+            <div className="glass-card rounded-3xl p-6 relative overflow-hidden group mb-6">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-50"></div>
 
                 <div className="flex justify-between items-center mb-6 relative z-10">
@@ -354,10 +364,32 @@ const Dashboard = ({
                         </div>
                     </div>
                 </div>
+
+                {/* Live Match Badge and Button */}
+                {isMatchLive && (
+                    <div className="mt-6 pt-6 border-t border-white/5">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                <span className="text-sm font-bold text-red-400 uppercase">Canlı</span>
+                            </div>
+                            <button
+                                onClick={() => setShowLiveMatchModal(true)}
+                                className="px-4 py-2 bg-yellow-400/10 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 hover:border-yellow-400 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.5)]"
+                            >
+                                Canlı Detayları Göster
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Next 3 Matches */}
-            <div className="glass-panel rounded-2xl p-4">
+            {/* Next 3 Matches */}
+            <div className="glass-panel rounded-2xl p-4 mb-6">
                 <div className="flex items-center gap-2 mb-4">
                     <span className="text-sm font-bold">Sonraki Maçlar</span>
                 </div>
@@ -397,6 +429,31 @@ const Dashboard = ({
                     }) : (
                         <div className="text-center text-slate-500 text-xs py-4">Maç bilgisi yükleniyor...</div>
                     )}
+                </div>
+            </div>
+
+            {/* Puan Durumu Buttons */}
+            <div className="glass-panel rounded-2xl p-4 mb-6">
+                <h3 className="text-sm font-bold text-white mb-4">Puan Durumu</h3>
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                        onClick={() => {
+                            setStandingsLeague('superlig');
+                            setShowStandingsModal(true);
+                        }}
+                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 hover:border-yellow-400 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+                    >
+                        Süper Lig
+                    </button>
+                    <button
+                        onClick={() => {
+                            setStandingsLeague('europa');
+                            setShowStandingsModal(true);
+                        }}
+                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 hover:border-yellow-400 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+                    >
+                        Avrupa Ligi
+                    </button>
                 </div>
             </div>
 
@@ -568,6 +625,77 @@ const Dashboard = ({
                             >
                                 Kaydet
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Live Match Modal */}
+            {/* Live Match Modal */}
+            {showLiveMatchModal && (
+                <div
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
+                    onClick={() => setShowLiveMatchModal(false)}
+                >
+                    <div
+                        className="bg-[#0f172a] border-2 border-yellow-400/30 rounded-2xl p-6 max-w-4xl w-full max-h-[85vh] overflow-hidden animate-slideUp shadow-[0_0_40px_rgba(234,179,8,0.2)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-yellow-400/20">
+                            <div className="flex items-center gap-3">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                                </span>
+                                <h2 className="text-xl font-bold text-yellow-400">Canlı Maç Detayları</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowLiveMatchModal(false)}
+                                className="text-yellow-400 hover:text-white transition-all duration-300 hover:rotate-90"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Live Match Component */}
+                        <div className="w-full">
+                            <LiveMatchScore />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Standings Modal */}
+            {showStandingsModal && (
+                <div
+                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
+                    onClick={() => setShowStandingsModal(false)}
+                >
+                    <div
+                        className="bg-[#0f172a] border-2 border-yellow-400/30 rounded-2xl p-6 max-w-4xl w-full max-h-[85vh] overflow-hidden animate-slideUp shadow-[0_0_40px_rgba(234,179,8,0.2)]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-yellow-400/20">
+                            <h2 className="text-xl font-bold text-yellow-400">
+                                {standingsLeague === 'superlig' ? 'Süper Lig Puan Durumu' : 'UEFA Avrupa Ligi Puan Durumu'}
+                            </h2>
+                            <button
+                                onClick={() => setShowStandingsModal(false)}
+                                className="text-yellow-400 hover:text-white hover:rotate-90 transition-all duration-300"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Custom Standings Component */}
+                        <div className="w-full">
+                            <CustomStandings league={standingsLeague} />
                         </div>
                     </div>
                 </div>

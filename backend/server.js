@@ -69,7 +69,9 @@ let cache = {
     next3Matches: [],
     squad: [],
     standings: [],
-    lastUpdate: null
+    liveMatch: null,
+    lastUpdate: null,
+    lastLiveUpdate: null
 };
 
 // Notification system storage (in-memory)
@@ -185,9 +187,8 @@ async function fetchDataFromAPI() {
         // Wait 2 seconds before fetching standings
         await sleep(2000);
 
-        // Fetch Standings
-        // await fetchStandings(); // Disabled: API requires paid subscription for standings
-        cache.standings = []; // Reset standings to empty
+        // Fetch Standings from ESPN (free!)
+        await fetchStandings();
 
         cache.lastUpdate = new Date();
         console.log(`✨ Cache updated at ${cache.lastUpdate.toISOString()}`);
@@ -197,83 +198,89 @@ async function fetchDataFromAPI() {
 }
 
 async function fetchStandings() {
-    console.log('🔄 Fetching standings...');
+    console.log('🔄 Fetching standings from ESPN...');
     try {
         const standingsData = [];
 
-        // 1. Süper Lig (Always fetch)
-        let superLigSeasonId = 77805; // Default fallback
-        let superLigTournamentId = 52;
+        // 1. Süper Lig - ESPN Turkey Super Lig
+        const slUrl = 'https://site.api.espn.com/apis/v2/sports/soccer/tur.1/standings?season=2025';
+        console.log(`Fetching Süper Lig from ESPN: ${slUrl}`);
 
-        // Try to find Super Lig season ID from next matches if available
-        if (cache.next3Matches && cache.next3Matches.length > 0) {
-            const slMatch = cache.next3Matches.find(m => m.tournament?.uniqueTournament?.id === 52);
-            if (slMatch && slMatch.season) {
-                superLigSeasonId = slMatch.season.id;
-                console.log(`Using Super Lig Season ID from match: ${superLigSeasonId}`);
-            }
-        } else {
-            console.log(`Using default Super Lig Season ID: ${superLigSeasonId}`);
-        }
+        const slResponse = await fetch(slUrl);
 
-        const slUrl = `https://${API_HOST}/tournaments/get-standings?seasonId=${superLigSeasonId}&tournamentId=${superLigTournamentId}`;
-        console.log(`Fetching: ${slUrl}`);
-
-        const slResponse = await fetch(slUrl, { headers });
-
-        if (!slResponse.ok) {
-            console.error(`❌ Super Lig standings failed: ${slResponse.status}`);
-            const errorText = await slResponse.text();
-            console.error('Error response:', errorText);
-        } else {
+        if (slResponse.ok) {
             const slData = await slResponse.json();
-            console.log('Super Lig response keys:', Object.keys(slData));
-
-            if (slData.standings && slData.standings.length > 0) {
-                const totalTable = slData.standings.find(t => t.type === 'total') || slData.standings[0];
+            if (slData.children && slData.children.length > 0) {
+                const standings = slData.children[0].standings.entries;
                 standingsData.push({
                     id: 'super-lig',
-                    name: 'Süper Lig',
-                    rows: totalTable.rows
+                    name: 'Trendyol Süper Lig',
+                    rows: standings.map(entry => ({
+                        team: {
+                            id: entry.team.id,
+                            name: entry.team.displayName,
+                            logo: entry.team.logos?.[0]?.href || ''
+                        },
+                        rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
+                        points: entry.stats.find(s => s.name === 'points')?.value || 0,
+                        matches: entry.stats.find(s => s.name === 'gamesPlayed')?.value || 0,
+                        wins: entry.stats.find(s => s.name === 'wins')?.value || 0,
+                        draws: entry.stats.find(s => s.name === 'ties')?.value || 0,
+                        losses: entry.stats.find(s => s.name === 'losses')?.value || 0,
+                        goalsFor: entry.stats.find(s => s.name === 'pointsFor')?.value || 0,
+                        goalsAgainst: entry.stats.find(s => s.name === 'pointsAgainst')?.value || 0,
+                        goalDiff: entry.stats.find(s => s.name === 'pointDifferential')?.value || 0
+                    }))
                 });
-                console.log(`✅ Süper Lig standings fetched (${totalTable.rows.length} teams)`);
-            } else {
-                console.warn('⚠️ No standings data in response');
+                console.log(`✅ Süper Lig standings fetched (${standings.length} teams)`);
             }
+        } else {
+            console.warn(`⚠️ ESPN Süper Lig fetch failed: ${slResponse.status}`);
         }
 
-        // 2. Check for other active tournaments
-        if (cache.nextMatch && cache.nextMatch.tournament?.uniqueTournament?.id !== 52) {
-            const otherTournId = cache.nextMatch.tournament.uniqueTournament.id;
-            const otherSeasonId = cache.nextMatch.season.id;
-            const otherTournName = cache.nextMatch.tournament.name;
+        // 2. UEFA Europa League
+        const elUrl = 'https://site.api.espn.com/apis/v2/sports/soccer/uefa.europa/standings?season=2025';
+        console.log(`Fetching Europa League from ESPN: ${elUrl}`);
 
-            console.log(`Fetching standings for ${otherTournName} (ID: ${otherTournId}, Season: ${otherSeasonId})`);
+        const elResponse = await fetch(elUrl);
 
-            const otherUrl = `https://${API_HOST}/tournaments/get-standings?seasonId=${otherSeasonId}&tournamentId=${otherTournId}`;
-            const otherResponse = await fetch(otherUrl, { headers });
-
-            if (otherResponse.ok) {
-                const otherData = await otherResponse.json();
-                if (otherData.standings && otherData.standings.length > 0) {
-                    const totalTable = otherData.standings.find(t => t.type === 'total') || otherData.standings[0];
-                    standingsData.push({
-                        id: `tourn-${otherTournId}`,
-                        name: otherTournName,
-                        rows: totalTable.rows
-                    });
-                    console.log(`✅ ${otherTournName} standings fetched (${totalTable.rows.length} teams)`);
-                }
-            } else {
-                console.warn(`⚠️ Failed to fetch ${otherTournName} standings: ${otherResponse.status}`);
+        if (elResponse.ok) {
+            const elData = await elResponse.json();
+            if (elData.children && elData.children.length > 0) {
+                // Europa League has multiple groups, get the main league phase
+                const leagueStandings = elData.children.find(c => c.name === 'League Phase') || elData.children[0];
+                const standings = leagueStandings.standings.entries;
+                standingsData.push({
+                    id: 'europa-league',
+                    name: 'UEFA Avrupa Ligi',
+                    rows: standings.map(entry => ({
+                        team: {
+                            id: entry.team.id,
+                            name: entry.team.displayName,
+                            logo: entry.team.logos?.[0]?.href || ''
+                        },
+                        rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
+                        points: entry.stats.find(s => s.name === 'points')?.value || 0,
+                        matches: entry.stats.find(s => s.name === 'gamesPlayed')?.value || 0,
+                        wins: entry.stats.find(s => s.name === 'wins')?.value || 0,
+                        draws: entry.stats.find(s => s.name === 'ties')?.value || 0,
+                        losses: entry.stats.find(s => s.name === 'losses')?.value || 0,
+                        goalsFor: entry.stats.find(s => s.name === 'pointsFor')?.value || 0,
+                        goalsAgainst: entry.stats.find(s => s.name === 'pointsAgainst')?.value || 0,
+                        goalDiff: entry.stats.find(s => s.name === 'pointDifferential')?.value || 0
+                    }))
+                });
+                console.log(`✅ Europa League standings fetched (${standings.length} teams)`);
             }
+        } else {
+            console.warn(`⚠️ ESPN Europa League fetch failed: ${elResponse.status}`);
         }
 
         cache.standings = standingsData;
         console.log(`✨ Standings cache updated with ${standingsData.length} league(s)`);
 
     } catch (error) {
-        console.error('❌ Error fetching standings:', error.message);
+        console.error('❌ Error fetching standings from ESPN:', error.message);
         console.error('Stack:', error.stack);
     }
 }
@@ -499,6 +506,90 @@ app.get('/api/squad', (req, res) => {
 
 app.get('/api/standings', (req, res) => {
     res.json(cache.standings || []);
+});
+
+// Get live match data from ESPN (with caching)
+app.get('/api/live-match', async (req, res) => {
+    try {
+        // Check if we have cached data less than 30 seconds old
+        const now = Date.now();
+        const cacheAge = cache.lastLiveUpdate ? now - cache.lastLiveUpdate : Infinity;
+
+        if (cache.liveMatch && cacheAge < 30000) {
+            console.log(`✅ Serving cached live match data (age: ${Math.round(cacheAge / 1000)}s)`);
+            return res.json(cache.liveMatch);
+        }
+
+        console.log('🔄 Fetching fresh live match data from ESPN...');
+
+        // Get today's matches from ESPN Turkish Super Lig scoreboard
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0].replace(/-/g, ''); // Format: YYYYMMDD
+
+        const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard?dates=${dateStr}`;
+        const response = await fetch(scoreboardUrl);
+
+        if (!response.ok) {
+            cache.liveMatch = null;
+            cache.lastLiveUpdate = now;
+            return res.status(404).json({ error: 'No live match data available' });
+        }
+
+        const data = await response.json();
+
+        // Find Fenerbahçe's match
+        const fenerbahceMatch = data.events?.find(event => {
+            const competitors = event.competitions?.[0]?.competitors || [];
+            return competitors.some(team =>
+                team.team.displayName.toLowerCase().includes('fenerbahce') ||
+                team.team.displayName.toLowerCase().includes('fenerbahçe')
+            );
+        });
+
+        if (!fenerbahceMatch) {
+            cache.liveMatch = null;
+            cache.lastLiveUpdate = now;
+            return res.status(404).json({ error: 'No Fenerbahçe match today' });
+        }
+
+        // Check if match is live or finished today
+        const status = fenerbahceMatch.status.type.state;
+        if (status !== 'in' && status !== 'post') {
+            cache.liveMatch = null;
+            cache.lastLiveUpdate = now;
+            return res.status(404).json({ error: 'Match not started yet' });
+        }
+
+        // Get detailed match data
+        const matchId = fenerbahceMatch.id;
+        const summaryUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/summary?event=${matchId}`;
+        const summaryResponse = await fetch(summaryUrl);
+
+        let finalData;
+        if (!summaryResponse.ok) {
+            finalData = fenerbahceMatch; // Return basic data if detailed fetch fails
+        } else {
+            finalData = await summaryResponse.json();
+        }
+
+        // Cache the result
+        cache.liveMatch = finalData;
+        cache.lastLiveUpdate = now;
+        console.log(`✅ Live match cached at ${new Date(now).toISOString()}`);
+
+        res.json(finalData);
+
+    } catch (error) {
+        console.error('❌ Error fetching live match:', error);
+
+        // If we have stale cache, return it with a warning
+        if (cache.liveMatch) {
+            console.log('⚠️ Returning stale cache due to error');
+            return res.json(cache.liveMatch);
+        }
+
+        res.status(500).json({ error: 'Failed to fetch live match data' });
+    }
 });
 
 app.get('/api/health', (req, res) => {
