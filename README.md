@@ -9,7 +9,6 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Vite](https://img.shields.io/badge/Vite-5.4.21-purple)
-![Vite](https://img.io/badge/Vite-5.4.21-purple)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
 ## Features
