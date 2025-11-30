@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
+import { BACKEND_URL } from '../services/api';
 
 const CustomStandings = ({ league }) => {
     const [standings, setStandings] = useState([]);
@@ -18,7 +19,7 @@ const CustomStandings = ({ league }) => {
 
         try {
             // Fetch from our own backend
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/standings`);
+            const response = await fetch(`${BACKEND_URL}/api/standings`);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch standings');

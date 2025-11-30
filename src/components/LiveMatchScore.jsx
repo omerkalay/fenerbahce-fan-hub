@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
+import { BACKEND_URL } from '../services/api';
 
 const LiveMatchScore = () => {
     const [liveData, setLiveData] = useState(null);
@@ -16,7 +17,7 @@ const LiveMatchScore = () => {
     const fetchLiveScore = async () => {
         try {
             // Fetch from our backend
-            const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/live-match`);
+            const response = await fetch(`${BACKEND_URL}/api/live-match`);
 
             if (!response.ok) {
                 if (response.status === 404) {
