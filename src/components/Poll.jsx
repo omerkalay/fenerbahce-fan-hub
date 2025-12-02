@@ -3,7 +3,7 @@ import { database } from '../firebase';
 import { ref, onValue, runTransaction } from "firebase/database";
 import { BarChart3, CheckCircle2 } from 'lucide-react';
 
-const Poll = ({ opponentName = "Rakip Takım" }) => {
+const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
     const [votes, setVotes] = useState({ home: 0, away: 0, draw: 0 });
     const [hasVoted, setHasVoted] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -17,8 +17,25 @@ const Poll = ({ opponentName = "Rakip Takım" }) => {
     useEffect(() => {
         // Check local storage for vote status
         const voted = localStorage.getItem('fenerbahce_poll_voted');
-        if (voted) {
+        const lastMatchId = localStorage.getItem('fenerbahce_last_match_id');
+
+        // If match changed, reset votes and clear vote status
+        if (matchId && lastMatchId && String(lastMatchId) !== String(matchId)) {
+            localStorage.removeItem('fenerbahce_poll_voted');
+            setHasVoted(false);
+
+            // Reset votes in Firebase
+            const votesRef = ref(database, 'match_poll');
+            import('firebase/database').then(({ set }) => {
+                set(votesRef, { home: 0, away: 0, draw: 0 });
+            });
+        } else if (voted) {
             setHasVoted(true);
+        }
+
+        // Save current matchId
+        if (matchId) {
+            localStorage.setItem('fenerbahce_last_match_id', String(matchId));
         }
 
         // Listen for vote updates
@@ -43,7 +60,7 @@ const Poll = ({ opponentName = "Rakip Takım" }) => {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [matchId]);
 
     const handleVote = (option) => {
         if (hasVoted) return;
