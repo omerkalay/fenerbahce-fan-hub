@@ -461,7 +461,7 @@ const Dashboard = ({
             {/* Poll */}
             <div className="mb-6">
                 <div className="mb-6">
-                    <Poll opponentName={opponent.name} />
+                    <Poll opponentName={opponent.name} matchId={matchData.id} />
                 </div>
             </div>
 
