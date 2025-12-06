@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { BACKEND_URL } from '../services/api';
 
-const buildLogoUrl = (teamId) => `${BACKEND_URL}/api/team-image/${teamId}`;
+const buildLogoUrl = (teamId) => `${BACKEND_URL}/team-image/${teamId}`;
 
 const TeamLogo = ({
     teamId,

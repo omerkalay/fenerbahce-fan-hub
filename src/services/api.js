@@ -1,10 +1,15 @@
-// Backend API URL
-export const BACKEND_URL = import.meta.env.DEV
-    ? 'http://localhost:3001'
-    : 'https://fenerbahce-backend.onrender.com';
+/**
+ * API Service - Firebase Cloud Functions Backend
+ * 
+ * Artık Render.com yerine Firebase kullanıyor!
+ */
+
+// Backend API URL - Firebase Cloud Functions
+// Local development da production backend'e bağlanıyor
+export const BACKEND_URL = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
 
 const ensureAbsolutePhoto = (player = {}) => {
-    const fallbackPath = `/api/player-image/${player.id ?? ''}`;
+    const fallbackPath = `/player-image/${player.id ?? ''}`;
     const value = player.photo || fallbackPath;
 
     if (value.startsWith('http://') && !value.includes('localhost')) {
@@ -22,7 +27,7 @@ const ensureAbsolutePhoto = (player = {}) => {
 // Fetch next match from backend
 export const fetchNextMatch = async () => {
     try {
-        const response = await fetch(`${BACKEND_URL}/api/next-match`);
+        const response = await fetch(`${BACKEND_URL}/next-match`);
         if (!response.ok) throw new Error('Backend fetch failed');
         return await response.json();
     } catch (error) {
@@ -34,7 +39,7 @@ export const fetchNextMatch = async () => {
 // Fetch squad from backend
 export const fetchSquad = async () => {
     try {
-        const response = await fetch(`${BACKEND_URL}/api/squad`);
+        const response = await fetch(`${BACKEND_URL}/squad`);
         if (!response.ok) throw new Error('Backend fetch failed');
         const squad = await response.json();
         return squad.map(player => ({
@@ -50,7 +55,7 @@ export const fetchSquad = async () => {
 // Fetch next 3 matches from backend
 export const fetchNext3Matches = async () => {
     try {
-        const response = await fetch(`${BACKEND_URL}/api/next-3-matches`);
+        const response = await fetch(`${BACKEND_URL}/next-3-matches`);
         if (!response.ok) throw new Error('Backend fetch failed');
         return await response.json();
     } catch (error) {
@@ -67,7 +72,7 @@ export const fetchInjuries = async () => {
 // Fetch standings from backend
 export const fetchStandings = async () => {
     try {
-        const response = await fetch(`${BACKEND_URL}/api/standings`);
+        const response = await fetch(`${BACKEND_URL}/standings`);
         if (!response.ok) throw new Error('Standings fetch failed');
         return await response.json();
     } catch (error) {

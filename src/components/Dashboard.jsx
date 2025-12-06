@@ -178,7 +178,7 @@ const Dashboard = ({
             }
 
             // 2. Send to backend
-            const response = await fetch(`${BACKEND_URL}/api/reminder`, {
+            const response = await fetch(`${BACKEND_URL}/reminder`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

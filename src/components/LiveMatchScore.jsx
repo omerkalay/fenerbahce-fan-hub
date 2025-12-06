@@ -17,7 +17,7 @@ const LiveMatchScore = () => {
     const fetchLiveScore = async () => {
         try {
             // Fetch from our backend
-            const response = await fetch(`${BACKEND_URL}/api/live-match`);
+            const response = await fetch(`${BACKEND_URL}/live-match`);
 
             if (!response.ok) {
                 if (response.status === 404) {
