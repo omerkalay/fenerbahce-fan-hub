@@ -19,7 +19,7 @@ const CustomStandings = ({ league }) => {
 
         try {
             // Fetch from our own backend
-            const response = await fetch(`${BACKEND_URL}/api/standings`);
+            const response = await fetch(`${BACKEND_URL}/standings`);
 
             if (!response.ok) {
                 throw new Error('Failed to fetch standings');

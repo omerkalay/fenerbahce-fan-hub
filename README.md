@@ -6,18 +6,25 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
+![Version](https://img.shields.io/badge/version-2.2.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
-![Vite](https://img.shields.io/badge/Vite-5.4.21-purple)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
+
+## What's New in v2.2.0 🚀
+
+**Backend Migration to Firebase Cloud Functions**
+- ⚡ **Zero Cold Start** - Instant response times (was 30-60s on Render free tier)
+- 💰 **99% API Cost Reduction** - From ~1440 to just 2 SofaScore API calls per day
+- 🔧 **Simplified Architecture** - Single platform (Firebase) instead of 3 separate services
+- 🛡️ **Improved Reliability** - Always-on serverless functions
 
 ## Features
 
 ### Dashboard
-### Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
-- **Live Match Tracking**: Real-time score updates, match events (goals, cards, substitutions), and live statistics (possession, shots, etc.) with custom Fenerbahçe styling (Powered by ESPN API)
-- **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**, fully integrated with custom design
+- **Live Match Tracking**: Real-time score updates, match events (goals, cards, substitutions), and live statistics (Powered by ESPN API)
+- **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
 - **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database)
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
@@ -29,16 +36,15 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
   - 1 hour before match
   - 30 minutes before match
   - 15 minutes before match
-  - **Daily Match Check**: Automatically checks at 09:00 TR every morning and notifies if there is a match that day.
-- **Always-On Delivery**: Powered by **Firebase Cloud Functions** (Serverless). Works even if the website is closed or the backend server is sleeping.
-- **Cross-Platform**: Works on mobile & desktop (PWA support).
+  - **Daily Match Check**: Automatically notifies at 09:00 TR if there is a match that day
+- **Always-On Delivery**: Powered by **Firebase Cloud Functions** (Serverless)
+- **Cross-Platform**: Works on mobile & desktop (PWA support)
 - **Beautiful Format**: `💛💙 Fenerbahçe - Opponent | 20:45 · 1 saat kaldı`
 
 ### Formation Builder
 - **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
 - **Realistic Pitch**: SVG-based football field with accurate markings
 - **Drag & Drop**: Intuitive player placement from squad pool
-- **Click to Add**: Modal-based player selection for empty positions
 - **Player Photos**: Dynamic player images from SofaScore API
 - **Share Feature**: Export formation as image
 
@@ -46,37 +52,63 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 - **Frontend**: React 19.2 + Vite 5.4
 - **Styling**: Tailwind CSS v4
-- **Backend**: Express.js (Data Fetching) + Firebase Cloud Functions (Notifications)
-- **Database**: Firebase Realtime Database (Polls & User Preferences)
-- **API**: SofaScore (via RapidAPI)
+- **Backend**: Firebase Cloud Functions (Serverless)
+- **Database**: Firebase Realtime Database (Polls, Cache & User Preferences)
+- **APIs**: 
+  - SofaScore (via RapidAPI) - Match data, Squad
+  - ESPN (Free) - Standings, Live scores
 - **Push Notifications**: Firebase Cloud Messaging (FCM)
 - **PWA**: Installable app with offline support
-- **Deployment**: GitHub Pages (frontend) + Render (backend) + Firebase (functions)
+- **Deployment**: GitHub Pages (frontend) + Firebase Cloud Functions (backend)
+
+## Architecture
+
+```
+┌─────────────────┐     ┌──────────────────────────────────────┐
+│   GitHub Pages  │     │         Firebase Cloud Functions     │
+│    (Frontend)   │────▶│  /api/next-match     (from cache)    │
+│                 │     │  /api/standings      (from cache)    │
+│  React + Vite   │     │  /api/squad          (from cache)    │
+│                 │     │  /api/reminder       (save prefs)    │
+└─────────────────┘     │  /api/live-match     (ESPN live)     │
+                        │  /api/player-image   (proxy)         │
+                        │  /api/team-image     (proxy)         │
+                        └──────────────────────────────────────┘
+                                        │
+                        ┌───────────────┼───────────────┐
+                        ▼               ▼               ▼
+                ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+                │   Firebase   │ │   SofaScore  │ │     ESPN     │
+                │   Realtime   │ │   (RapidAPI) │ │   (Free)     │
+                │   Database   │ │  2 calls/day │ │   Unlimited  │
+                └──────────────┘ └──────────────┘ └──────────────┘
+```
 
 ## Project Structure
 
 ```
 fenerbahce-fan-hub/
-├── backend/
-│   ├── server.js                  # Express API (Data fetching only)
-│   └── package.json               # Backend dependencies
 ├── functions/
-│   ├── index.js                   # Firebase Cloud Functions (Notifications)
-│   └── package.json               # Functions dependencies
+│   ├── index.js           # Firebase Cloud Functions (ALL backend logic)
+│   └── package.json       # Functions dependencies
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.jsx          # Main dashboard with matches & poll
 │   │   ├── Poll.jsx               # Real-time voting component
 │   │   ├── FormationBuilder.jsx   # Interactive pitch & formations
-│   │   └── ...
+│   │   ├── CustomStandings.jsx    # Standings table
+│   │   └── LiveMatchScore.jsx     # Live match tracker
 │   ├── services/
-│   │   └── api.js                 # Backend API integration
+│   │   └── api.js                 # Firebase API integration
 │   ├── firebase.js                # Firebase client initialization
 │   ├── App.jsx                    # Main app & routing
 │   └── main.jsx                   # React entry point
 ├── public/                        # Static assets & PWA icons
+├── backend/                       # [DEPRECATED] Old Render.com backend (kept for rollback)
 └── firebase.json                  # Firebase configuration
 ```
+
+> **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, change `BACKEND_URL` in `src/services/api.js` back to `https://fenerbahce-backend.onrender.com`.
 
 ## Installation & Setup
 
@@ -94,14 +126,14 @@ git clone https://github.com/yourusername/fenerbahce-fan-hub.git
 cd fenerbahce-fan-hub
 ```
 
-2. **Install frontend dependencies**
+2. **Install dependencies**
 
 ```bash
 npm install
 ```
 
 3. **Configure Firebase**
-   - Create `.env` file with your Firebase config:
+   Create `.env` file:
    ```env
    VITE_FIREBASE_API_KEY=...
    VITE_FIREBASE_AUTH_DOMAIN=...
@@ -116,31 +148,7 @@ npm install
 npm run dev
 ```
 
-### Backend Setup (Data Fetcher)
-
-1. **Navigate to backend directory**
-
-```bash
-cd backend
-npm install
-```
-
-2. **Configure environment**
-   Create `backend/.env`:
-
-```env
-RAPIDAPI_KEY=your_rapidapi_key
-RAPIDAPI_HOST=sofascore.p.rapidapi.com
-PORT=3001
-```
-
-3. **Run backend server**
-
-```bash
-npm start
-```
-
-### Firebase Cloud Functions Setup (Notifications)
+### Firebase Cloud Functions Setup
 
 1. **Navigate to functions directory**
 
@@ -149,50 +157,52 @@ cd functions
 npm install
 ```
 
-2. **Configure Environment**
-   Create `functions/.env` with your API keys:
-   ```env
-   RAPIDAPI_KEY=your_rapidapi_key
-   RAPIDAPI_HOST=sofascore.p.rapidapi.com
-   ```
+2. **Configure Secrets**
+   
+```bash
+firebase functions:secrets:set RAPIDAPI_KEY
+firebase functions:secrets:set RAPIDAPI_HOST
+```
 
-2. **Deploy Functions**
+3. **Deploy Functions**
 
 ```bash
 firebase login
 firebase deploy --only functions
 ```
 
+4. **Initialize Cache**
+   Visit: `https://us-central1-YOUR-PROJECT.cloudfunctions.net/api/refresh`
+
 ## How It Works
 
-### Poll System
-- Uses **Firebase Realtime Database** to store vote counts.
-- Real-time listeners update the UI instantly when anyone votes.
-- LocalStorage prevents double voting from the same browser.
+### Scheduled Functions
+
+| Function | Schedule | Description |
+|----------|----------|-------------|
+| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match & squad data from SofaScore, standings from ESPN. Caches everything in Firebase. |
+| `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
 
 ### Notification System
-1. **User Preference**: User selects "1 Hour Before" in the UI.
-2. **Database**: Preference is saved to `notifications/{userId}/matches/{matchId}` in Firebase.
-3. **Cloud Function**: A scheduled function runs **every minute** on Google Cloud.
-   - Checks upcoming matches.
-   - Scans database for users who want notifications at this time.
-   - Sends push notification via FCM.
-4. **Delivery**: Notification arrives on user's device via Service Worker.
+1. **User Preference**: User selects "1 Hour Before" in the UI
+2. **Database**: Preference is saved to `notifications/{userId}/matches/{matchId}` in Firebase
+3. **Cloud Function**: Scheduled function checks every minute
+   - Reads match data from **cache** (not external API!)
+   - Scans database for users who want notifications at this time
+   - Sends push notification via FCM
+4. **Delivery**: Notification arrives on user's device via Service Worker
 
 ### Live Match Tracking
-- **Data Source**: Fetches real-time data from **ESPN API** (via internal proxy) every 30 seconds during matches.
-- **Caching**: Backend implements intelligent caching to prevent rate limits while ensuring fresh data.
-- **Smart Status**: Automatically detects if a match is "Live", "Halftime", or "Finished" to adjust polling frequency.
+- **Data Source**: ESPN API (free, unlimited)
+- **Refresh Rate**: Every 30 seconds during live matches
+- **Smart Status**: Auto-detects "Live", "Halftime", "Finished"
 
-### Custom Standings
-- **Multi-League**: Fetches standings for both **Süper Lig** and **UEFA Europa League** from ESPN.
-- **Data Processing**: Backend normalizes data from different leagues into a unified format for the frontend.
-- **Performance**: Caches standings data for 1 hour to minimize external API calls.
-
-### Formation Builder
-- **Interactive Pitch**: Uses HTML5 Drag and Drop API for smooth player placement.
-- **Export**: Uses `html-to-image` to generate a high-quality PNG of the user's custom formation.
-- **Dynamic Assets**: Automatically loads player photos from SofaScore based on player IDs.
+### API Cost Optimization
+| | Before (v2.1) | After (v2.2) |
+|---|---|---|
+| SofaScore calls/day | ~1,440 | **2** |
+| SofaScore calls/month | ~43,200 | **~60** |
+| Savings | - | **99.9%** |
 
 ## Deployment
 
@@ -203,11 +213,11 @@ npm run build
 npm run deploy
 ```
 
-### Backend (Render)
-Deploys automatically from `backend/` directory.
-
 ### Functions (Firebase)
-Deploys via CLI: `firebase deploy --only functions`
+
+```bash
+firebase deploy --only functions
+```
 
 ## Contributing
 
@@ -219,11 +229,13 @@ MIT License - Free to use and modify
 
 ## Credits
 
-- **API**: SofaScore via RapidAPI
+- **APIs**: SofaScore (RapidAPI), ESPN (Free)
 - **Design Inspiration**: Modern sports apps
 - **Icons**: Lucide React
-- **Team**: Fenerbahçe SK
+- **Team**: Fenerbahçe SK 💛💙
 
 ---
 
 Made with passion for Fenerbahçe fans
+
+**v2.2.0** | December 2025
