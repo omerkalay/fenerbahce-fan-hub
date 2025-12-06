@@ -576,6 +576,15 @@ async function handleReminder(req, res) {
     }
 
     try {
+        // Manuel bildirimler için kullanıcıyı genel topic'e abone et
+        await admin.messaging().subscribeToTopic(playerId, 'all_fans');
+        console.log(`✅ Subscribed ${playerId.slice(0, 10)}... to topic 'all_fans'`);
+    } catch (subError) {
+        console.error('Topic subscription failed:', subError);
+        // Topic hatası akışı bozmasın, devam et
+    }
+
+    try {
         const playerRef = db.ref(`notifications/${playerId}`);
         const snapshot = await playerRef.once('value');
         const currentData = snapshot.val() || {};
