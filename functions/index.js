@@ -240,9 +240,15 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
         const updates = {};
 
         // 3. Her kullanıcı için kontrol
+        // Daily check SADECE sabah 09:00-09:02 İstanbul saatinde çalışsın
+        const istanbulNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
+        const istanbulHour = istanbulNow.getHours();
+        const istanbulMinute = istanbulNow.getMinutes();
+        const isDailyCheckTime = istanbulHour === 9 && istanbulMinute <= 2; // 09:00-09:02 arası
+
         for (const [playerId, playerData] of Object.entries(allNotifications)) {
-            // Daily check
-            if (playerData.dailyCheck) {
+            // Daily check - SADECE sabah 09:00-09:02 arasında
+            if (playerData.dailyCheck && isDailyCheckTime) {
                 const todayStr = new Date().toDateString();
                 const nextMatch = nextMatches[0];
                 const matchDate = new Date(nextMatch.startTimestamp * 1000);
