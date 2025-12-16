@@ -280,19 +280,21 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                 }
             }
 
-            // Match-specific notifications
-            if (!playerData.matches) continue;
+            // Global default options - TÜM maçlara uygulanır
+            if (!playerData.defaultOptions) continue;
 
-            for (const [matchId, matchOptions] of Object.entries(playerData.matches)) {
-                const match = nextMatches.find(m => String(m.id) === String(matchId));
-                if (!match) continue;
+            const defaultOpts = playerData.defaultOptions;
+            const sentNotificationsMap = playerData.sentNotifications || {};
 
+            // Her upcoming maç için kontrol et
+            for (const match of nextMatches) {
+                const matchId = String(match.id);
                 const matchTime = match.startTimestamp * 1000;
-                const sentNotifications = matchOptions.sentNotifications || [];
+                const sentForMatch = sentNotificationsMap[matchId] || [];
 
                 for (const [optionKey, config] of Object.entries(MATCH_CONFIG)) {
-                    if (!matchOptions[optionKey]) continue;
-                    if (sentNotifications.includes(optionKey)) continue;
+                    if (!defaultOpts[optionKey]) continue;
+                    if (sentForMatch.includes(optionKey)) continue;
 
                     const triggerTime = matchTime - config.offsetMs;
                     const triggerWindowEnd = triggerTime + (2 * 60 * 1000); // 2 dakikalık window
@@ -314,7 +316,7 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                                 body: `${timeString} · ${config.timeText}`
                             },
                             data: {
-                                matchId: String(match.id),
+                                matchId: matchId,
                                 type: optionKey
                             },
                             webpush: {
@@ -322,8 +324,9 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                             }
                         });
 
-                        const sentPath = `notifications/${playerId}/matches/${matchId}/sentNotifications`;
-                        updates[sentPath] = [...sentNotifications, optionKey];
+                        // Gönderilen bildirimleri takip et (yeni yapı)
+                        const sentPath = `notifications/${playerId}/sentNotifications/${matchId}`;
+                        updates[sentPath] = [...sentForMatch, optionKey];
                     }
                 }
             }
@@ -598,36 +601,30 @@ async function handleReminder(req, res) {
         // Update dailyCheck
         currentData.dailyCheck = options.dailyCheck || false;
 
-        // Update match-specific reminders
-        if (matchId) {
-            if (!currentData.matches) {
-                currentData.matches = {};
-            }
+        // Update global default options (tüm maçlara uygulanır)
+        currentData.defaultOptions = {
+            threeHours: options.threeHours || false,
+            oneHour: options.oneHour || false,
+            thirtyMinutes: options.thirtyMinutes || false,
+            fifteenMinutes: options.fifteenMinutes || false,
+            updatedAt: Date.now()
+        };
 
-            const hasOptions = options.threeHours || options.oneHour ||
-                options.thirtyMinutes || options.fifteenMinutes;
-
-            if (hasOptions) {
-                currentData.matches[matchId] = {
-                    threeHours: options.threeHours || false,
-                    oneHour: options.oneHour || false,
-                    thirtyMinutes: options.thirtyMinutes || false,
-                    fifteenMinutes: options.fifteenMinutes || false,
-                    sentNotifications: currentData.matches?.[matchId]?.sentNotifications || [],
-                    updatedAt: Date.now()
-                };
-            } else if (currentData.matches[matchId]) {
-                delete currentData.matches[matchId];
-            }
+        // Eski matches verisini temizle (artık kullanılmıyor)
+        if (currentData.matches) {
+            delete currentData.matches;
         }
 
         await playerRef.set(currentData);
+
+        const activeCount = Object.values(currentData.defaultOptions)
+            .filter(v => v === true).length;
 
         return res.json({
             success: true,
             message: 'Preferences saved',
             dailyCheckActive: currentData.dailyCheck,
-            activeMatchReminders: Object.keys(currentData.matches || {}).length
+            activeNotifications: activeCount
         });
 
     } catch (error) {
