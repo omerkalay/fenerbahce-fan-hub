@@ -6,18 +6,18 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue)
+![Version](https://img.shields.io/badge/version-2.3.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.2.0 🚀
+## What's New in v2.3.0 🚀
 
-**Backend Migration to Firebase Cloud Functions**
-- ⚡ **Zero Cold Start** - Instant response times (was 30-60s on Render free tier)
-- 💰 **99% API Cost Reduction** - From ~1440 to just 2 SofaScore API calls per day
-- 🔧 **Simplified Architecture** - Single platform (Firebase) instead of 3 separate services
-- 🛡️ **Improved Reliability** - Always-on serverless functions
+**Formation Builder Improvements**
+- 📤 **Web Share API** - Share your lineup directly to WhatsApp, Telegram, Twitter (native share menu)
+- ⚽ **Improved Pitch Design** - Professional SVG pitch with FIFA-standard markings (penalty areas, corner arcs, center circle)
+- 🎯 **Optimized Positions** - Player positions aligned with pitch markings for realistic formations
+- � **Drag & Drop Fix** - Fixed card dragging issue on desktop browsers
 
 ## Features
 
@@ -43,10 +43,11 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ### Formation Builder
 - **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
-- **Realistic Pitch**: SVG-based football field with accurate markings
+- **Realistic Pitch**: SVG-based football field with accurate FIFA-standard markings
 - **Drag & Drop**: Intuitive player placement from squad pool
 - **Player Photos**: Dynamic player images from SofaScore API
-- **Share Feature**: Export formation as image
+- **Native Share**: Share your lineup directly to WhatsApp, Telegram, Twitter via Web Share API
+- **Download**: Export formation as PNG image
 
 ## Tech Stack
 
@@ -239,4 +240,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.2.0** | December 2025
+**v2.3.0** | December 2025

@@ -2,11 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fetchSquad } from '../services/api';
 import { toPng } from 'html-to-image';
 
-const parsePercent = (value = '0') => {
-    const numeric = parseFloat(String(value).replace('%', ''));
-    if (Number.isNaN(numeric)) return 0;
-    return numeric / 100;
-};
+const PITCH_SVG = `data:image/svg+xml,${encodeURIComponent(`<svg viewBox="0 0 68 105" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grass" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#1a472a"/><stop offset="50%" style="stop-color:#166534"/><stop offset="100%" style="stop-color:#1a472a"/></linearGradient></defs><rect width="68" height="105" fill="url(#grass)"/><g stroke="rgba(255,255,255,0.5)" stroke-width="0.4" fill="none"><rect x="4" y="4" width="60" height="97"/><line x1="4" y1="52.5" x2="64" y2="52.5"/><circle cx="34" cy="52.5" r="9.15"/><circle cx="34" cy="52.5" r="0.5" fill="rgba(255,255,255,0.5)"/><rect x="13.84" y="4" width="40.32" height="16.5"/><rect x="24.84" y="4" width="18.32" height="5.5"/><circle cx="34" cy="15" r="0.5" fill="rgba(255,255,255,0.5)"/><path d="M 25.5 20.5 A 9.15 9.15 0 0 0 42.5 20.5"/><rect x="13.84" y="84.5" width="40.32" height="16.5"/><rect x="24.84" y="95.5" width="18.32" height="5.5"/><circle cx="34" cy="90" r="0.5" fill="rgba(255,255,255,0.5)"/><path d="M 25.5 84.5 A 9.15 9.15 0 0 1 42.5 84.5"/><path d="M 4 6 A 2 2 0 0 0 6 4"/><path d="M 62 4 A 2 2 0 0 0 64 6"/><path d="M 4 99 A 2 2 0 0 1 6 101"/><path d="M 62 101 A 2 2 0 0 1 64 99"/></g></svg>`)}`;
 
 const FormationBuilder = () => {
     const [squad, setSquad] = useState([]);
@@ -45,27 +41,23 @@ const FormationBuilder = () => {
         const player = JSON.parse(e.dataTransfer.getData('player'));
         const sourcePosition = e.dataTransfer.getData('sourcePosition');
 
-        // Eğer saha içinden geliyorsa
         if (sourcePosition) {
             const targetPlayer = pitchPlayers[positionKey];
-            
+
             setPitchPlayers(prev => {
                 const newState = { ...prev };
-                
-                // Hedef pozisyonda oyuncu varsa yer değiştir
+
                 if (targetPlayer) {
                     newState[sourcePosition] = targetPlayer;
                     newState[positionKey] = player;
                 } else {
-                    // Hedef pozisyon boşsa sadece taşı
                     delete newState[sourcePosition];
                     newState[positionKey] = player;
                 }
-                
+
                 return newState;
             });
         } else {
-            // Oyuncu havuzundan geliyorsa
             const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
             if (isAlreadyOnPitch) {
                 return;
@@ -112,71 +104,72 @@ const FormationBuilder = () => {
         setPlayerSearch('');
     };
 
+    // Pozisyonlar saha çizgilerine göre optimize edildi
     const formations = {
         '4-3-3': {
-            GK: { top: '92%', left: '50%' },
-            LB: { top: '75%', left: '15%' },
-            CB1: { top: '75%', left: '37%' },
-            CB2: { top: '75%', left: '63%' },
-            RB: { top: '75%', left: '85%' },
-            CM1: { top: '48%', left: '30%' },
-            CM2: { top: '48%', left: '50%' },
-            CM3: { top: '48%', left: '70%' },
-            LW: { top: '25%', left: '15%' },
-            ST: { top: '18%', left: '50%' },
-            RW: { top: '25%', left: '85%' }
+            GK: { top: '93%', left: '50%' },
+            LB: { top: '78%', left: '12%' },
+            CB1: { top: '78%', left: '35%' },
+            CB2: { top: '78%', left: '65%' },
+            RB: { top: '78%', left: '88%' },
+            CM1: { top: '50%', left: '28%' },
+            CM2: { top: '50%', left: '50%' },
+            CM3: { top: '50%', left: '72%' },
+            LW: { top: '25%', left: '12%' },
+            ST: { top: '15%', left: '50%' },
+            RW: { top: '25%', left: '88%' }
         },
         '4-4-2': {
-            GK: { top: '92%', left: '50%' },
-            LB: { top: '75%', left: '15%' },
-            CB1: { top: '75%', left: '37%' },
-            CB2: { top: '75%', left: '63%' },
-            RB: { top: '75%', left: '85%' },
-            LM: { top: '48%', left: '15%' },
-            CM1: { top: '48%', left: '37%' },
-            CM2: { top: '48%', left: '63%' },
-            RM: { top: '48%', left: '85%' },
-            ST1: { top: '20%', left: '37%' },
-            ST2: { top: '20%', left: '63%' }
+            GK: { top: '93%', left: '50%' },
+            LB: { top: '78%', left: '12%' },
+            CB1: { top: '78%', left: '35%' },
+            CB2: { top: '78%', left: '65%' },
+            RB: { top: '78%', left: '88%' },
+            LM: { top: '50%', left: '12%' },
+            CM1: { top: '50%', left: '35%' },
+            CM2: { top: '50%', left: '65%' },
+            RM: { top: '50%', left: '88%' },
+            ST1: { top: '18%', left: '35%' },
+            ST2: { top: '18%', left: '65%' }
         },
         '4-2-3-1': {
-            GK: { top: '92%', left: '50%' },
-            LB: { top: '75%', left: '15%' },
-            CB1: { top: '75%', left: '37%' },
-            CB2: { top: '75%', left: '63%' },
-            RB: { top: '75%', left: '85%' },
-            CDM1: { top: '58%', left: '37%' },
-            CDM2: { top: '58%', left: '63%' },
+            GK: { top: '93%', left: '50%' },
+            LB: { top: '78%', left: '12%' },
+            CB1: { top: '78%', left: '35%' },
+            CB2: { top: '78%', left: '65%' },
+            RB: { top: '78%', left: '88%' },
+            CDM1: { top: '60%', left: '35%' },
+            CDM2: { top: '60%', left: '65%' },
             LAM: { top: '35%', left: '15%' },
-            CAM: { top: '30%', left: '50%' },
+            CAM: { top: '32%', left: '50%' },
             RAM: { top: '35%', left: '85%' },
-            ST: { top: '18%', left: '50%' }
+            ST: { top: '15%', left: '50%' }
         },
         '4-1-4-1': {
-            GK: { top: '92%', left: '50%' },
-            LB: { top: '75%', left: '15%' },
-            CB1: { top: '75%', left: '37%' },
-            CB2: { top: '75%', left: '63%' },
-            RB: { top: '75%', left: '85%' },
-            CDM: { top: '60%', left: '50%' },
-            LM: { top: '42%', left: '15%' },
-            CM1: { top: '42%', left: '37%' },
-            CM2: { top: '42%', left: '63%' },
-            RM: { top: '42%', left: '85%' },
-            ST: { top: '18%', left: '50%' }
+            GK: { top: '93%', left: '50%' },
+            LB: { top: '78%', left: '12%' },
+            CB1: { top: '78%', left: '35%' },
+            CB2: { top: '78%', left: '65%' },
+            RB: { top: '78%', left: '88%' },
+            CDM: { top: '62%', left: '50%' },
+            LM: { top: '45%', left: '12%' },
+            CM1: { top: '45%', left: '35%' },
+            CM2: { top: '45%', left: '65%' },
+            RM: { top: '45%', left: '88%' },
+            ST: { top: '15%', left: '50%' }
         },
         '3-5-2': {
-            GK: { top: '92%', left: '50%' },
-            CB1: { top: '75%', left: '25%' },
-            CB2: { top: '75%', left: '50%' },
-            CB3: { top: '75%', left: '75%' },
-            LWB: { top: '52%', left: '10%' },
-            CM1: { top: '48%', left: '30%' },
-            CM2: { top: '48%', left: '50%' },
-            CM3: { top: '48%', left: '70%' },
-            RWB: { top: '52%', left: '90%' },
-            ST1: { top: '20%', left: '37%' },
-            ST2: { top: '20%', left: '63%' }
+            GK: { top: '93%', left: '50%' },
+            CB1: { top: '78%', left: '25%' },
+            CB2: { top: '78%', left: '50%' },
+            CB3: { top: '78%', left: '75%' },
+            LWB: { top: '55%', left: '8%' },
+            CM1: { top: '50%', left: '28%' },
+            CM2: { top: '50%', left: '50%' },
+            CM3: { top: '50%', left: '72%' },
+            RWB: { top: '55%', left: '92%' },
+            ST1: { top: '18%', left: '35%' },
+            ST2: { top: '18%', left: '65%' }
         }
     };
 
@@ -184,23 +177,27 @@ const FormationBuilder = () => {
     const filledSpots = Object.keys(pitchPlayers).length;
     const totalSpots = Object.keys(currentPositions).length;
 
+    const generateLineupImage = async () => {
+        const date = new Date().toISOString().split('T')[0];
+        const dataUrl = await toPng(pitchRef.current, {
+            quality: 1.0,
+            pixelRatio: 2,
+            backgroundColor: '#030712',
+            style: { transform: 'scale(1)' }
+        });
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const fileName = `fenerbahce-${formation.replace(/[^0-9a-z-]/gi, '')}-lineup-${date}.png`;
+        return { blob, fileName, dataUrl };
+    };
+
     const downloadLineupCard = async () => {
         if (!filledSpots || isExporting || !pitchRef.current) return;
         setIsExporting(true);
-
         try {
-            const date = new Date().toISOString().split('T')[0];
-            const dataUrl = await toPng(pitchRef.current, {
-                quality: 1.0,
-                pixelRatio: 2, // Better quality for text
-                backgroundColor: '#030712',
-                style: {
-                    transform: 'scale(1)',
-                }
-            });
-
+            const { dataUrl, fileName } = await generateLineupImage();
             const link = document.createElement('a');
-            link.download = `fenerbahce-${formation.replace(/[^0-9a-z-]/gi, '')}-lineup-${date}.png`;
+            link.download = fileName;
             link.href = dataUrl;
             link.click();
         } catch (error) {
@@ -211,16 +208,32 @@ const FormationBuilder = () => {
         }
     };
 
-    // Sort positions by 'top' coordinate (ascending) so that players lower on the screen (higher top %)
-    // are rendered LAST (on top of others). This fixes overlap issues where a forward covers a midfielder.
-    // Wait, if GK is at 92% (bottom), and ST is at 18% (top).
-    // If we render ST first, then GK. GK is on top of ST.
-    // If ST's name extends down, it might be covered by a midfielder rendered later?
-    // We want players "closer" to the viewer (bottom of screen) to be on top.
-    // So we should render from Top to Bottom?
-    // If ST (18%) is rendered first. Then CAM (30%).
-    // If ST's name overlaps CAM's head, CAM (rendered later) will cover ST's name. This is correct for 3D.
-    // So we want to render smaller 'top' values first, larger 'top' values last.
+    const shareLineupCard = async () => {
+        if (!filledSpots || isExporting || !pitchRef.current) return;
+        setIsExporting(true);
+        try {
+            const { blob, fileName } = await generateLineupImage();
+            const file = new File([blob], fileName, { type: 'image/png' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    title: 'Fenerbahçe Kadrom',
+                    text: `Benim ${formation} kadrom! 💛💙`,
+                    files: [file]
+                });
+            } else {
+                // Fallback: indirme yap
+                downloadLineupCard();
+            }
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Paylaşım hatası:', error);
+            }
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const sortedPositions = Object.entries(currentPositions).sort(([, a], [, b]) => {
         return parseFloat(a.top) - parseFloat(b.top);
     });
@@ -255,19 +268,34 @@ const FormationBuilder = () => {
                                 Tamamlanan kadro: <span className="font-semibold text-white">{filledSpots}/{totalSpots}</span>
                             </p>
                         </div>
-                        <button
-                            onClick={downloadLineupCard}
-                            disabled={!filledSpots || isExporting}
-                            className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${filledSpots && !isExporting
+                        <div className="flex gap-2">
+                            <button
+                                onClick={shareLineupCard}
+                                disabled={!filledSpots || isExporting}
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${filledSpots && !isExporting
+                                    ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 hover:bg-yellow-500/30'
+                                    : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
+                                    }`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                                {isExporting ? 'Hazırlanıyor...' : 'Paylaş'}
+                            </button>
+                            <button
+                                onClick={downloadLineupCard}
+                                disabled={!filledSpots || isExporting}
+                                className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors ${filledSpots && !isExporting
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
                                     : 'bg-white/5 text-slate-500 border border-white/10 cursor-not-allowed'
-                                }`}
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            {isExporting ? 'Hazırlanıyor...' : 'Ekran Görüntüsü Al'}
-                        </button>
+                                    }`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                İndir
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -277,7 +305,7 @@ const FormationBuilder = () => {
                 ref={pitchRef}
                 className="relative w-full aspect-[2/3] overflow-hidden mx-auto max-w-sm rounded-xl mb-6"
                 style={{
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='grass' x1='0%25' y1='0%25' x2='0%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%23166534'/%3E%3Cstop offset='100%25' style='stop-color:%231e7e34'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='100' height='150' fill='url(%23grass)'/%3E%3Cg stroke='white' stroke-width='0.5' fill='none' opacity='0.4'%3E%3Crect x='5' y='5' width='90' height='140'/%3E%3Cline x1='5' x2='95' y1='75' y2='75'/%3E%3Ccircle cx='50' cy='75' r='10'/%3E%3Ccircle cx='50' cy='75' r='0.5' fill='white'/%3E%3Crect x='30' y='5' width='40' height='18'/%3E%3Crect x='40' y='5' width='20' height='7'/%3E%3Ccircle cx='50' cy='0.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 23 A 10 10 0 0 0 65 23' /%3E%3Crect x='30' y='127' width='40' height='18'/%3E%3Crect x='40' y='138' width='20' height='7'/%3E%3Ccircle cx='50' cy='149.5' r='0.5' fill='white'/%3E%3Cpath d='M 35 127 A 10 10 0 0 1 65 127' /%3E%3Cpath d='M 5 5 Q 7 7 5 9' /%3E%3Cpath d='M 95 5 Q 93 7 95 9' /%3E%3Cpath d='M 5 145 Q 7 143 5 141' /%3E%3Cpath d='M 95 145 Q 93 143 95 141' /%3E%3C/g%3E%3C/svg%3E")`,
+                    backgroundImage: `url("${PITCH_SVG}")`,
                     backgroundSize: 'cover',
                     backgroundPosition: 'center'
                 }}>
@@ -295,7 +323,7 @@ const FormationBuilder = () => {
                             onClick={() => handlePositionClick(posKey)}
                         >
                             {player ? (
-                                <div 
+                                <div
                                     className="relative w-full h-full flex flex-col items-center group"
                                     draggable={!isExporting && !isTouchDevice}
                                     onDragStart={(e) => {
@@ -354,19 +382,19 @@ const FormationBuilder = () => {
                                     onDragStart={(e) => handleDragStart(e, player)}
                                     className="glass-panel rounded-lg p-2 flex flex-col items-center gap-1 cursor-move active:scale-95 transition-transform hover:bg-white/5"
                                 >
-                                    <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-white/10">
+                                    <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-white/10 pointer-events-none">
                                         {player.photo ? (
-                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" draggable="false" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
                                                 {player.number}
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-[9px] text-center leading-tight line-clamp-2 h-6 flex items-center">
+                                    <span className="text-[9px] text-center leading-tight line-clamp-2 h-6 flex items-center pointer-events-none">
                                         {player.name.split(' ').slice(-1)[0]}
                                     </span>
-                                    <span className="text-[8px] text-slate-500 bg-slate-900/50 px-1.5 rounded">
+                                    <span className="text-[8px] text-slate-500 bg-slate-900/50 px-1.5 rounded pointer-events-none">
                                         {player.position}
                                     </span>
                                 </div>
