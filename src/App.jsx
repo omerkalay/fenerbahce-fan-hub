@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
+import NotificationSettings from './components/NotificationSettings';
 import { fetchNextMatch, fetchNext3Matches } from './services/api';
 
 const readCachedMatchData = () => {
@@ -100,9 +101,14 @@ function App() {
             </h1>
             <p className="text-slate-400 text-xs">Taraftarın Sesi</p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 p-0.5 shadow-lg shadow-yellow-500/20">
-            <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-              <img src="https://media.api-sports.io/football/teams/611.png" alt="FB Logo" className="w-8 h-8 object-contain" />
+          <div className="flex items-center gap-3">
+            {/* Bildirim Ayarları - Logonun solunda */}
+            <NotificationSettings />
+            {/* Logo */}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 p-0.5 shadow-lg shadow-yellow-500/20">
+              <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
+                <img src="https://media.api-sports.io/football/teams/611.png" alt="FB Logo" className="w-8 h-8 object-contain" />
+              </div>
             </div>
           </div>
         </header>

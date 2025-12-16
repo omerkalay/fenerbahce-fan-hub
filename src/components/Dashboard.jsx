@@ -1,22 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { BACKEND_URL } from '../services/api';
 import TeamLogo from './TeamLogo';
 import Poll from './Poll';
 import CustomStandings from './CustomStandings';
 import LiveMatchScore from './LiveMatchScore';
-
-const createEmptyOptions = () => ({
-    threeHours: false,
-    oneHour: false,
-    thirtyMinutes: false,
-    fifteenMinutes: false,
-    dailyCheck: false
-});
-
-const normalizeOptions = (options = {}) => ({
-    ...createEmptyOptions(),
-    ...options
-});
 
 const Dashboard = ({
     matchData,
@@ -28,28 +14,9 @@ const Dashboard = ({
     isRefreshing
 }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-    const [showNotificationModal, setShowNotificationModal] = useState(false);
     const [showLiveMatchModal, setShowLiveMatchModal] = useState(false);
     const [showStandingsModal, setShowStandingsModal] = useState(false);
-    const [standingsLeague, setStandingsLeague] = useState(''); // 'superlig' or 'europa'
-    const [selectedOptions, setSelectedOptions] = useState(() => {
-        // localStorage'dan oku
-        const saved = localStorage.getItem('fb_notification_options');
-        if (saved) {
-            try {
-                return normalizeOptions(JSON.parse(saved));
-            } catch {
-                return createEmptyOptions();
-            }
-        }
-        return createEmptyOptions();
-    });
-    const [draftOptions, setDraftOptions] = useState(null); // Modal içinde düzenlenen taslak değerler
-    const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
-        // localStorage'dan oku
-        const saved = localStorage.getItem('fb_has_notifications');
-        return saved === 'true';
-    });
+    const [standingsLeague, setStandingsLeague] = useState('');
 
     useEffect(() => {
         if (!matchData) return;
@@ -75,7 +42,7 @@ const Dashboard = ({
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
-        if (showNotificationModal || showLiveMatchModal || showStandingsModal) {
+        if (showLiveMatchModal || showStandingsModal) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
@@ -83,7 +50,7 @@ const Dashboard = ({
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [showNotificationModal, showLiveMatchModal, showStandingsModal]);
+    }, [showLiveMatchModal, showStandingsModal]);
 
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
     if (!matchData) {
@@ -115,147 +82,6 @@ const Dashboard = ({
     const matchEndTime = new Date(matchDate.getTime() + (120 * 60 * 1000)); // 2 hours after start
     const isMatchLive = now >= matchDate && now <= matchEndTime && matchData.status?.type === 'inprogress';
 
-    const toggleOption = (optionId) => {
-        setDraftOptions(prev => {
-            const base = prev ?? selectedOptions;
-            return {
-                ...base,
-                [optionId]: !base?.[optionId]
-            };
-        });
-    };
-
-    const saveNotifications = async () => {
-        const optionsToSave = normalizeOptions(currentDraftOptions);
-        const count = Object.values(optionsToSave).filter(v => v).length;
-
-        try {
-            // 1. Get Firebase token
-            let token = null;
-            try {
-                if (!('Notification' in window)) {
-                    alert('❌ Bu tarayıcı bildirimleri desteklemiyor.');
-                    return;
-                }
-
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    const { messaging } = await import('../firebase');
-                    const { getToken } = await import('firebase/messaging');
-
-                    // Register service worker with dynamic base path
-                    const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
-                    console.log('Service Worker registering at:', swUrl);
-
-                    try {
-                        const registration = await navigator.serviceWorker.register(swUrl, {
-                            scope: import.meta.env.BASE_URL
-                        });
-                        console.log('✅ Service Worker registered:', registration);
-
-                        token = await getToken(messaging, {
-                            vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
-                            serviceWorkerRegistration: registration
-                        });
-                    } catch (swError) {
-                        console.error('Service Worker registration failed:', swError);
-                        alert(`❌ Service Worker hatası: ${swError.message}`);
-                        return;
-                    }
-                } else {
-                    alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
-                    return;
-                }
-            } catch (err) {
-                console.error('Token alınamadı:', err);
-                alert(`❌ Bildirim hatası: ${err.message}`);
-                return;
-            }
-
-            if (!token) {
-                alert('❌ Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
-                return;
-            }
-
-            // 2. Send to backend
-            const response = await fetch(`${BACKEND_URL}/reminder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playerId: token, // Using token as unique player ID
-                    matchId: matchData.id,
-                    options: optionsToSave
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Backend error: ${response.status}`);
-            }
-
-            const result = await response.json();
-            console.log('Backend response:', result);
-
-            // 3. Update UI
-            if (count === 0) {
-                setHasActiveNotifications(false);
-                localStorage.removeItem('fb_has_notifications');
-                localStorage.removeItem('fb_notification_options');
-                alert('✅ Tüm bildirimler temizlendi!');
-            } else {
-                setHasActiveNotifications(true);
-                localStorage.setItem('fb_has_notifications', 'true');
-                localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
-                alert(`✅ ${count} bildirim ayarlandı!`);
-            }
-
-            setSelectedOptions(optionsToSave);
-            setDraftOptions(null);
-            setShowNotificationModal(false);
-
-        } catch (error) {
-            console.error('Bildirim kaydetme hatası:', error);
-            alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
-        }
-    };
-
-    const notificationOptions = [
-        {
-            id: 'threeHours',
-            label: 'Maçtan 3 saat önce',
-            description: 'Hazırlık yapmaya zamanın olsun'
-        },
-        {
-            id: 'oneHour',
-            label: 'Maçtan 1 saat önce',
-            description: 'Heyecan zamanı!'
-        },
-        {
-            id: 'thirtyMinutes',
-            label: 'Maçtan 30 dakika önce',
-            description: 'Son hazırlık'
-        },
-        {
-            id: 'fifteenMinutes',
-            label: 'Maçtan 15 dakika önce',
-            description: 'Maç başlıyor!'
-        }
-    ];
-
-    const handleOpenNotificationModal = () => {
-        setDraftOptions({ ...selectedOptions });
-        setShowNotificationModal(true);
-    };
-
-    const handleCloseNotificationModal = () => {
-        setDraftOptions(null);
-        setShowNotificationModal(false);
-    };
-
-    const currentDraftOptions = draftOptions ?? selectedOptions;
-    const hasDraftChanges = JSON.stringify(currentDraftOptions) !== JSON.stringify(selectedOptions);
-    const draftSelectionCount = Object.values(currentDraftOptions).filter(Boolean).length;
-    const savedSelectionCount = Object.values(selectedOptions).filter(Boolean).length;
-
     return (
         <div className="min-h-screen pb-20">
             {/* Hero Section: Next Match Card */}
@@ -267,42 +93,9 @@ const Dashboard = ({
                         {matchData.tournament.name}
                     </span>
 
-                    <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-400 font-medium">
-                            {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
-                        </span>
-
-                        {/* Bildirim İkonu */}
-                        <button
-                            onClick={handleOpenNotificationModal}
-                            className={`relative p-2.5 rounded-full transition-all duration-300 group ${hasActiveNotifications
-                                ? 'bg-yellow-400 text-black shadow-[0_0_20px_rgba(234,179,8,0.5)]'
-                                : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110'
-                                }`}
-                            title="Bildirim ayarları"
-                        >
-                            {hasActiveNotifications ? (
-                                // Ayar ikonu aktif (kalın kontur)
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            ) : (
-                                // Ayar ikonu (ince kontur)
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                            )}
-
-                            {/* Badge - Aktif bildirim sayısı */}
-                            {hasActiveNotifications && savedSelectionCount > 0 && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-blue-900 text-yellow-400 text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-slate-950">
-                                    {savedSelectionCount}
-                                </span>
-                            )}
-                        </button>
-                    </div>
+                    <span className="text-xs text-slate-400 font-medium">
+                        {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                    </span>
                 </div>
 
 
@@ -468,169 +261,6 @@ const Dashboard = ({
             </div>
 
 
-            {/* Bildirim Modal */}
-            {showNotificationModal && (
-                <div
-                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
-                    onClick={handleCloseNotificationModal}
-                >
-                    <div
-                        className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="flex justify-between items-start mb-6">
-                            <div>
-                                <h2 className="text-xl font-bold text-white">
-                                    Bildirim Ayarları
-                                </h2>
-                                <p className="text-sm text-slate-400 mt-2">
-                                    Ne zaman hatırlatmak istersin?
-                                </p>
-                            </div>
-                            <button
-                                onClick={handleCloseNotificationModal}
-                                className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Maç Bilgisi */}
-                        <div className="glass-panel rounded-xl p-4 mb-6 border border-yellow-400/20">
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex flex-col gap-2">
-                                        <div className="w-10 h-10 rounded-full bg-white/5 p-2 flex-shrink-0">
-                                            <TeamLogo
-                                                teamId={FENERBAHCE_ID}
-                                                name="Fenerbahçe"
-                                                wrapperClassName="w-full h-full"
-                                                imageClassName="object-contain"
-                                            />
-                                        </div>
-                                        <div className="w-10 h-10 rounded-full bg-white/5 p-2 flex-shrink-0">
-                                            <TeamLogo
-                                                teamId={opponent.id}
-                                                name={opponent.name}
-                                                wrapperClassName="w-full h-full"
-                                                imageClassName="object-contain"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-yellow-400 font-semibold">
-                                            Fenerbahçe
-                                        </p>
-                                        <p className="text-[10px] text-slate-400">vs</p>
-                                        <p className="text-xs text-white font-semibold">
-                                            {opponent.name}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-xs text-slate-400">
-                                        {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}
-                                    </p>
-                                    <p className="text-lg font-bold text-yellow-400">
-                                        {matchDate.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Seçenekler */}
-                        <div className="space-y-3 mb-6">
-                            {notificationOptions.map((option) => (
-                                <label
-                                    key={option.id}
-                                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id]
-                                        ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
-                                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                                        }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={currentDraftOptions[option.id]}
-                                        onChange={() => toggleOption(option.id)}
-                                        className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
-                                    />
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-white">{option.label}</span>
-                                            {option.time && (
-                                                <span className="text-xs text-slate-400">({option.time})</span>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-slate-400">{option.description}</p>
-                                    </div>
-                                </label>
-                            ))}
-
-                            {/* Günlük Kontrol - ÖZEL */}
-                            <div className="pt-3 border-t border-white/10">
-                                <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.dailyCheck
-                                    ? 'bg-blue-400/20 border-blue-400 scale-[1.02]'
-                                    : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                                    }`}>
-                                    <input
-                                        type="checkbox"
-                                        checked={currentDraftOptions.dailyCheck}
-                                        onChange={() => toggleOption('dailyCheck')}
-                                        className="mt-1 w-5 h-5 rounded border-2 border-blue-400 bg-transparent checked:bg-blue-400 cursor-pointer accent-blue-400"
-                                    />
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-white">Günlük Maç Kontrolü</span>
-                                            <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">ÖZEL</span>
-                                        </div>
-                                        <p className="text-xs text-slate-400">
-                                            Her sabah 09:00'da kontrol et, o gün maç varsa bildir
-                                        </p>
-                                        <p className="text-[10px] text-blue-300/60 mt-1 italic">
-                                            * Tüm maçlar için geçerli (sadece bu maça özel değil)
-                                        </p>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
-
-                        {/* Seçim Özeti */}
-                        {Object.values(currentDraftOptions).some(v => v) && (
-                            <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4 animate-fadeIn">
-                                <p className="text-xs text-yellow-200">
-                                    <strong className="text-yellow-400">{draftSelectionCount}</strong> bildirim seçtiniz
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Butonlar */}
-                        <div className="flex gap-3">
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCloseNotificationModal();
-                                }}
-                                className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 font-medium border border-white/10 hover:border-white/20"
-                            >
-                                İptal
-                            </button>
-                            <button
-                                onClick={saveNotifications}
-                                disabled={!hasDraftChanges}
-                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${!hasDraftChanges
-                                    ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
-                                    : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'
-                                    }`}
-                            >
-                                Kaydet
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Live Match Modal */}
             {/* Live Match Modal */}
