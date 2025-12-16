@@ -94,6 +94,7 @@ fenerbahce-fan-hub/
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.jsx          # Main dashboard with matches & poll
+│   │   ├── NotificationSettings.jsx # Global notification preferences
 │   │   ├── Poll.jsx               # Real-time voting component
 │   │   ├── FormationBuilder.jsx   # Interactive pitch & formations
 │   │   ├── CustomStandings.jsx    # Standings table
@@ -184,11 +185,11 @@ firebase deploy --only functions
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
 
 ### Notification System
-1. **User Preference**: User selects "1 Hour Before" in the UI
-2. **Database**: Preference is saved to `notifications/{userId}/matches/{matchId}` in Firebase
+1. **User Preference**: User selects notification options once (applies to ALL matches)
+2. **Database**: Preferences saved to `notifications/{userId}/defaultOptions` in Firebase
 3. **Cloud Function**: Scheduled function checks every minute
    - Reads match data from **cache** (not external API!)
-   - Scans database for users who want notifications at this time
+   - Applies `defaultOptions` to all upcoming matches
    - Sends push notification via FCM
 4. **Delivery**: Notification arrives on user's device via Service Worker
 
