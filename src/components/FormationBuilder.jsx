@@ -170,6 +170,19 @@ const FormationBuilder = () => {
             RWB: { top: '55%', left: '92%' },
             ST1: { top: '18%', left: '35%' },
             ST2: { top: '18%', left: '65%' }
+        },
+        '4-1-2-1-2 Diamond': {
+            GK: { top: '93%', left: '50%' },
+            LB: { top: '78%', left: '12%' },
+            CB1: { top: '78%', left: '35%' },
+            CB2: { top: '78%', left: '65%' },
+            RB: { top: '78%', left: '88%' },
+            CDM: { top: '62%', left: '50%' },
+            CM1: { top: '48%', left: '25%' },
+            CM2: { top: '48%', left: '75%' },
+            CAM: { top: '32%', left: '50%' },
+            ST1: { top: '18%', left: '35%' },
+            ST2: { top: '18%', left: '65%' }
         }
     };
 
