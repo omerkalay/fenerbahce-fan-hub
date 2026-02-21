@@ -1,4 +1,4 @@
-# Fenerbahçe Fan Hub 💛💙
+# Fenerbahce Fan Hub
 
 Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, **live polls**, squad management, formation builder, **push notifications**, and full PWA (Progressive Web App) support.
 
@@ -6,28 +6,42 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.3.0-blue)
+![Version](https://img.shields.io/badge/version-2.4.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.3.0 🚀
+## What's New in v2.4.0
+
+**Live Match Auto-Transition System**
+- **Automatic Live Mode** - Dashboard transitions from countdown to live mode when match starts
+- **Inline Live Score** - Score, match events, and stats displayed directly in the match card
+- **Post-Match Transition** - Automatically switches to next match 30 seconds after game ends
+- **Automatic Data Cleanup** - Old poll and notification records are purged from DB daily
+- **DB Cache Architecture** - ESPN data cached in Firebase Realtime DB; all users read from cache
+- **Multi-League Support** - Live match detection covers both Super Lig and UEFA Europa League
+
+<details>
+<summary>Previous: v2.3.0</summary>
 
 **Formation Builder Improvements**
-- 📤 **Web Share API** - Share your lineup directly to WhatsApp, Telegram, Twitter (native share menu)
-- ⚽ **Improved Pitch Design** - Professional SVG pitch with FIFA-standard markings (penalty areas, corner arcs, center circle)
-- 🎯 **Optimized Positions** - Player positions aligned with pitch markings for realistic formations
-- � **Drag & Drop Fix** - Fixed card dragging issue on desktop browsers
+- **Web Share API** - Share your lineup directly to WhatsApp, Telegram, Twitter
+- **Improved Pitch Design** - Professional SVG pitch with FIFA-standard markings
+- **Optimized Positions** - Player positions aligned with pitch markings
+- **Drag and Drop Fix** - Fixed card dragging issue on desktop browsers
+</details>
 
 ## Features
 
 ### Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
-- **Live Match Tracking**: Real-time score updates, match events (goals, cards, substitutions), and live statistics (Powered by ESPN API)
+- **Live Match Auto-Transition**: Countdown → "Starting Soon" → Live Score → Finished → Next Match (fully automatic)
+- **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
 - **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
 - **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database)
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
+- **Automatic Data Cleanup**: Old polls and notification records cleaned up daily
 - **Premium UI**: Glassmorphic design with smooth animations
 
 ### Push Notification System
@@ -39,7 +53,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
   - **Daily Match Check**: Automatically notifies at 09:00 TR if there is a match that day
 - **Always-On Delivery**: Powered by **Firebase Cloud Functions** (Serverless)
 - **Cross-Platform**: Works on mobile & desktop (PWA support)
-- **Beautiful Format**: `💛💙 Fenerbahçe - Opponent | 20:45 · 1 saat kaldı`
+- **Beautiful Format**: `Fenerbahce - Opponent | 20:45 - 1 saat kaldi`
 
 ### Formation Builder
 - **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
@@ -71,7 +85,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 │                 │     │  /api/standings      (from cache)    │
 │  React + Vite   │     │  /api/squad          (from cache)    │
 │                 │     │  /api/reminder       (save prefs)    │
-└─────────────────┘     │  /api/live-match     (ESPN live)     │
+└─────────────────┘     │  /api/live-match     (from DB cache) │
                         │  /api/player-image   (proxy)         │
                         │  /api/team-image     (proxy)         │
                         └──────────────────────────────────────┘
@@ -81,8 +95,13 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
                 ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
                 │   Firebase   │ │   SofaScore  │ │     ESPN     │
                 │   Realtime   │ │   (RapidAPI) │ │   (Free)     │
-                │   Database   │ │  2 calls/day │ │   Unlimited  │
-                └──────────────┘ └──────────────┘ └──────────────┘
+                │   Database   │ │  2 calls/day │ │  ~120/match  │
+                │              │ └──────────────┘ └──────────────┘
+                │ cache/       │        ▲
+                │   liveMatch  │────────┘ updateLiveMatch (1/min)
+                │ match_polls/ │
+                │ notifications│
+                └──────────────┘
 ```
 
 ## Project Structure
@@ -182,8 +201,9 @@ firebase deploy --only functions
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match & squad data from SofaScore, standings from ESPN. Caches everything in Firebase. |
+| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match & squad data from SofaScore, standings from ESPN. Caches in Firebase. Cleans up old polls & notification records. |
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
+| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches (Süper Lig + Europa League) during match window. Caches live data to `cache/liveMatch`. Auto-cleans after match ends. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
@@ -194,10 +214,12 @@ firebase deploy --only functions
    - Sends push notification via FCM
 4. **Delivery**: Notification arrives on user's device via Service Worker
 
-### Live Match Tracking
-- **Data Source**: ESPN API (free, unlimited)
-- **Refresh Rate**: Every 30 seconds during live matches
-- **Smart Status**: Auto-detects "Live", "Halftime", "Finished"
+### Live Match System
+- **Flow**: ESPN → `updateLiveMatch` (1/min) → DB `cache/liveMatch` → Users read from DB
+- **Match Window**: Starts 30min before kickoff, ends 3 hours after
+- **Auto-Transition**: Countdown → Pre → Live → Post → Next Match
+- **Leagues**: Süper Lig (`tur.1`) + Europa League (`uefa.europa`)
+- **Cleanup**: Live cache deleted 5min after match ends
 
 ### API Cost Optimization
 | | Before (v2.1) | After (v2.2) |
@@ -234,10 +256,10 @@ MIT License - Free to use and modify
 - **APIs**: SofaScore (RapidAPI), ESPN (Free)
 - **Design Inspiration**: Modern sports apps
 - **Icons**: Lucide React
-- **Team**: Fenerbahçe SK 💛💙
+- **Team**: Fenerbahce SK
 
 ---
 
 Made with passion for Fenerbahçe fans
 
-**v2.3.0** | December 2025
+**v2.4.0** | February 2026

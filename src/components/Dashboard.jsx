@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TeamLogo from './TeamLogo';
 import Poll from './Poll';
 import CustomStandings from './CustomStandings';
@@ -11,15 +11,25 @@ const Dashboard = ({
     onRetry,
     errorMessage,
     lastUpdated,
-    isRefreshing
+    isRefreshing,
+    liveMatchState = 'countdown',
+    liveMatchData = null,
+    onCountdownEnd
 }) => {
     const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
     const [showLiveMatchModal, setShowLiveMatchModal] = useState(false);
     const [showStandingsModal, setShowStandingsModal] = useState(false);
     const [standingsLeague, setStandingsLeague] = useState('');
+    const [postCountdown, setPostCountdown] = useState(30);
+    const countdownEndedRef = useRef(false);
+
+    // Reset countdownEndedRef when match changes
+    useEffect(() => {
+        countdownEndedRef.current = false;
+    }, [matchData?.id]);
 
     useEffect(() => {
-        if (!matchData) return;
+        if (!matchData || liveMatchState !== 'countdown') return;
 
         const timer = setInterval(() => {
             const matchDate = new Date(matchData.startTimestamp * 1000);
@@ -33,12 +43,34 @@ const Dashboard = ({
                 const seconds = Math.floor((difference / 1000) % 60);
                 setTimeLeft({ days, hours, minutes, seconds });
             } else {
+                // Countdown reached 0 — trigger live checking
+                if (!countdownEndedRef.current && onCountdownEnd) {
+                    countdownEndedRef.current = true;
+                    onCountdownEnd();
+                }
                 setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
             }
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [matchData]);
+    }, [matchData, liveMatchState, onCountdownEnd]);
+
+    // Post-match countdown (30s visual timer)
+    useEffect(() => {
+        if (liveMatchState !== 'post') {
+            setPostCountdown(30);
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setPostCountdown(prev => {
+                if (prev <= 1) return 0;
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [liveMatchState]);
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
@@ -77,10 +109,7 @@ const Dashboard = ({
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
 
-    // Check if match is currently live
-    const now = new Date();
-    const matchEndTime = new Date(matchDate.getTime() + (120 * 60 * 1000)); // 2 hours after start
-    const isMatchLive = now >= matchDate && now <= matchEndTime && matchData.status?.type === 'inprogress';
+    // Live state is now managed by App.jsx via liveMatchState prop
 
     return (
         <div className="min-h-screen pb-20">
@@ -139,47 +168,139 @@ const Dashboard = ({
                     </div>
                 </div>
 
+                {/* Dynamic Section: Countdown / Pre / Live / Post */}
                 <div className="mt-8 pt-6 border-t border-white/5">
-                    <div className="grid grid-cols-4 gap-2 text-center">
-                        <div className="glass-panel rounded-lg p-2">
-                            <span className="block text-xl font-bold text-yellow-400">{timeLeft.days}</span>
-                            <span className="text-[10px] text-slate-400 uppercase">Gün</span>
+                    {/* STATE: COUNTDOWN */}
+                    {liveMatchState === 'countdown' && (
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                            <div className="glass-panel rounded-lg p-2">
+                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.days}</span>
+                                <span className="text-[10px] text-slate-400 uppercase">Gün</span>
+                            </div>
+                            <div className="glass-panel rounded-lg p-2">
+                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.hours}</span>
+                                <span className="text-[10px] text-slate-400 uppercase">Saat</span>
+                            </div>
+                            <div className="glass-panel rounded-lg p-2">
+                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.minutes}</span>
+                                <span className="text-[10px] text-slate-400 uppercase">Dk</span>
+                            </div>
+                            <div className="glass-panel rounded-lg p-2">
+                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.seconds}</span>
+                                <span className="text-[10px] text-slate-400 uppercase">Sn</span>
+                            </div>
                         </div>
-                        <div className="glass-panel rounded-lg p-2">
-                            <span className="block text-xl font-bold text-yellow-400">{timeLeft.hours}</span>
-                            <span className="text-[10px] text-slate-400 uppercase">Saat</span>
-                        </div>
-                        <div className="glass-panel rounded-lg p-2">
-                            <span className="block text-xl font-bold text-yellow-400">{timeLeft.minutes}</span>
-                            <span className="text-[10px] text-slate-400 uppercase">Dk</span>
-                        </div>
-                        <div className="glass-panel rounded-lg p-2">
-                            <span className="block text-xl font-bold text-yellow-400">{timeLeft.seconds}</span>
-                            <span className="text-[10px] text-slate-400 uppercase">Sn</span>
-                        </div>
-                    </div>
-                </div>
+                    )}
 
-                {/* Live Match Badge and Button */}
-                {isMatchLive && (
-                    <div className="mt-6 pt-6 border-t border-white/5">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
+                    {/* STATE: PRE (match about to start) */}
+                    {liveMatchState === 'pre' && (
+                        <div className="text-center py-4">
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-400"></span>
+                                </span>
+                                <span className="text-sm font-bold text-yellow-400 uppercase">Maç Birazdan Başlıyor!</span>
+                            </div>
+                            <p className="text-xs text-slate-400">Takımlar sahaya çıkıyor...</p>
+                        </div>
+                    )}
+
+                    {/* STATE: IN (live match) */}
+                    {liveMatchState === 'in' && liveMatchData && (
+                        <div>
+                            {/* Live Badge */}
+                            <div className="flex items-center justify-center gap-2 mb-4">
                                 <span className="relative flex h-3 w-3">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                                 </span>
                                 <span className="text-sm font-bold text-red-400 uppercase">Canlı</span>
+                                <span className="text-xs text-slate-400 ml-1">{liveMatchData.displayClock}</span>
                             </div>
+
+                            {/* Score */}
+                            <div className="flex items-center justify-center gap-6 mb-4">
+                                <span className="text-4xl font-black text-white">{liveMatchData.homeTeam?.score || '0'}</span>
+                                <span className="text-lg text-slate-500">—</span>
+                                <span className="text-4xl font-black text-white">{liveMatchData.awayTeam?.score || '0'}</span>
+                            </div>
+
+                            {/* Events */}
+                            {liveMatchData.events && liveMatchData.events.length > 0 && (
+                                <div className="space-y-1 mb-4 max-h-32 overflow-y-auto">
+                                    {liveMatchData.events.map((event, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 text-xs">
+                                            <span className="text-slate-500 w-10 text-right">{event.clock}</span>
+                                            <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                                                {event.isGoal && (
+                                                    <svg viewBox="0 0 16 16" className="w-4 h-4"><circle cx="8" cy="8" r="7" fill="none" stroke="#eab308" strokeWidth="1.5" /><circle cx="8" cy="8" r="3" fill="#eab308" /></svg>
+                                                )}
+                                                {event.isYellowCard && (
+                                                    <svg viewBox="0 0 12 16" className="w-3 h-4"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#eab308" /></svg>
+                                                )}
+                                                {event.isRedCard && (
+                                                    <svg viewBox="0 0 12 16" className="w-3 h-4"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#ef4444" /></svg>
+                                                )}
+                                            </span>
+                                            <span className={`${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400' : 'text-slate-300'}`}>
+                                                {event.player}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Detail Button */}
                             <button
                                 onClick={() => setShowLiveMatchModal(true)}
-                                className="px-4 py-2 bg-yellow-400/10 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 hover:border-yellow-400 rounded-lg text-xs font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.5)]"
+                                className="w-full px-4 py-2 bg-yellow-400/10 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 rounded-lg text-xs font-bold transition-all duration-300"
                             >
-                                Canlı Detayları Göster
+                                Detaylı İstatistikler
                             </button>
                         </div>
-                    </div>
-                )}
+                    )}
+
+                    {/* STATE: POST (match finished) */}
+                    {liveMatchState === 'post' && liveMatchData && (
+                        <div>
+                            {/* Finished Badge */}
+                            <div className="flex items-center justify-center gap-2 mb-4">
+                                <span className="text-sm font-bold text-green-400 uppercase">Maç Bitti</span>
+                            </div>
+
+                            {/* Final Score */}
+                            <div className="flex items-center justify-center gap-6 mb-4">
+                                <span className="text-4xl font-black text-white">{liveMatchData.homeTeam?.score || '0'}</span>
+                                <span className="text-lg text-slate-500">—</span>
+                                <span className="text-4xl font-black text-white">{liveMatchData.awayTeam?.score || '0'}</span>
+                            </div>
+
+                            {/* Goals Summary */}
+                            {liveMatchData.events && liveMatchData.events.filter(e => e.isGoal).length > 0 && (
+                                <div className="flex flex-wrap justify-center gap-2 mb-4">
+                                    {liveMatchData.events.filter(e => e.isGoal).map((event, idx) => (
+                                        <span key={idx} className="text-xs text-slate-300 bg-white/5 px-2 py-1 rounded-full flex items-center gap-1">
+                                            <svg viewBox="0 0 16 16" className="w-3 h-3 inline"><circle cx="8" cy="8" r="7" fill="none" stroke="#eab308" strokeWidth="1.5" /><circle cx="8" cy="8" r="3" fill="#eab308" /></svg>
+                                            {event.clock} {event.player}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Transition Progress */}
+                            <div className="glass-panel rounded-lg p-3 text-center">
+                                <p className="text-xs text-slate-400 mb-2">Sonraki maça geçiliyor... {postCountdown}sn</p>
+                                <div className="w-full bg-white/5 rounded-full h-1">
+                                    <div
+                                        className="bg-yellow-400/50 h-1 rounded-full transition-all duration-1000"
+                                        style={{ width: `${((30 - postCountdown) / 30) * 100}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Next 3 Matches */}
