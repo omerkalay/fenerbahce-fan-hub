@@ -6,12 +6,17 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.4.0-blue)
+![Version](https://img.shields.io/badge/version-2.4.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.4.0
+## What's New in v2.4.1
+
+- **New Formation** - Added 4-1-2-1-2 Diamond (Baklava) to the Formation Builder
+
+<details>
+<summary>Previous: v2.4.0</summary>
 
 **Live Match Auto-Transition System**
 - **Automatic Live Mode** - Dashboard transitions from countdown to live mode when match starts
@@ -20,6 +25,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Automatic Data Cleanup** - Old poll and notification records are purged from DB daily
 - **DB Cache Architecture** - ESPN data cached in Firebase Realtime DB; all users read from cache
 - **Multi-League Support** - Live match detection covers both Super Lig and UEFA Europa League
+</details>
 
 <details>
 <summary>Previous: v2.3.0</summary>
@@ -56,7 +62,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Beautiful Format**: `Fenerbahce - Opponent | 20:45 - 1 saat kaldi`
 
 ### Formation Builder
-- **5 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2
+- **6 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2, 4-1-2-1-2 Diamond
 - **Realistic Pitch**: SVG-based football field with accurate FIFA-standard markings
 - **Drag & Drop**: Intuitive player placement from squad pool
 - **Player Photos**: Dynamic player images from SofaScore API
@@ -256,10 +262,10 @@ MIT License - Free to use and modify
 - **APIs**: SofaScore (RapidAPI), ESPN (Free)
 - **Design Inspiration**: Modern sports apps
 - **Icons**: Lucide React
-- **Team**: Fenerbahce SK
+- **Team**: Fenerbahce SK 💛💙
 
 ---
 
 Made with passion for Fenerbahçe fans
 
-**v2.4.0** | February 2026
+**v2.4.1** | February 2026
