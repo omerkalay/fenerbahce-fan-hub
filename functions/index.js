@@ -200,8 +200,204 @@ exports.dailyDataRefresh = onSchedule({
         await db.ref('cache').set(cache);
         console.log(`✨ Cache updated at ${new Date().toISOString()}`);
 
+        // 5. Eski poll verilerini temizle
+        console.log('5️⃣ Cleaning up old poll data...');
+        const currentMatchId = String(cache.nextMatch?.id);
+        const pollsSnapshot = await db.ref('match_polls').once('value');
+        const allPolls = pollsSnapshot.val() || {};
+        const deleteOps = {};
+        for (const pollMatchId of Object.keys(allPolls)) {
+            if (pollMatchId !== currentMatchId) {
+                deleteOps[`match_polls/${pollMatchId}`] = null;
+            }
+        }
+        if (Object.keys(deleteOps).length > 0) {
+            await db.ref().update(deleteOps);
+            console.log(`🗑️ Silinen eski poll: ${Object.keys(deleteOps).length}`);
+        } else {
+            console.log('✅ Temizlenecek eski poll yok');
+        }
+
+        // 6. Eski sentNotifications kayıtlarını temizle
+        console.log('6️⃣ Cleaning up old notification records...');
+        const activeMatchIds = new Set(
+            cache.next3Matches.map(m => String(m.id))
+        );
+        const notifSnapshot = await db.ref('notifications').once('value');
+        const allNotifs = notifSnapshot.val() || {};
+        const notifDeletes = {};
+        for (const [token, data] of Object.entries(allNotifs)) {
+            if (data.sentNotifications) {
+                for (const matchId of Object.keys(data.sentNotifications)) {
+                    if (!activeMatchIds.has(matchId)) {
+                        notifDeletes[`notifications/${token}/sentNotifications/${matchId}`] = null;
+                    }
+                }
+            }
+            if (data.lastDailyNotification) {
+                const today = new Date().toDateString();
+                if (data.lastDailyNotification !== today) {
+                    notifDeletes[`notifications/${token}/lastDailyNotification`] = null;
+                }
+            }
+        }
+        if (Object.keys(notifDeletes).length > 0) {
+            await db.ref().update(notifDeletes);
+            console.log(`🗑️ Silinen eski notification kayıtları: ${Object.keys(notifDeletes).length}`);
+        } else {
+            console.log('✅ Temizlenecek eski notification kaydı yok');
+        }
+
     } catch (error) {
         console.error('❌ Daily refresh failed:', error);
+    }
+});
+
+// ============================================
+// LIVE MATCH UPDATER
+// ============================================
+
+/**
+ * Update Live Match - Her dakika çalışır
+ * Maç günü ESPN'den canlı veri çeker, cache/liveMatch'e yazar
+ * Maç yoksa veya bitmişse cache'i temizler
+ */
+exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
+    try {
+        // 1. Cache'den maç verisini oku
+        const cacheSnapshot = await db.ref('cache').once('value');
+        const cache = cacheSnapshot.val();
+
+        if (!cache || !cache.nextMatch) {
+            return;
+        }
+
+        const nextMatch = cache.nextMatch;
+        const matchTime = nextMatch.startTimestamp * 1000;
+        const now = Date.now();
+
+        // Maç saatine 30dk'dan fazla varsa çalışma
+        const thirtyMinBefore = matchTime - (30 * 60 * 1000);
+        // Maç başlangıcından 3 saat sonrasına kadar kontrol et (uzatmalar dahil)
+        const threeHoursAfter = matchTime + (3 * 60 * 60 * 1000);
+
+        if (now < thirtyMinBefore || now > threeHoursAfter) {
+            // Maç penceresi dışında — liveMatch varsa temizle
+            const liveSnapshot = await db.ref('cache/liveMatch').once('value');
+            if (liveSnapshot.val()) {
+                await db.ref('cache/liveMatch').remove();
+                console.log('🗑️ Live match cache cleaned (outside match window)');
+            }
+            return;
+        }
+
+        console.log('⚽ Checking live match from ESPN...');
+
+        // 2. ESPN'den Fenerbahçe maçını ara (Süper Lig + Europa League)
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+        const leagues = ['tur.1', 'uefa.europa'];
+        let fenerbahceMatch = null;
+        let matchLeague = null;
+
+        for (const league of leagues) {
+            try {
+                const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${dateStr}`;
+                const response = await fetch(scoreboardUrl);
+                if (!response.ok) continue;
+
+                const data = await response.json();
+                const match = data.events?.find(event => {
+                    const competitors = event.competitions?.[0]?.competitors || [];
+                    return competitors.some(team =>
+                        team.team.displayName.toLowerCase().includes('fenerbahce') ||
+                        team.team.displayName.toLowerCase().includes('fenerbahçe')
+                    );
+                });
+
+                if (match) {
+                    fenerbahceMatch = match;
+                    matchLeague = league;
+                    break;
+                }
+            } catch (err) {
+                console.error(`ESPN ${league} error:`, err.message);
+            }
+        }
+
+        if (!fenerbahceMatch) {
+            // Maç bulunamadı — pre state olarak işaretle
+            await db.ref('cache/liveMatch').set({
+                matchState: 'pre',
+                lastUpdated: now
+            });
+            console.log('ℹ️ No Fenerbahçe match found on ESPN today, setting pre state');
+            return;
+        }
+
+        // 3. Maç durumunu belirle
+        const matchState = fenerbahceMatch.status?.type?.state; // 'pre' | 'in' | 'post'
+        const competition = fenerbahceMatch.competitions?.[0];
+        const homeTeam = competition?.competitors?.find(c => c.homeAway === 'home');
+        const awayTeam = competition?.competitors?.find(c => c.homeAway === 'away');
+
+        // Temel veriyi hazırla
+        const liveData = {
+            matchState: matchState,
+            matchId: fenerbahceMatch.id,
+            league: matchLeague,
+            displayClock: fenerbahceMatch.status?.displayClock || '',
+            period: fenerbahceMatch.status?.period || 0,
+            statusDetail: fenerbahceMatch.status?.type?.detail || '',
+            homeTeam: {
+                id: homeTeam?.team?.id,
+                name: homeTeam?.team?.displayName,
+                logo: homeTeam?.team?.logo,
+                score: homeTeam?.score || '0'
+            },
+            awayTeam: {
+                id: awayTeam?.team?.id,
+                name: awayTeam?.team?.displayName,
+                logo: awayTeam?.team?.logo,
+                score: awayTeam?.score || '0'
+            },
+            events: (competition?.details || []).map(detail => ({
+                type: detail.type?.text || '',
+                clock: detail.clock?.displayValue || '',
+                team: detail.team?.id || '',
+                isGoal: detail.scoringPlay || false,
+                isYellowCard: detail.yellowCard || false,
+                isRedCard: detail.redCard || false,
+                isPenalty: detail.penaltyKick || false,
+                isOwnGoal: detail.ownGoal || false,
+                player: detail.athletesInvolved?.[0]?.displayName || ''
+            })),
+            stats: (homeTeam?.statistics || []).map((stat, idx) => ({
+                name: stat.name,
+                homeValue: stat.displayValue,
+                awayValue: awayTeam?.statistics?.[idx]?.displayValue || '0'
+            })),
+            lastUpdated: now
+        };
+
+        // 4. Cache'e yaz
+        await db.ref('cache/liveMatch').set(liveData);
+        console.log(`✅ Live match updated: ${liveData.homeTeam.name} ${liveData.homeTeam.score} - ${liveData.awayTeam.score} ${liveData.awayTeam.name} [${matchState}]`);
+
+        // 5. Maç bittiyse, 5 dk sonra temizlenmesi için işaretle
+        if (matchState === 'post') {
+            const postTime = liveData.postMarkedAt || now;
+            if (!liveData.postMarkedAt) {
+                await db.ref('cache/liveMatch/postMarkedAt').set(now);
+            } else if (now - postTime > 5 * 60 * 1000) {
+                // 5 dk geçtiyse temizle
+                await db.ref('cache/liveMatch').remove();
+                console.log('🗑️ Live match cache cleaned (5 min after post)');
+            }
+        }
+
+    } catch (error) {
+        console.error('❌ Live match update failed:', error);
     }
 });
 
@@ -472,47 +668,15 @@ async function handleStandings(req, res) {
 }
 
 async function handleLiveMatch(req, res) {
-    // Live match - her zaman ESPN'den taze veri çek (maç canlıyken)
+    // Live match - Realtime Database cache'den oku
+    // updateLiveMatch scheduled function ESPN'den çeker ve buraya yazar
     try {
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
-
-        const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/scoreboard?dates=${dateStr}`;
-        const response = await fetch(scoreboardUrl);
-
-        if (!response.ok) {
-            return res.status(404).json({ error: 'No live match data' });
+        const snapshot = await db.ref('cache/liveMatch').once('value');
+        const data = snapshot.val();
+        if (!data) {
+            return res.json({ matchState: 'no-match' });
         }
-
-        const data = await response.json();
-        const fenerbahceMatch = data.events?.find(event => {
-            const competitors = event.competitions?.[0]?.competitors || [];
-            return competitors.some(team =>
-                team.team.displayName.toLowerCase().includes('fenerbahce') ||
-                team.team.displayName.toLowerCase().includes('fenerbahçe')
-            );
-        });
-
-        if (!fenerbahceMatch) {
-            return res.status(404).json({ error: 'No Fenerbahçe match today' });
-        }
-
-        const status = fenerbahceMatch.status.type.state;
-        if (status !== 'in' && status !== 'post') {
-            return res.status(404).json({ error: 'Match not started yet' });
-        }
-
-        // Get detailed match data
-        const matchId = fenerbahceMatch.id;
-        const summaryUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/summary?event=${matchId}`;
-        const summaryResponse = await fetch(summaryUrl);
-
-        if (summaryResponse.ok) {
-            return res.json(await summaryResponse.json());
-        }
-
-        return res.json(fenerbahceMatch);
-
+        return res.json(data);
     } catch (error) {
         console.error('Live match error:', error);
         return res.status(500).json({ error: 'Failed to fetch live match' });
