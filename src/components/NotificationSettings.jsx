@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 
+const FCM_TOKEN_STORAGE_KEY = 'fb_fcm_token';
+
 const createEmptyOptions = () => ({
     threeHours: false,
     oneHour: false,
@@ -68,69 +70,81 @@ const NotificationSettings = () => {
     const saveNotifications = async () => {
         const optionsToSave = normalizeOptions(currentDraftOptions);
         const count = Object.entries(optionsToSave).filter(([k, v]) => v && k !== 'updatedAt').length;
+        const isDisablingAll = count === 0;
+        let token = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
 
         try {
-            let token = null;
-            try {
-                if (!('Notification' in window)) {
-                    alert('❌ Bu tarayıcı bildirimleri desteklemiyor.');
-                    return;
-                }
-
-                const permission = await Notification.requestPermission();
-                if (permission === 'granted') {
-                    const { messaging } = await import('../firebase');
-                    const { getToken } = await import('firebase/messaging');
-
-                    const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
-                    console.log('Service Worker registering at:', swUrl);
-
-                    try {
-                        const registration = await navigator.serviceWorker.register(swUrl, {
-                            scope: import.meta.env.BASE_URL
-                        });
-                        console.log('✅ Service Worker registered:', registration);
-
-                        token = await getToken(messaging, {
-                            vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
-                            serviceWorkerRegistration: registration
-                        });
-                    } catch (swError) {
-                        console.error('Service Worker registration failed:', swError);
-                        alert(`❌ Service Worker hatası: ${swError.message}`);
+            if (!isDisablingAll) {
+                try {
+                    if (!('Notification' in window)) {
+                        alert('❌ Bu tarayıcı bildirimleri desteklemiyor.');
                         return;
                     }
-                } else {
-                    alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
+
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        const { messaging } = await import('../firebase');
+                        const { getToken } = await import('firebase/messaging');
+
+                        const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
+                        const fcmScope = `${import.meta.env.BASE_URL}firebase-cloud-messaging-push-scope`;
+                        console.log('FCM Service Worker registration path:', swUrl, 'scope:', fcmScope);
+
+                        try {
+                            let registration = await navigator.serviceWorker.getRegistration(fcmScope);
+                            if (!registration) {
+                                registration = await navigator.serviceWorker.register(swUrl, {
+                                    scope: fcmScope
+                                });
+                            }
+                            console.log('✅ FCM Service Worker ready:', registration);
+
+                            token = await getToken(messaging, {
+                                vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
+                                serviceWorkerRegistration: registration
+                            });
+                            if (token) {
+                                localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
+                            }
+                        } catch (swError) {
+                            console.error('FCM Service Worker registration failed:', swError);
+                            alert(`❌ Service Worker hatası: ${swError.message}`);
+                            return;
+                        }
+                    } else {
+                        alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
+                        return;
+                    }
+                } catch (err) {
+                    console.error('Token alınamadı:', err);
+                    alert(`❌ Bildirim hatası: ${err.message}`);
                     return;
                 }
-            } catch (err) {
-                console.error('Token alınamadı:', err);
-                alert(`❌ Bildirim hatası: ${err.message}`);
-                return;
             }
 
-            if (!token) {
+            if (token) {
+                // Backend'e gönder (matchId YOK - global tercihler)
+                const response = await fetch(`${BACKEND_URL}/reminder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        playerId: token,
+                        options: optionsToSave
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Backend error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                console.log('Backend response:', result);
+            } else if (!isDisablingAll) {
                 alert('❌ Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
                 return;
+            } else {
+                console.warn('No stored token found while disabling notifications; local state cleared only.');
             }
-
-            // Backend'e gönder (matchId YOK - global tercihler)
-            const response = await fetch(`${BACKEND_URL}/reminder`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    playerId: token,
-                    options: optionsToSave
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Backend error: ${response.status}`);
-            }
-
-            const result = await response.json();
-            console.log('Backend response:', result);
 
             if (count === 0) {
                 setHasActiveNotifications(false);

@@ -29,6 +29,7 @@ const FENERBAHCE_ID = 3052;
 const SOFASCORE_IMAGE_BASE = 'http://img.sofascore.com/api/v1';  // HTTP, not HTTPS!
 const IMAGE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 const DEFAULT_API_HOST = 'sofascore.p.rapidapi.com';
+const ISTANBUL_TIMEZONE = 'Europe/Istanbul';
 
 // Helper to get API host (must be called inside function context)
 const getApiHost = () => rapidApiHost.value() || DEFAULT_API_HOST;
@@ -53,6 +54,16 @@ const corsOptions = {
 
 // Helper: Sleep function
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Stable date key for per-day notification dedupe in Istanbul timezone.
+const formatDateKey = (timestamp, timeZone = ISTANBUL_TIMEZONE) => (
+    new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).format(new Date(timestamp))
+);
 
 // ============================================
 // SCHEDULED FUNCTIONS
@@ -432,8 +443,7 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
             fifteenMinutes: { offsetMs: 15 * 60 * 1000, timeText: '15 dakika kaldı' }
         };
 
-        const notificationsToSend = [];
-        const updates = {};
+        const pendingNotifications = [];
 
         // 3. Her kullanıcı için kontrol
         // Daily check SADECE sabah 09:00-09:02 İstanbul saatinde çalışsın
@@ -445,11 +455,12 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
         for (const [playerId, playerData] of Object.entries(allNotifications)) {
             // Daily check - SADECE sabah 09:00-09:02 arasında
             if (playerData.dailyCheck && isDailyCheckTime) {
-                const todayStr = new Date().toDateString();
+                const todayStr = formatDateKey(now);
                 const nextMatch = nextMatches[0];
                 const matchDate = new Date(nextMatch.startTimestamp * 1000);
+                const matchDayStr = formatDateKey(matchDate.getTime());
 
-                if (matchDate.toDateString() === todayStr) {
+                if (matchDayStr === todayStr) {
                     const lastDaily = playerData.lastDailyNotification;
                     if (!lastDaily || lastDaily !== todayStr) {
                         const isHome = nextMatch.homeTeam.id === FENERBAHCE_ID;
@@ -460,18 +471,22 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                             timeZone: 'Europe/Istanbul'
                         });
 
-                        notificationsToSend.push({
-                            token: playerId,
-                            notification: {
-                                title: '📅 Bugün Maç Var!',
-                                body: `💛💙 Fenerbahçe - ${opponent} | ${timeString}`
+                        pendingNotifications.push({
+                            playerId,
+                            message: {
+                                token: playerId,
+                                notification: {
+                                    title: '📅 Bugün Maç Var!',
+                                    body: `💛💙 Fenerbahçe - ${opponent} | ${timeString}`
+                                },
+                                webpush: {
+                                    fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
+                                }
                             },
-                            webpush: {
-                                fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
+                            successUpdates: {
+                                [`notifications/${playerId}/lastDailyNotification`]: todayStr
                             }
                         });
-
-                        updates[`notifications/${playerId}/lastDailyNotification`] = todayStr;
                     }
                 }
             }
@@ -505,43 +520,73 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                             timeZone: 'Europe/Istanbul'
                         });
 
-                        notificationsToSend.push({
-                            token: playerId,
-                            notification: {
-                                title: `💛💙 Fenerbahçe - ${opponent}`,
-                                body: `${timeString} · ${config.timeText}`
-                            },
-                            data: {
-                                matchId: matchId,
-                                type: optionKey
-                            },
-                            webpush: {
-                                fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
-                            }
-                        });
-
                         // Gönderilen bildirimleri takip et (yeni yapı)
                         const sentPath = `notifications/${playerId}/sentNotifications/${matchId}`;
-                        updates[sentPath] = [...sentForMatch, optionKey];
+                        pendingNotifications.push({
+                            playerId,
+                            message: {
+                                token: playerId,
+                                notification: {
+                                    title: `💛💙 Fenerbahçe - ${opponent}`,
+                                    body: `${timeString} · ${config.timeText}`
+                                },
+                                data: {
+                                    matchId: matchId,
+                                    type: optionKey
+                                },
+                                webpush: {
+                                    fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
+                                }
+                            },
+                            successUpdates: {
+                                [sentPath]: [...sentForMatch, optionKey]
+                            }
+                        });
                     }
                 }
             }
         }
 
         // 4. Bildirimleri gönder
-        if (notificationsToSend.length > 0) {
-            console.log(`🚀 Sending ${notificationsToSend.length} notifications...`);
+        const updates = {};
+        const invalidTokenDeletes = {};
+
+        if (pendingNotifications.length > 0) {
+            console.log(`🚀 Sending ${pendingNotifications.length} notifications...`);
             const results = await Promise.allSettled(
-                notificationsToSend.map(msg => admin.messaging().send(msg))
+                pendingNotifications.map(item => admin.messaging().send(item.message))
             );
             const success = results.filter(r => r.status === 'fulfilled').length;
             const failed = results.filter(r => r.status === 'rejected').length;
             console.log(`✅ Sent: ${success}, ❌ Failed: ${failed}`);
+
+            results.forEach((result, index) => {
+                const item = pendingNotifications[index];
+                if (result.status === 'fulfilled') {
+                    Object.assign(updates, item.successUpdates);
+                    return;
+                }
+
+                const errorCode = result.reason?.code || result.reason?.errorInfo?.code;
+                if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
+                    invalidTokenDeletes[`notifications/${item.playerId}`] = null;
+                    console.log(`🧹 Removing invalid token: ${item.playerId.slice(0, 10)}...`);
+                }
+            });
         }
 
         // 5. Database güncelle
-        if (Object.keys(updates).length > 0) {
-            await db.ref().update(updates);
+        for (const deletePath of Object.keys(invalidTokenDeletes)) {
+            for (const updatePath of Object.keys(updates)) {
+                if (updatePath === deletePath || updatePath.startsWith(`${deletePath}/`)) {
+                    delete updates[updatePath];
+                }
+            }
+        }
+
+        const dbUpdates = { ...updates, ...invalidTokenDeletes };
+        if (Object.keys(dbUpdates).length > 0) {
+            await db.ref().update(dbUpdates);
         }
 
     } catch (error) {
