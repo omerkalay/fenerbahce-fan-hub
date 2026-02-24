@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const backendUrl = 'https://fenerbahce-backend.onrender.com';
+const backendUrl = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net';
 const appBase = '/fenerbahce-fan-hub/';
 
 export default defineConfig({

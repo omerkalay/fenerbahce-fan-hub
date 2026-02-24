@@ -6,14 +6,24 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.4.1-blue)
+![Version](https://img.shields.io/badge/version-2.4.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.4.1
+## What's New in v2.4.2
+
+- **Notification Reliability Fixes** - Improved FCM service worker registration scope to avoid conflicts with the PWA service worker
+- **Delivery Tracking Fix** - Notification send records are now stored only after successful FCM delivery attempts
+- **Token Cleanup** - Invalid FCM tokens are automatically removed after failed sends
+- **Timezone Consistency** - Daily match check date comparison is normalized for Istanbul time
+
+<details>
+<summary>Previous: v2.4.1</summary>
 
 - **New Formation** - Added 4-1-2-1-2 Diamond (Baklava) to the Formation Builder
+
+</details>
 
 <details>
 <summary>Previous: v2.4.0</summary>
@@ -268,4 +278,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.4.1** | February 2026
+**v2.4.2** | February 2026
