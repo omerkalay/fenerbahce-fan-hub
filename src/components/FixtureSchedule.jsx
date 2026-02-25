@@ -200,7 +200,7 @@ function FixtureSchedule() {
     return (
         <div className="min-h-screen pb-24">
             <section className="mb-4 space-y-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                     <div className="grid grid-cols-3 gap-2 flex-1">
                         {STATUS_FILTERS.map((item) => (
                             <button
@@ -216,10 +216,10 @@ function FixtureSchedule() {
                         ))}
                     </div>
 
-                    <div className="shrink-0 flex items-center gap-2">
+                    <div className="shrink-0 flex items-center gap-1.5">
                         <button
                             onClick={() => setShowFilters((prev) => !prev)}
-                            className={`h-10 px-3 rounded-xl text-xs font-semibold border transition-colors inline-flex items-center gap-2 ${showFilters
+                            className={`h-[38px] px-[11px] rounded-xl text-xs font-semibold border transition-colors inline-flex items-center gap-1.5 ${showFilters
                                 ? 'border-yellow-400/30 text-yellow-300 bg-yellow-400/5'
                                 : 'border-white/10 text-slate-300 bg-white/5 hover:bg-white/10'
                                 }`}
@@ -229,7 +229,7 @@ function FixtureSchedule() {
                             </svg>
                             <span>Filtre</span>
                             {activeAdvancedFilterCount > 0 && (
-                                <span className="min-w-5 h-5 px-1 rounded-full bg-yellow-400 text-black text-[10px] inline-flex items-center justify-center font-bold">
+                                <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-yellow-400 text-black text-[9px] inline-flex items-center justify-center font-bold">
                                     {activeAdvancedFilterCount}
                                 </span>
                             )}
@@ -238,7 +238,7 @@ function FixtureSchedule() {
                         <button
                             onClick={handleRefresh}
                             disabled={loading || isRefreshing}
-                            className="h-10 px-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-2"
+                            className="h-[38px] px-[11px] rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
                             title="Fikstürü yenile"
                         >
                             <svg
