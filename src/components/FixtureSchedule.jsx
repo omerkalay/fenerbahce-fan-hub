@@ -3,7 +3,7 @@ import { fetchEspnFenerbahceFixtures } from '../services/api';
 
 const STATUS_FILTERS = [
     { id: 'all', label: 'Tümü' },
-    { id: 'played', label: 'Oynanan' },
+    { id: 'played', label: 'Biten' },
     { id: 'upcoming', label: 'Kalan' }
 ];
 
