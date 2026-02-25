@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
 import NotificationSettings from './components/NotificationSettings';
+import FixtureSchedule from './components/FixtureSchedule';
 import { fetchNextMatch, fetchNext3Matches, BACKEND_URL } from './services/api';
 
 const readCachedMatchData = () => {
@@ -227,11 +228,12 @@ function App() {
               onCountdownEnd={onCountdownEnd}
             />
           )}
+          {activeTab === 'fixtures' && <FixtureSchedule />}
           {activeTab === 'builder' && <FormationBuilder />}
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[70%] max-w-xs glass-panel rounded-2xl p-2 flex justify-around items-center z-50">
+        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[88%] max-w-sm glass-panel rounded-2xl p-2 flex justify-around items-center z-50">
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-slate-400 hover:text-white'}`}
@@ -240,6 +242,16 @@ function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
             <span className="text-[10px] mt-1 font-medium">Pano</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('fixtures')}
+            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'fixtures' ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-slate-400 hover:text-white'}`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z" />
+            </svg>
+            <span className="text-[10px] mt-1 font-medium">Fikstür</span>
           </button>
 
           <button

@@ -79,13 +79,13 @@ define(['./workbox-137dedbd'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "index.html",
-    "revision": "0.6mm5evo0dmo"
+    "revision": "0.eb87m77a0co"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
     allowlist: [/^\/$/]
   }));
-  workbox.registerRoute(/https:\/\/fenerbahce-backend.onrender.com\/api\/(next-match|next-3-matches|squad)/, new workbox.NetworkFirst({
+  workbox.registerRoute(/https:\/\/us-central1-fb-hub-ed9de.cloudfunctions.net\/api\/(next-match|next-3-matches|squad)/, new workbox.NetworkFirst({
     "cacheName": "fb-api-cache",
     "networkTimeoutSeconds": 10,
     plugins: [new workbox.ExpirationPlugin({
@@ -95,7 +95,7 @@ define(['./workbox-137dedbd'], (function (workbox) { 'use strict';
       statuses: [0, 200]
     })]
   }), 'GET');
-  workbox.registerRoute(/https:\/\/fenerbahce-backend.onrender.com\/api\/(player|team)-image\/\d+/, new workbox.CacheFirst({
+  workbox.registerRoute(/https:\/\/us-central1-fb-hub-ed9de.cloudfunctions.net\/api\/(player|team)-image\/\d+/, new workbox.CacheFirst({
     "cacheName": "fb-image-cache",
     plugins: [new workbox.ExpirationPlugin({
       maxEntries: 60,
