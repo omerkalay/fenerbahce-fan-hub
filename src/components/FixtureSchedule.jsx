@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEspnFenerbahceFixtures } from '../services/api';
 
 const STATUS_FILTERS = [
@@ -84,6 +84,58 @@ const TeamInline = ({ team, isFenerbahce = false, align = 'left' }) => (
     </div>
 );
 
+const FixtureMatchCard = ({ match, featured = false, cardRef = null }) => {
+    const dateInfo = formatMatchDate(match.date);
+    const scored = isScoredMatch(match);
+    const venueName = getDisplayVenueName(match);
+
+    return (
+        <article
+            ref={cardRef}
+            className={`glass-panel rounded-2xl p-4 border transition-colors ${featured
+                ? 'border-yellow-400/20 shadow-[0_0_24px_rgba(234,179,8,0.08)]'
+                : 'border-white/5 hover:border-yellow-400/10'
+                }`}
+        >
+            <p className={`text-[12px] mb-3 ${featured ? 'text-slate-300' : 'text-slate-400'}`}>
+                {dateInfo.full} • {dateInfo.time}
+            </p>
+
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                <TeamInline
+                    team={match.homeTeam}
+                    isFenerbahce={match.homeTeam.id === match.fbTeam.id}
+                    align="left"
+                />
+
+                <div className="px-2 text-center shrink-0">
+                    {scored ? (
+                        <span className="font-black text-white text-lg tracking-tight">
+                            {match.homeTeam.score ?? '-'} <span className="text-slate-500">:</span> {match.awayTeam.score ?? '-'}
+                        </span>
+                    ) : (
+                        <span className={`font-bold text-sm ${featured ? 'text-yellow-300' : 'text-slate-400'}`}>VS</span>
+                    )}
+                </div>
+
+                <TeamInline
+                    team={match.awayTeam}
+                    isFenerbahce={match.awayTeam.id === match.fbTeam.id}
+                    align="right"
+                />
+            </div>
+
+            {venueName && (
+                <div className="mt-3 pt-3 border-t border-white/5">
+                    <p className="text-[11px] text-slate-500 truncate">
+                        {venueName}
+                    </p>
+                </div>
+            )}
+        </article>
+    );
+};
+
 function FixtureSchedule() {
     const [fixtureData, setFixtureData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -95,6 +147,7 @@ function FixtureSchedule() {
     const [searchTerm, setSearchTerm] = useState('');
     const [venueFilter, setVenueFilter] = useState('all');
     const [competitionFilter, setCompetitionFilter] = useState('all');
+    const nextMatchFocusRef = useRef(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -185,6 +238,23 @@ function FixtureSchedule() {
         });
     }, [statusFilteredMatches, venueFilter, competitionFilter, normalizedQuery]);
 
+    const allFilterPlayedMatches = useMemo(() => {
+        if (statusFilter !== 'all') return [];
+        return filteredMatches
+            .filter((match) => match.status.completed || match.status.state === 'post')
+            .sort((a, b) => getMatchTimestamp(b) - getMatchTimestamp(a));
+    }, [statusFilter, filteredMatches]);
+
+    const allFilterUpcomingMatches = useMemo(() => {
+        if (statusFilter !== 'all') return [];
+        return filteredMatches
+            .filter((match) => !match.status.completed && match.status.state !== 'post')
+            .sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b));
+    }, [statusFilter, filteredMatches]);
+
+    const allFilterNextMatch = allFilterUpcomingMatches[0] ?? null;
+    const allFilterLaterMatches = allFilterUpcomingMatches.slice(1);
+
     const activeAdvancedFilterCount = [
         venueFilter !== 'all',
         competitionFilter !== 'all',
@@ -199,7 +269,7 @@ function FixtureSchedule() {
 
     return (
         <div className="min-h-screen pb-24">
-            <section className="mb-4 space-y-3">
+            <section className="sticky top-0 z-30 mb-4 space-y-3 pt-1 pb-2 bg-gradient-to-b from-slate-950/95 via-slate-950/90 to-transparent backdrop-blur-sm">
                 <div className="flex items-center gap-1.5">
                     <div className="grid grid-cols-3 gap-2 flex-1">
                         {STATUS_FILTERS.map((item) => (
@@ -361,56 +431,79 @@ function FixtureSchedule() {
                         </div>
                     )}
 
-                    {!error && filteredMatches.length > 0 && (
+                    {!error && filteredMatches.length > 0 && statusFilter !== 'all' && (
                         <div className="space-y-2.5">
-                            {filteredMatches.map((match) => {
-                                const dateInfo = formatMatchDate(match.date);
-                                const scored = isScoredMatch(match);
-                                const venueName = getDisplayVenueName(match);
+                            {filteredMatches.map((match) => (
+                                <FixtureMatchCard key={match.id} match={match} />
+                            ))}
+                        </div>
+                    )}
 
-                                return (
-                                    <article
-                                        key={match.id}
-                                        className="glass-panel rounded-2xl p-4 border border-white/5 hover:border-yellow-400/10 transition-colors"
-                                    >
-                                        <p className="text-[12px] text-slate-400 mb-3">
-                                            {dateInfo.full} • {dateInfo.time}
-                                        </p>
+                    {!error && filteredMatches.length > 0 && statusFilter === 'all' && (
+                        <div className="relative space-y-4">
+                            {allFilterPlayedMatches.length > 0 && (
+                                <section className="space-y-2.5">
+                                    <div className="flex items-center gap-2 px-1">
+                                        <div className="h-px bg-white/10 flex-1" />
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Geçmiş</p>
+                                        <div className="h-px bg-white/10 flex-1" />
+                                    </div>
+                                    {allFilterPlayedMatches.map((match) => (
+                                        <FixtureMatchCard key={match.id} match={match} />
+                                    ))}
+                                </section>
+                            )}
 
-                                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-                                            <TeamInline
-                                                team={match.homeTeam}
-                                                isFenerbahce={match.homeTeam.id === match.fbTeam.id}
-                                                align="left"
-                                            />
-
-                                            <div className="px-2 text-center shrink-0">
-                                                {scored ? (
-                                                    <span className="font-black text-white text-lg tracking-tight">
-                                                        {match.homeTeam.score ?? '-'} <span className="text-slate-500">:</span> {match.awayTeam.score ?? '-'}
-                                                    </span>
-                                                ) : (
-                                                    <span className="font-bold text-slate-400 text-sm">VS</span>
-                                                )}
+                            {allFilterNextMatch && (
+                                <section className="space-y-2.5">
+                                    {allFilterPlayedMatches.length > 0 && (
+                                        <div className="flex justify-center">
+                                            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-white/65 backdrop-blur-sm">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                </svg>
+                                                <span>Geçmiş</span>
+                                                <span className="text-white/30">•</span>
+                                                <span>Kaydır</span>
                                             </div>
-
-                                            <TeamInline
-                                                team={match.awayTeam}
-                                                isFenerbahce={match.awayTeam.id === match.fbTeam.id}
-                                                align="right"
-                                            />
                                         </div>
+                                    )}
 
-                                        {venueName && (
-                                            <div className="mt-3 pt-3 border-t border-white/5">
-                                                <p className="text-[11px] text-slate-500 truncate">
-                                                    {venueName}
-                                                </p>
+                                    <div className="flex items-center gap-2 px-1">
+                                        <div className="h-px bg-yellow-400/20 flex-1" />
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-yellow-300">Sıradaki Maç</p>
+                                        <div className="h-px bg-yellow-400/20 flex-1" />
+                                    </div>
+                                    <FixtureMatchCard match={allFilterNextMatch} featured cardRef={nextMatchFocusRef} />
+
+                                    {allFilterLaterMatches.length > 0 && (
+                                        <div className="flex justify-center">
+                                            <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] text-white/65 backdrop-blur-sm">
+                                                <span>Kaydır</span>
+                                                <span className="text-white/30">•</span>
+                                                <span>Gelecek</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
                                             </div>
-                                        )}
-                                    </article>
-                                );
-                            })}
+                                        </div>
+                                    )}
+                                </section>
+                            )}
+
+                            {allFilterLaterMatches.length > 0 && (
+                                <section className="space-y-2.5">
+                                    <div className="flex items-center gap-2 px-1">
+                                        <div className="h-px bg-white/10 flex-1" />
+                                        <p className="text-[11px] uppercase tracking-[0.14em] text-slate-400">Gelecek</p>
+                                        <div className="h-px bg-white/10 flex-1" />
+                                    </div>
+                                    {allFilterLaterMatches.map((match) => (
+                                        <FixtureMatchCard key={match.id} match={match} />
+                                    ))}
+                                </section>
+                            )}
+
                         </div>
                     )}
                 </section>
