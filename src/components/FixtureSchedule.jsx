@@ -151,7 +151,7 @@ function FixtureSchedule() {
     const statusFilteredMatches = useMemo(() => {
         if (statusFilter === 'played') return playedMatches;
         if (statusFilter === 'upcoming') return upcomingMatches;
-        return [...playedMatches, ...upcomingMatches];
+        return [...upcomingMatches, ...playedMatches];
     }, [statusFilter, playedMatches, upcomingMatches]);
 
     const normalizedQuery = searchTerm.trim().toLocaleLowerCase('tr-TR');
