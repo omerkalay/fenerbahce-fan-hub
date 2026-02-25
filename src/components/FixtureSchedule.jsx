@@ -242,7 +242,7 @@ function FixtureSchedule() {
         if (statusFilter !== 'all') return [];
         return filteredMatches
             .filter((match) => match.status.completed || match.status.state === 'post')
-            .sort((a, b) => getMatchTimestamp(b) - getMatchTimestamp(a));
+            .sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b));
     }, [statusFilter, filteredMatches]);
 
     const allFilterUpcomingMatches = useMemo(() => {
