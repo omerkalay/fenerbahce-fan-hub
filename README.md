@@ -6,17 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.4.2-blue)
+![Version](https://img.shields.io/badge/version-2.5.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.4.2
+## What's New in v2.5.0
+
+- **Fixture Tab (New)** - Added a dedicated fixture screen in the bottom navigation with a modern mobile-first layout
+- **ESPN Fixture Integration** - Pulls Fenerbahçe fixtures directly from ESPN (free) with current season schedule support
+- **Played + Upcoming Merge** - Combines completed matches and upcoming matches into a single timeline view
+- **Multi-Competition Coverage** - Includes both Turkish Super Lig and UEFA Europa League fixtures
+- **Advanced Fixture Filters** - Added status filters (`All`, `Played`, `Remaining`) plus search, home/away, and competition filters
+- **Fixture UI Localization** - Displays team names in Turkish-friendly form (for example `Fenerbahce` -> `Fenerbahçe`)
+- **Venue Display Override** - Home venue display is normalized to the current stadium naming in the fixture cards
+
+<details>
+<summary>Previous: v2.4.2</summary>
 
 - **Notification Reliability Fixes** - Improved FCM service worker registration scope to avoid conflicts with the PWA service worker
 - **Delivery Tracking Fix** - Notification send records are now stored only after successful FCM delivery attempts
 - **Token Cleanup** - Invalid FCM tokens are automatically removed after failed sends
 - **Timezone Consistency** - Daily match check date comparison is normalized for Istanbul time
+
+</details>
 
 <details>
 <summary>Previous: v2.4.1</summary>
@@ -60,6 +73,15 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Automatic Data Cleanup**: Old polls and notification records cleaned up daily
 - **Premium UI**: Glassmorphic design with smooth animations
 
+### Fixture Explorer
+- **Dedicated Fixture Tab**: Separate bottom-nav screen for season fixtures
+- **Current Season Timeline**: Shows both completed and upcoming matches in one view
+- **Competition Filtering**: Filter by **Süper Lig** or **UEFA Europa League**
+- **Home/Away Filter**: Quickly narrow down to home or away fixtures
+- **Team Search**: Search fixtures by opponent name
+- **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
+- **Manual Refresh**: Re-fetch ESPN fixture data on demand
+
 ### Push Notification System
 - **5 Notification Types**:
   - 3 hours before match
@@ -87,7 +109,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Database**: Firebase Realtime Database (Polls, Cache & User Preferences)
 - **APIs**: 
   - SofaScore (via RapidAPI) - Match data, Squad
-  - ESPN (Free) - Standings, Live scores
+  - ESPN (Free) - Standings, Live scores, Fixture schedules
 - **Push Notifications**: Firebase Cloud Messaging (FCM)
 - **PWA**: Installable app with offline support
 - **Deployment**: GitHub Pages (frontend) + Firebase Cloud Functions (backend)
@@ -120,6 +142,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
                 └──────────────┘
 ```
 
+Note: The fixture tab fetches ESPN fixture schedules directly from the frontend (CORS-enabled ESPN endpoints) for the current season. The diagram above focuses on the backend/cache-driven match, poll, and notification flows.
+
 ## Project Structure
 
 ```
@@ -130,13 +154,14 @@ fenerbahce-fan-hub/
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.jsx          # Main dashboard with matches & poll
+│   │   ├── FixtureSchedule.jsx    # Fixture tab with ESPN-backed filters
 │   │   ├── NotificationSettings.jsx # Global notification preferences
 │   │   ├── Poll.jsx               # Real-time voting component
 │   │   ├── FormationBuilder.jsx   # Interactive pitch & formations
 │   │   ├── CustomStandings.jsx    # Standings table
 │   │   └── LiveMatchScore.jsx     # Live match tracker
 │   ├── services/
-│   │   └── api.js                 # Firebase API integration
+│   │   └── api.js                 # Firebase API integration + ESPN fixture aggregation
 │   ├── firebase.js                # Firebase client initialization
 │   ├── App.jsx                    # Main app & routing
 │   └── main.jsx                   # React entry point
@@ -237,6 +262,12 @@ firebase deploy --only functions
 - **Leagues**: Süper Lig (`tur.1`) + Europa League (`uefa.europa`)
 - **Cleanup**: Live cache deleted 5min after match ends
 
+### Fixture System
+- **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints (free, client-side fetch)
+- **Coverage**: Süper Lig (`tur.1`) + UEFA Europa League (`uefa.europa`)
+- **Data Merge**: Results (`schedule`) + upcoming fixtures (`schedule?fixture=true`)
+- **Filtering**: Status (All/Played/Remaining), team search, home/away, competition
+
 ### API Cost Optimization
 | | Before (v2.1) | After (v2.2) |
 |---|---|---|
@@ -272,10 +303,10 @@ MIT License - Free to use and modify
 - **APIs**: SofaScore (RapidAPI), ESPN (Free)
 - **Design Inspiration**: Modern sports apps
 - **Icons**: Lucide React
-- **Team**: Fenerbahce SK 💛💙
+- **Team**: Fenerbahce SK
 
 ---
 
 Made with passion for Fenerbahçe fans
 
-**v2.4.2** | February 2026
+**v2.5.0** | February 2026
