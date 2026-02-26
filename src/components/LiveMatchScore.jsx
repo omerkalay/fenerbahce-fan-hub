@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 
+const STAT_GROUPS = [
+    { label: 'Toplam Şut', keys: ['totalShots'] },
+    { label: 'İsabetli Şut', keys: ['shotsOnTarget'] },
+    { label: 'Topla Oynama %', keys: ['possessionPct', 'possession'] },
+    { label: 'Korner', keys: ['wonCorners', 'corners'] },
+    { label: 'Faul', keys: ['foulsCommitted', 'fouls'] },
+    { label: 'Sarı Kart', keys: ['yellowCards', 'yellowCard'] },
+    { label: 'Kırmızı Kart', keys: ['redCards', 'redCard'] }
+];
+
 const LiveMatchScore = () => {
     const [liveData, setLiveData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -50,15 +60,16 @@ const LiveMatchScore = () => {
         );
     }
 
-    const statLabels = {
-        possessionPct: 'Topla Oynama %',
-        totalShots: 'Toplam Şut',
-        shotsOnTarget: 'İsabetli Şut',
-        wonCorners: 'Korner',
-        foulsCommitted: 'Faul',
-        totalGoals: 'Gol',
-        goalAssists: 'Asist'
-    };
+    const orderedStats = STAT_GROUPS
+        .map((group) => {
+            const stat = liveData.stats?.find((item) => group.keys.includes(item.name));
+            if (!stat) return null;
+            return {
+                ...stat,
+                label: group.label
+            };
+        })
+        .filter(Boolean);
 
     return (
         <div className="w-full space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
@@ -157,13 +168,11 @@ const LiveMatchScore = () => {
             )}
 
             {/* Stats */}
-            {liveData.stats && liveData.stats.length > 0 && (
+            {orderedStats.length > 0 && (
                 <div className="glass-panel rounded-2xl p-4">
                     <h3 className="text-sm font-bold text-white mb-3">İstatistikler</h3>
                     <div className="space-y-3">
-                        {liveData.stats
-                            .filter(stat => statLabels[stat.name])
-                            .map((stat, idx) => {
+                        {orderedStats.map((stat, idx) => {
                                 const homeVal = parseFloat(stat.homeValue) || 0;
                                 const awayVal = parseFloat(stat.awayValue) || 0;
                                 const total = homeVal + awayVal || 1;
@@ -171,7 +180,7 @@ const LiveMatchScore = () => {
                                     <div key={idx} className="space-y-1">
                                         <div className="flex justify-between text-xs text-slate-400">
                                             <span className="font-medium text-white">{stat.homeValue}</span>
-                                            <span>{statLabels[stat.name]}</span>
+                                            <span>{stat.label}</span>
                                             <span className="font-medium text-white">{stat.awayValue}</span>
                                         </div>
                                         <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
