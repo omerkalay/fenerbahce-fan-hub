@@ -6,17 +6,26 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.5.1-blue)
+![Version](https://img.shields.io/badge/version-2.5.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.5.1
+## What's New in v2.5.2
+
+- **Live Match Stats Cleanup** - Reordered live match statistics to prioritize shots, possession, corners, fouls, and cards
+- **Removed Noisy Stats** - Hidden less useful rows such as assists/goals from the live stats panel (score already covers goals)
+- **Card Stats Added** - Yellow/red card counts are now derived from ESPN live match events and displayed in the stats list
+
+<details>
+<summary>Previous: v2.5.1</summary>
 
 - **Formation Builder Position Persistence Fix** - Fixed a bug where selected forwards could disappear or become unselectable after switching formations (for example from `4-2-3-1` to `4-1-2-1-2 Diamond`)
 - **Active Formation Deduplication Fix** - Player duplicate checks now consider only active formation slots, preventing hidden slots from incorrectly blocking player selection
 - **Formation Transition Mapping** - Existing players are remapped to compatible role families (defense/midfield/attack) when formation changes, reducing accidental lineup loss
 - **Mobile Scroll Performance Improvements** - Improved touch scrolling smoothness in the player pool and selection modal by tuning overscroll behavior and reducing heavy card blur effects
+
+</details>
 
 <details>
 <summary>Previous: v2.5.0</summary>
@@ -319,4 +328,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.5.1** | February 2026
+**v2.5.2** | February 2026

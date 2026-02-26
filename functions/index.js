@@ -351,6 +351,62 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         const competition = fenerbahceMatch.competitions?.[0];
         const homeTeam = competition?.competitors?.find(c => c.homeAway === 'home');
         const awayTeam = competition?.competitors?.find(c => c.homeAway === 'away');
+        const homeTeamId = String(homeTeam?.team?.id || '');
+        const awayTeamId = String(awayTeam?.team?.id || '');
+        const rawDetails = competition?.details || [];
+
+        const events = rawDetails.map(detail => ({
+            type: detail.type?.text || '',
+            clock: detail.clock?.displayValue || '',
+            team: detail.team?.id || '',
+            isGoal: detail.scoringPlay || false,
+            isYellowCard: detail.yellowCard || false,
+            isRedCard: detail.redCard || false,
+            isPenalty: detail.penaltyKick || false,
+            isOwnGoal: detail.ownGoal || false,
+            player: detail.athletesInvolved?.[0]?.displayName || ''
+        }));
+
+        const homeStatistics = homeTeam?.statistics || [];
+        const awayStatistics = awayTeam?.statistics || [];
+        const homeStatMap = new Map(homeStatistics.map(stat => [stat.name, stat.displayValue]));
+        const awayStatMap = new Map(awayStatistics.map(stat => [stat.name, stat.displayValue]));
+        const statNames = Array.from(new Set([
+            ...homeStatistics.map(stat => stat.name),
+            ...awayStatistics.map(stat => stat.name)
+        ]));
+
+        const stats = statNames.map((name) => ({
+            name,
+            homeValue: homeStatMap.get(name) || '0',
+            awayValue: awayStatMap.get(name) || '0'
+        }));
+
+        const countCards = (teamId, cardType) => rawDetails.filter((detail) => {
+            const detailTeamId = String(detail.team?.id || '');
+            if (detailTeamId !== teamId) return false;
+            return cardType === 'yellow'
+                ? Boolean(detail.yellowCard)
+                : Boolean(detail.redCard);
+        }).length;
+
+        const upsertStat = (name, homeValue, awayValue) => {
+            const existingIndex = stats.findIndex((stat) => stat.name === name);
+            const payload = {
+                name,
+                homeValue: String(homeValue),
+                awayValue: String(awayValue)
+            };
+
+            if (existingIndex >= 0) {
+                stats[existingIndex] = payload;
+            } else {
+                stats.push(payload);
+            }
+        };
+
+        upsertStat('yellowCards', countCards(homeTeamId, 'yellow'), countCards(awayTeamId, 'yellow'));
+        upsertStat('redCards', countCards(homeTeamId, 'red'), countCards(awayTeamId, 'red'));
 
         // Temel veriyi hazırla
         const liveData = {
@@ -372,22 +428,8 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
                 logo: awayTeam?.team?.logo,
                 score: awayTeam?.score || '0'
             },
-            events: (competition?.details || []).map(detail => ({
-                type: detail.type?.text || '',
-                clock: detail.clock?.displayValue || '',
-                team: detail.team?.id || '',
-                isGoal: detail.scoringPlay || false,
-                isYellowCard: detail.yellowCard || false,
-                isRedCard: detail.redCard || false,
-                isPenalty: detail.penaltyKick || false,
-                isOwnGoal: detail.ownGoal || false,
-                player: detail.athletesInvolved?.[0]?.displayName || ''
-            })),
-            stats: (homeTeam?.statistics || []).map((stat, idx) => ({
-                name: stat.name,
-                homeValue: stat.displayValue,
-                awayValue: awayTeam?.statistics?.[idx]?.displayValue || '0'
-            })),
+            events,
+            stats,
             lastUpdated: now
         };
 
