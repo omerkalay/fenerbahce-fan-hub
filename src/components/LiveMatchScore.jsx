@@ -177,6 +177,9 @@ const LiveMatchScore = () => {
                                 <span className={`text-sm flex-1 ${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400 font-semibold' : 'text-slate-300'
                                     }`}>
                                     {event.player}
+                                    {event.isGoal && event.isPenalty && (
+                                        <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
+                                    )}
                                     {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && (
                                         <span className="text-slate-500 ml-1">({event.type})</span>
                                     )}

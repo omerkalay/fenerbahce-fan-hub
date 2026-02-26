@@ -265,6 +265,9 @@ const Dashboard = ({
                                             </span>
                                             <span className={`${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400' : 'text-slate-300'}`}>
                                                 {event.player}
+                                                {event.isGoal && event.isPenalty && (
+                                                    <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
+                                                )}
                                             </span>
                                         </div>
                                     ))}
