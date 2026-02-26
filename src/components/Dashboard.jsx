@@ -4,6 +4,19 @@ import Poll from './Poll';
 import CustomStandings from './CustomStandings';
 import LiveMatchScore from './LiveMatchScore';
 
+const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
+    const status = String(statusDetail || '').trim().toLowerCase();
+    const clock = String(displayClock || '').trim().toLowerCase();
+
+    return (
+        status === 'ht' ||
+        status === 'halftime' ||
+        status.includes('half time') ||
+        status.includes('devre') ||
+        clock === 'ht'
+    );
+};
+
 const Dashboard = ({
     matchData,
     next3Matches = [],
@@ -108,6 +121,9 @@ const Dashboard = ({
     const FENERBAHCE_ID = 3052;
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
+    const isLiveHalftime = liveMatchState === 'in' && liveMatchData
+        ? isHalftimeDisplay(liveMatchData.statusDetail, liveMatchData.displayClock)
+        : false;
 
     // Live state is now managed by App.jsx via liveMatchState prop
 
@@ -215,8 +231,12 @@ const Dashboard = ({
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                                 </span>
-                                <span className="text-sm font-bold text-red-400 uppercase">Canlı</span>
-                                <span className="text-xs text-slate-400 ml-1">{liveMatchData.displayClock}</span>
+                                <span className="text-sm font-bold text-red-400 uppercase">
+                                    {isLiveHalftime ? 'Devre Arası' : 'Canlı'}
+                                </span>
+                                {!isLiveHalftime && liveMatchData.displayClock && (
+                                    <span className="text-xs text-slate-400 ml-1">{liveMatchData.displayClock}</span>
+                                )}
                             </div>
 
                             {/* Score */}

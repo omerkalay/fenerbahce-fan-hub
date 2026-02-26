@@ -11,6 +11,19 @@ const STAT_GROUPS = [
     { label: 'Kırmızı Kart', keys: ['redCards', 'redCard'] }
 ];
 
+const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
+    const status = String(statusDetail || '').trim().toLowerCase();
+    const clock = String(displayClock || '').trim().toLowerCase();
+
+    return (
+        status === 'ht' ||
+        status === 'halftime' ||
+        status.includes('half time') ||
+        status.includes('devre') ||
+        clock === 'ht'
+    );
+};
+
 const LiveMatchScore = () => {
     const [liveData, setLiveData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -70,6 +83,11 @@ const LiveMatchScore = () => {
             };
         })
         .filter(Boolean);
+    const isHalftime = isHalftimeDisplay(liveData.statusDetail, liveData.displayClock);
+    const statusLabel = isHalftime
+        ? 'Devre Arası'
+        : (liveData.statusDetail || (liveData.matchState === 'in' ? 'Canlı' : 'Maç Bitti'));
+    const centerClockLabel = liveData.displayClock || '';
 
     return (
         <div className="w-full space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
@@ -77,7 +95,7 @@ const LiveMatchScore = () => {
             <div className="glass-card rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-bold text-yellow-400 uppercase">
-                        {liveData.statusDetail || (liveData.matchState === 'in' ? 'Canlı' : 'Maç Bitti')}
+                        {statusLabel}
                     </span>
                     {liveData.matchState === 'in' && (
                         <div className="flex items-center gap-2">
@@ -85,7 +103,9 @@ const LiveMatchScore = () => {
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                             </span>
-                            <span className="text-sm font-bold text-red-400">CANLI</span>
+                            <span className="text-sm font-bold text-red-400">
+                                {isHalftime ? 'DEVRE ARASI' : 'CANLI'}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -112,7 +132,7 @@ const LiveMatchScore = () => {
                             <span className="text-3xl font-bold text-slate-600">-</span>
                             <span className="text-5xl font-black text-white">{liveData.awayTeam?.score || '0'}</span>
                         </div>
-                        <span className="text-xs text-slate-400">{liveData.displayClock || ''}</span>
+                        <span className="text-xs text-slate-400">{centerClockLabel}</span>
                     </div>
 
                     {/* Away Team */}
