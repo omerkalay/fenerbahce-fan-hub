@@ -6,16 +6,27 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.5.2-blue)
+![Version](https://img.shields.io/badge/version-2.5.3-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.5.2
+## What's New in v2.5.3
+
+- **Live Event Feed Expanded (ESPN)** - Added substitution events by merging ESPN `summary.keyEvents` with the existing live scoreboard event feed
+- **Duplicate Event Protection** - Live event timeline now deduplicates merged events (clock/team/type/player based) while preserving chronological order
+- **Penalty Goal Labels** - Penalty goals now display a clear ` (P)` suffix in live event rows
+- **Halftime UI Polish** - `HT` / halftime states now render as `Devre Arası` in live UI (detail modal keeps the exact clock value visible)
+- **Cleaner Dashboard Event Preview** - Substitutions are shown in the detail modal timeline, but hidden from the compact dashboard event list to reduce noise
+
+<details>
+<summary>Previous: v2.5.2</summary>
 
 - **Live Match Stats Cleanup** - Reordered live match statistics to prioritize shots, possession, corners, fouls, and cards
 - **Removed Noisy Stats** - Hidden less useful rows such as assists/goals from the live stats panel (score already covers goals)
 - **Card Stats Added** - Yellow/red card counts are now derived from ESPN live match events and displayed in the stats list
+
+</details>
 
 <details>
 <summary>Previous: v2.5.1</summary>
@@ -328,4 +339,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.5.2** | February 2026
+**v2.5.3** | February 2026

@@ -159,13 +159,21 @@ const LiveMatchScore = () => {
                         {liveData.events.map((event, idx) => (
                             <div
                                 key={idx}
-                                className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${event.isGoal ? 'bg-yellow-400/10' : event.isRedCard ? 'bg-red-500/10' : 'bg-white/5'
+                                className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${event.isGoal ? 'bg-yellow-400/10' : event.isRedCard ? 'bg-red-500/10' : event.isSubstitution ? 'bg-emerald-400/10' : 'bg-white/5'
                                     }`}
                             >
                                 <span className="text-xs text-yellow-400 font-mono w-12">{event.clock}</span>
                                 <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
                                     {event.isGoal && (
                                         <svg viewBox="0 0 16 16" className="w-4 h-4"><circle cx="8" cy="8" r="7" fill="none" stroke="#eab308" strokeWidth="1.5" /><circle cx="8" cy="8" r="3" fill="#eab308" /></svg>
+                                    )}
+                                    {event.isSubstitution && (
+                                        <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <path d="M2 5h9" />
+                                            <path d="m8 2 3 3-3 3" />
+                                            <path d="M14 11H5" />
+                                            <path d="m8 8-3 3 3 3" />
+                                        </svg>
                                     )}
                                     {event.isYellowCard && !event.isRedCard && (
                                         <svg viewBox="0 0 12 16" className="w-3.5 h-5"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#eab308" /></svg>
@@ -174,13 +182,16 @@ const LiveMatchScore = () => {
                                         <svg viewBox="0 0 12 16" className="w-3.5 h-5"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#ef4444" /></svg>
                                     )}
                                 </span>
-                                <span className={`text-sm flex-1 ${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400 font-semibold' : 'text-slate-300'
+                                <span className={`text-sm flex-1 ${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400 font-semibold' : event.isSubstitution ? 'text-emerald-300 font-medium' : 'text-slate-300'
                                     }`}>
                                     {event.player}
+                                    {event.isSubstitution && event.playerOut && (
+                                        <span className="text-slate-400 ml-1">↔ {event.playerOut}</span>
+                                    )}
                                     {event.isGoal && event.isPenalty && (
                                         <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
                                     )}
-                                    {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && (
+                                    {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && !event.isSubstitution && (
                                         <span className="text-slate-500 ml-1">({event.type})</span>
                                     )}
                                 </span>
