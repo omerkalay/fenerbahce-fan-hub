@@ -354,18 +354,87 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         const homeTeamId = String(homeTeam?.team?.id || '');
         const awayTeamId = String(awayTeam?.team?.id || '');
         const rawDetails = competition?.details || [];
+        const summaryUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${matchLeague}/summary?event=${fenerbahceMatch.id}`;
 
-        const events = rawDetails.map(detail => ({
+        const buildScoreboardEvent = (detail, index) => ({
             type: detail.type?.text || '',
             clock: detail.clock?.displayValue || '',
+            clockValue: Number.isFinite(Number(detail.clock?.value)) ? Number(detail.clock.value) : null,
+            sourceOrder: index,
             team: detail.team?.id || '',
             isGoal: detail.scoringPlay || false,
             isYellowCard: detail.yellowCard || false,
             isRedCard: detail.redCard || false,
             isPenalty: detail.penaltyKick || false,
             isOwnGoal: detail.ownGoal || false,
-            player: detail.athletesInvolved?.[0]?.displayName || ''
-        }));
+            isSubstitution: false,
+            player: detail.athletesInvolved?.[0]?.displayName || '',
+            playerOut: ''
+        });
+
+        const buildSummarySubstitutionEvent = (item, index) => {
+            const participants = Array.isArray(item.participants) ? item.participants : [];
+            const playerIn = participants[0]?.athlete?.displayName || '';
+            const playerOut = participants[1]?.athlete?.displayName || '';
+
+            return {
+                type: item.type?.text || 'Substitution',
+                clock: item.clock?.displayValue || '',
+                clockValue: Number.isFinite(Number(item.clock?.value)) ? Number(item.clock.value) : null,
+                sourceOrder: rawDetails.length + index,
+                team: item.team?.id || '',
+                isGoal: false,
+                isYellowCard: false,
+                isRedCard: false,
+                isPenalty: false,
+                isOwnGoal: false,
+                isSubstitution: true,
+                player: playerIn || item.shortText?.replace(/\s*Substitution\s*$/i, '') || '',
+                playerOut
+            };
+        };
+
+        let summaryKeyEvents = [];
+        try {
+            const summaryResponse = await fetch(summaryUrl);
+            if (summaryResponse.ok) {
+                const summaryJson = await summaryResponse.json();
+                summaryKeyEvents = Array.isArray(summaryJson?.keyEvents) ? summaryJson.keyEvents : [];
+            }
+        } catch (summaryError) {
+            console.warn(`⚠️ ESPN summary keyEvents unavailable for ${fenerbahceMatch.id}:`, summaryError.message);
+        }
+
+        const scoreboardEvents = rawDetails.map(buildScoreboardEvent);
+        const summarySubstitutionEvents = summaryKeyEvents
+            .filter((item) => item?.type?.type === 'substitution')
+            .map(buildSummarySubstitutionEvent)
+            .filter((event) => event.clock || event.player);
+
+        const buildEventDedupKey = (event) => ([
+            String(event.clock || ''),
+            String(event.team || ''),
+            String(event.type || '').toLowerCase(),
+            String(event.player || '').toLowerCase(),
+            String(event.playerOut || '').toLowerCase(),
+            event.isGoal ? 'goal' : '',
+            event.isYellowCard ? 'yellow' : '',
+            event.isRedCard ? 'red' : '',
+            event.isPenalty ? 'penalty' : '',
+            event.isSubstitution ? 'sub' : ''
+        ].join('|'));
+
+        const events = [...scoreboardEvents, ...summarySubstitutionEvents]
+            .sort((a, b) => {
+                const aClock = Number.isFinite(a.clockValue) ? a.clockValue : Number.POSITIVE_INFINITY;
+                const bClock = Number.isFinite(b.clockValue) ? b.clockValue : Number.POSITIVE_INFINITY;
+                if (aClock !== bClock) return aClock - bClock;
+                return (a.sourceOrder || 0) - (b.sourceOrder || 0);
+            })
+            .filter((event, idx, arr) => {
+                const key = buildEventDedupKey(event);
+                return idx === arr.findIndex((candidate) => buildEventDedupKey(candidate) === key);
+            });
 
         const homeStatistics = homeTeam?.statistics || [];
         const awayStatistics = awayTeam?.statistics || [];

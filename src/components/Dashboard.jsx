@@ -249,7 +249,9 @@ const Dashboard = ({
                             {/* Events */}
                             {liveMatchData.events && liveMatchData.events.length > 0 && (
                                 <div className="space-y-1 mb-4 max-h-32 overflow-y-auto">
-                                    {liveMatchData.events.map((event, idx) => (
+                                    {liveMatchData.events
+                                        .filter((event) => !event.isSubstitution)
+                                        .map((event, idx) => (
                                         <div key={idx} className="flex items-center gap-2 text-xs">
                                             <span className="text-slate-500 w-10 text-right">{event.clock}</span>
                                             <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
