@@ -4,6 +4,14 @@ import { toPng } from 'html-to-image';
 
 const PITCH_SVG = `data:image/svg+xml,${encodeURIComponent(`<svg viewBox="0 0 68 105" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grass" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#1a472a"/><stop offset="50%" style="stop-color:#166534"/><stop offset="100%" style="stop-color:#1a472a"/></linearGradient></defs><rect width="68" height="105" fill="url(#grass)"/><g stroke="rgba(255,255,255,0.5)" stroke-width="0.4" fill="none"><rect x="4" y="4" width="60" height="97"/><line x1="4" y1="52.5" x2="64" y2="52.5"/><circle cx="34" cy="52.5" r="9.15"/><circle cx="34" cy="52.5" r="0.5" fill="rgba(255,255,255,0.5)"/><rect x="13.84" y="4" width="40.32" height="16.5"/><rect x="24.84" y="4" width="18.32" height="5.5"/><circle cx="34" cy="15" r="0.5" fill="rgba(255,255,255,0.5)"/><path d="M 25.5 20.5 A 9.15 9.15 0 0 0 42.5 20.5"/><rect x="13.84" y="84.5" width="40.32" height="16.5"/><rect x="24.84" y="95.5" width="18.32" height="5.5"/><circle cx="34" cy="90" r="0.5" fill="rgba(255,255,255,0.5)"/><path d="M 25.5 84.5 A 9.15 9.15 0 0 1 42.5 84.5"/><path d="M 4 6 A 2 2 0 0 0 6 4"/><path d="M 62 4 A 2 2 0 0 0 64 6"/><path d="M 4 99 A 2 2 0 0 1 6 101"/><path d="M 62 101 A 2 2 0 0 1 64 99"/></g></svg>`)}`;
 
+const getPositionFamily = (positionKey) => {
+    if (positionKey === 'GK') return 'gk';
+    if (/^(LB|RB|LWB|RWB|CB\d*)$/.test(positionKey)) return 'def';
+    if (/^(CDM\d*|CM\d*|CAM|LAM|RAM|LM|RM)$/.test(positionKey)) return 'mid';
+    if (/^(ST\d*|ST|LW|RW)$/.test(positionKey)) return 'att';
+    return 'other';
+};
+
 const FormationBuilder = () => {
     const [squad, setSquad] = useState([]);
     const [pitchPlayers, setPitchPlayers] = useState({});
@@ -58,7 +66,7 @@ const FormationBuilder = () => {
                 return newState;
             });
         } else {
-            const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
+            const isAlreadyOnPitch = Object.values(activePitchPlayers).some(p => p.id === player.id);
             if (isAlreadyOnPitch) {
                 return;
             }
@@ -91,7 +99,7 @@ const FormationBuilder = () => {
 
     const handlePlayerSelect = (player) => {
         if (selectedPosition) {
-            const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
+            const isAlreadyOnPitch = Object.values(activePitchPlayers).some(p => p.id === player.id);
             if (!isAlreadyOnPitch) {
                 setPitchPlayers(prev => ({
                     ...prev,
@@ -186,8 +194,55 @@ const FormationBuilder = () => {
         }
     };
 
+    useEffect(() => {
+        const targetPositionKeys = Object.keys(formations[formation]);
+
+        setPitchPlayers(prev => {
+            const next = {};
+            const assignedPlayerIds = new Set();
+
+            // Keep players that already match the new formation positions.
+            for (const key of targetPositionKeys) {
+                const player = prev[key];
+                if (player) {
+                    next[key] = player;
+                    assignedPlayerIds.add(player.id);
+                }
+            }
+
+            // Move hidden players to the first compatible empty slot.
+            for (const [sourceKey, player] of Object.entries(prev)) {
+                if (next[sourceKey] || assignedPlayerIds.has(player.id)) {
+                    continue;
+                }
+
+                const sourceFamily = getPositionFamily(sourceKey);
+                const fallbackKey = targetPositionKeys.find(targetKey => {
+                    if (next[targetKey]) {
+                        return false;
+                    }
+                    return getPositionFamily(targetKey) === sourceFamily;
+                });
+
+                if (fallbackKey) {
+                    next[fallbackKey] = player;
+                    assignedPlayerIds.add(player.id);
+                }
+            }
+
+            return next;
+        });
+    }, [formation]);
+
     const currentPositions = formations[formation];
-    const filledSpots = Object.keys(pitchPlayers).length;
+    const activePositionKeys = Object.keys(currentPositions);
+    const activePitchPlayers = activePositionKeys.reduce((acc, key) => {
+        if (pitchPlayers[key]) {
+            acc[key] = pitchPlayers[key];
+        }
+        return acc;
+    }, {});
+    const filledSpots = Object.keys(activePitchPlayers).length;
     const totalSpots = Object.keys(currentPositions).length;
 
     const generateLineupImage = async () => {
@@ -383,7 +438,7 @@ const FormationBuilder = () => {
             {/* Player Pool */}
             <div className="flex-1 overflow-hidden flex flex-col">
                 <h3 className="text-sm font-bold text-slate-400 mb-2 px-2 uppercase tracking-wider">Oyuncular</h3>
-                <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-20 touch-pan-y">
+                <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-20 touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]">
                     <div className="grid grid-cols-4 gap-2">
                         {loading ? (
                             <div className="col-span-4 text-center text-slate-500 py-4">Yükleniyor...</div>
@@ -393,7 +448,7 @@ const FormationBuilder = () => {
                                     key={player.id}
                                     draggable={!isTouchDevice}
                                     onDragStart={(e) => handleDragStart(e, player)}
-                                    className="glass-panel rounded-lg p-2 flex flex-col items-center gap-1 cursor-move active:scale-95 transition-transform hover:bg-white/5"
+                                    className="rounded-lg p-2 flex flex-col items-center gap-1 cursor-move active:scale-95 transition-transform bg-slate-900/75 border border-white/10 shadow-lg hover:bg-slate-800/80"
                                 >
                                     <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-white/10 pointer-events-none">
                                         {player.photo ? (
@@ -457,7 +512,7 @@ const FormationBuilder = () => {
                                 </svg>
                             </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto no-scrollbar">
+                        <div className="flex-1 overflow-y-auto no-scrollbar overscroll-contain [-webkit-overflow-scrolling:touch]">
                             <div className="grid grid-cols-3 gap-2">
                                 {(() => {
                                     const normalizedSearch = playerSearch.trim().toLowerCase();
@@ -478,15 +533,15 @@ const FormationBuilder = () => {
                                     }
 
                                     return filteredPlayers.map(player => {
-                                        const isAlreadyOnPitch = Object.values(pitchPlayers).some(p => p.id === player.id);
+                                        const isAlreadyOnPitch = Object.values(activePitchPlayers).some(p => p.id === player.id);
                                         return (
                                             <button
                                                 key={player.id}
                                                 onClick={() => handlePlayerSelect(player)}
                                                 disabled={isAlreadyOnPitch}
-                                                className={`glass-panel rounded-lg p-2 flex flex-col items-center gap-1 transition-all ${isAlreadyOnPitch
+                                                className={`rounded-lg p-2 flex flex-col items-center gap-1 transition-all bg-slate-900/75 border border-white/10 shadow-lg ${isAlreadyOnPitch
                                                     ? 'opacity-50 cursor-not-allowed'
-                                                    : 'hover:bg-yellow-400/20 hover:border-yellow-400/30 cursor-pointer'
+                                                    : 'hover:bg-yellow-400/15 hover:border-yellow-400/35 cursor-pointer'
                                                     }`}
                                             >
                                                 <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden border border-white/10">

@@ -6,12 +6,20 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.5.0-blue)
+![Version](https://img.shields.io/badge/version-2.5.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.5.0
+## What's New in v2.5.1
+
+- **Formation Builder Position Persistence Fix** - Fixed a bug where selected forwards could disappear or become unselectable after switching formations (for example from `4-2-3-1` to `4-1-2-1-2 Diamond`)
+- **Active Formation Deduplication Fix** - Player duplicate checks now consider only active formation slots, preventing hidden slots from incorrectly blocking player selection
+- **Formation Transition Mapping** - Existing players are remapped to compatible role families (defense/midfield/attack) when formation changes, reducing accidental lineup loss
+- **Mobile Scroll Performance Improvements** - Improved touch scrolling smoothness in the player pool and selection modal by tuning overscroll behavior and reducing heavy card blur effects
+
+<details>
+<summary>Previous: v2.5.0</summary>
 
 - **Fixture Tab (New)** - Added a dedicated fixture screen in the bottom navigation with a modern mobile-first layout
 - **ESPN Fixture Integration** - Pulls Fenerbahçe fixtures directly from ESPN (free) with current season schedule support
@@ -20,6 +28,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Advanced Fixture Filters** - Added status filters (`All`, `Played`, `Remaining`) plus search, home/away, and competition filters
 - **Fixture UI Localization** - Displays team names in Turkish-friendly form (for example `Fenerbahce` -> `Fenerbahçe`)
 - **Venue Display Override** - Home venue display is normalized to the current stadium naming in the fixture cards
+
+</details>
 
 <details>
 <summary>Previous: v2.4.2</summary>
@@ -309,4 +319,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.5.0** | February 2026
+**v2.5.1** | February 2026
