@@ -1,49 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
-import { BACKEND_URL } from '../services/api';
+import { fetchEspnStandings } from '../services/api';
 
 const CustomStandings = ({ league }) => {
     const [standings, setStandings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const FENERBAHCE_ID = 3052;
-
     useEffect(() => {
-        fetchStandings();
-    }, [league]);
+        let cancelled = false;
+        const load = async () => {
+            setLoading(true);
+            setError(null);
 
-    const fetchStandings = async () => {
-        setLoading(true);
-        setError(null);
+            const leagueId = league === 'superlig' ? 'super-lig' : 'europa-league';
+            const data = await fetchEspnStandings(leagueId);
 
-        try {
-            // Fetch from our own backend
-            const response = await fetch(`${BACKEND_URL}/standings`);
+            if (cancelled) return;
 
-            if (!response.ok) {
-                throw new Error('Failed to fetch standings');
-            }
-
-            const data = await response.json();
-
-            // Find the correct league
-            const leagueData = league === 'superlig'
-                ? data.find(l => l.id === 'super-lig')
-                : data.find(l => l.id === 'europa-league');
-
-            if (leagueData && leagueData.rows) {
-                setStandings(leagueData.rows);
+            if (data && data.rows) {
+                setStandings(data.rows);
             } else {
-                throw new Error('League data not found');
+                setError('Puan durumu yüklenemedi');
             }
-        } catch (err) {
-            console.error('Error fetching standings:', err);
-            setError('Puan durumu yüklenemedi');
-        } finally {
             setLoading(false);
-        }
-    };
+        };
+
+        load();
+        return () => { cancelled = true; };
+    }, [league]);
 
     if (loading) {
         return (
