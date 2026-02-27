@@ -47,7 +47,7 @@ const NotificationSettings = () => {
         };
     }, [showModal]);
 
-    // FCM token otomatik sync: token değişmişse backend'e güncelle
+    // FCM token sync: SW + token gecerliligi kontrol et, degismisse backend'e bildir
     useEffect(() => {
         if (!hasActiveNotifications) return;
 
@@ -78,7 +78,6 @@ const NotificationSettings = () => {
                 const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
                 if (currentToken === storedToken) return;
 
-                console.log('🔄 FCM token changed, syncing with backend...');
                 localStorage.setItem(FCM_TOKEN_STORAGE_KEY, currentToken);
 
                 const savedOptions = localStorage.getItem('fb_notification_options');
@@ -88,9 +87,12 @@ const NotificationSettings = () => {
                 await fetch(`${BACKEND_URL}/reminder`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ playerId: currentToken, options })
+                    body: JSON.stringify({
+                        playerId: currentToken,
+                        oldPlayerId: storedToken || undefined,
+                        options
+                    })
                 });
-                console.log('✅ FCM token synced with backend');
             } catch (err) {
                 console.error('FCM token sync error:', err);
             }
@@ -123,7 +125,8 @@ const NotificationSettings = () => {
         const optionsToSave = normalizeOptions(currentDraftOptions);
         const count = Object.entries(optionsToSave).filter(([k, v]) => v && k !== 'updatedAt').length;
         const isDisablingAll = count === 0;
-        let token = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+        const previousToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+        let token = previousToken;
 
         try {
             if (!isDisablingAll) {
@@ -140,7 +143,6 @@ const NotificationSettings = () => {
 
                         const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
                         const fcmScope = `${import.meta.env.BASE_URL}firebase-cloud-messaging-push-scope`;
-                        console.log('FCM Service Worker registration path:', swUrl, 'scope:', fcmScope);
 
                         try {
                             let registration = await navigator.serviceWorker.getRegistration(fcmScope);
@@ -149,7 +151,6 @@ const NotificationSettings = () => {
                                     scope: fcmScope
                                 });
                             }
-                            console.log('✅ FCM Service Worker ready:', registration);
 
                             token = await getToken(messaging, {
                                 vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
@@ -175,12 +176,13 @@ const NotificationSettings = () => {
             }
 
             if (token) {
-                // Backend'e gönder (matchId YOK - global tercihler)
+                const oldPlayerId = (previousToken && previousToken !== token) ? previousToken : undefined;
                 const response = await fetch(`${BACKEND_URL}/reminder`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         playerId: token,
+                        oldPlayerId,
                         options: optionsToSave
                     })
                 });

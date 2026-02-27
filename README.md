@@ -6,16 +6,29 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.6.1-blue)
+![Version](https://img.shields.io/badge/version-2.6.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.6.1
+## What's New in v2.6.2
+
+- **Standings Direct from ESPN** - Standings are now fetched directly from ESPN on the client side instead of going through the backend cache, providing always up-to-date league tables without 24-hour staleness
+- **Backend Standings Removal** - Removed standings fetch from `dailyDataRefresh` and `handleRefresh` Cloud Functions, reducing scheduled function runtime and Firebase read/write costs
+- **Notification Scheduler Hardening** - Rewrote `checkMatchNotifications` to read only `cache/next3Matches` instead of the full cache tree, use `Intl.DateTimeFormat.formatToParts` for reliable Istanbul timezone calculation, widen daily check window, add `sentForMatch` type safety, and fix `Object.assign` accumulation bug for sent records
+- **Live Match Cache Read Optimization** - `updateLiveMatch` now reads only `cache/nextMatch` instead of the full cache tree
+- **Post-Match Cleanup Fix** - Fixed `postMarkedAt` logic that never triggered because it read from the freshly built live data object instead of the existing cache value
+- **Token Lifecycle Cleanup** - Both manual save and auto-sync now send the previous token to the backend for immediate deletion, preventing zombie token accumulation in the database
+- **Daily Cleanup Date Format Fix** - Fixed `lastDailyNotification` cleanup using mismatched date formats (`toDateString` vs `formatDateKey`)
+
+<details>
+<summary>Previous: v2.6.1</summary>
 
 - **FCM Token Auto-Sync** - The app now detects FCM token refreshes on every launch and silently re-registers the new token with the backend, preventing missed notifications caused by stale tokens
 - **Foreground Notification Handler** - Added `onMessage` handler so push notifications are displayed even when the app is actively open in the browser
 - **Wider Notification Trigger Window** - Expanded the scheduled notification check window from 2 minutes to 5 minutes to account for Cloud Scheduler timing variance
+
+</details>
 
 <details>
 <summary>Previous: v2.6.0</summary>
@@ -25,9 +38,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Stored Match Summaries** - Added `cache/matchSummaries/{matchId}` storage and preservation across daily refresh/manual refresh
 - **Live State Reliability Upgrade** - Improved `no-match` handling to prevent incorrect pre-match rendering after kickoff; frontend now uses an explicit `checking` state
 - **Event Pipeline Normalization** - Improved ESPN event normalization/deduplication to avoid conflicting event flags and support assist extraction for goal events
-- **UI and Localization Polish** - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Mac Sonu`, and improved fixture summary header visuals
-
-</details>
+- **UI and Localization Polish** - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Maç Sonu`, and improved fixture summary header visuals
 
 <details>
 <summary>Previous: v2.5.3</summary>
@@ -366,4 +377,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.6.1** | February 2026
+**v2.6.2** | February 2026

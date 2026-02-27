@@ -351,7 +351,6 @@ exports.dailyDataRefresh = onSchedule({
             lastFinishedMatch: null,
             matchSummaries: existingMatchSummaries,
             squad: [],
-            standings: [],
             lastUpdate: Date.now()
         };
 
@@ -399,81 +398,8 @@ exports.dailyDataRefresh = onSchedule({
             console.error(`❌ Squad fetch failed: ${squadResponse.status}`);
         }
 
-        await sleep(2000);
-
-        // 3. Fetch standings from ESPN (FREE!)
-        console.log('3️⃣ Fetching standings from ESPN...');
-        const standingsData = [];
-
-        // Süper Lig
-        const slResponse = await fetch(
-            'https://site.api.espn.com/apis/v2/sports/soccer/tur.1/standings?season=2025'
-        );
-        if (slResponse.ok) {
-            const slData = await slResponse.json();
-            if (slData.children && slData.children.length > 0) {
-                const standings = slData.children[0].standings.entries;
-                standingsData.push({
-                    id: 'super-lig',
-                    name: 'Trendyol Süper Lig',
-                    rows: standings.map(entry => ({
-                        team: {
-                            id: entry.team.id,
-                            name: entry.team.displayName,
-                            logo: entry.team.logos?.[0]?.href || ''
-                        },
-                        rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
-                        points: entry.stats.find(s => s.name === 'points')?.value || 0,
-                        matches: entry.stats.find(s => s.name === 'gamesPlayed')?.value || 0,
-                        wins: entry.stats.find(s => s.name === 'wins')?.value || 0,
-                        draws: entry.stats.find(s => s.name === 'ties')?.value || 0,
-                        losses: entry.stats.find(s => s.name === 'losses')?.value || 0,
-                        goalsFor: entry.stats.find(s => s.name === 'pointsFor')?.value || 0,
-                        goalsAgainst: entry.stats.find(s => s.name === 'pointsAgainst')?.value || 0,
-                        goalDiff: entry.stats.find(s => s.name === 'pointDifferential')?.value || 0
-                    }))
-                });
-                console.log(`✅ Süper Lig: ${standings.length} teams`);
-            }
-        }
-
-        // Europa League
-        const elResponse = await fetch(
-            'https://site.api.espn.com/apis/v2/sports/soccer/uefa.europa/standings?season=2025'
-        );
-        if (elResponse.ok) {
-            const elData = await elResponse.json();
-            if (elData.children && elData.children.length > 0) {
-                const leagueStandings = elData.children.find(c => c.name === 'League Phase') || elData.children[0];
-                const standings = leagueStandings.standings.entries;
-                standingsData.push({
-                    id: 'europa-league',
-                    name: 'UEFA Avrupa Ligi',
-                    rows: standings.map(entry => ({
-                        team: {
-                            id: entry.team.id,
-                            name: entry.team.displayName,
-                            logo: entry.team.logos?.[0]?.href || ''
-                        },
-                        rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
-                        points: entry.stats.find(s => s.name === 'points')?.value || 0,
-                        matches: entry.stats.find(s => s.name === 'gamesPlayed')?.value || 0,
-                        wins: entry.stats.find(s => s.name === 'wins')?.value || 0,
-                        draws: entry.stats.find(s => s.name === 'ties')?.value || 0,
-                        losses: entry.stats.find(s => s.name === 'losses')?.value || 0,
-                        goalsFor: entry.stats.find(s => s.name === 'pointsFor')?.value || 0,
-                        goalsAgainst: entry.stats.find(s => s.name === 'pointsAgainst')?.value || 0,
-                        goalDiff: entry.stats.find(s => s.name === 'pointDifferential')?.value || 0
-                    }))
-                });
-                console.log(`✅ Europa League: ${standings.length} teams`);
-            }
-        }
-
-        cache.standings = standingsData;
-
-        // 4. Save to Firebase
-        console.log('4️⃣ Saving to Firebase cache...');
+        // 3. Save to Firebase
+        console.log('3️⃣ Saving to Firebase cache...');
         await db.ref('cache').set(cache);
         console.log(`✨ Cache updated at ${new Date().toISOString()}`);
 
@@ -512,8 +438,8 @@ exports.dailyDataRefresh = onSchedule({
                 }
             }
             if (data.lastDailyNotification) {
-                const today = new Date().toDateString();
-                if (data.lastDailyNotification !== today) {
+                const todayKey = formatDateKey(Date.now());
+                if (data.lastDailyNotification !== todayKey) {
                     notifDeletes[`notifications/${token}/lastDailyNotification`] = null;
                 }
             }
@@ -541,15 +467,13 @@ exports.dailyDataRefresh = onSchedule({
  */
 exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
     try {
-        // 1. Cache'den maç verisini oku
-        const cacheSnapshot = await db.ref('cache').once('value');
-        const cache = cacheSnapshot.val();
+        const nextMatchSnapshot = await db.ref('cache/nextMatch').once('value');
+        const nextMatch = nextMatchSnapshot.val();
 
-        if (!cache || !cache.nextMatch) {
+        if (!nextMatch) {
             return;
         }
 
-        const nextMatch = cache.nextMatch;
         const matchTime = nextMatch.startTimestamp * 1000;
         const now = Date.now();
 
@@ -814,13 +738,13 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         }
         console.log(`✅ Live match updated: ${liveData.homeTeam.name} ${liveData.homeTeam.score} - ${liveData.awayTeam.score} ${liveData.awayTeam.name} [${matchState}]`);
 
-        // 5. Maç bittiyse, 5 dk sonra temizlenmesi için işaretle
         if (matchState === 'post') {
-            const postTime = liveData.postMarkedAt || now;
-            if (!liveData.postMarkedAt) {
+            const markedSnapshot = await db.ref('cache/liveMatch/postMarkedAt').once('value');
+            const existingMark = markedSnapshot.val();
+
+            if (!existingMark) {
                 await db.ref('cache/liveMatch/postMarkedAt').set(now);
-            } else if (now - postTime > 5 * 60 * 1000) {
-                // 5 dk geçtiyse temizle
+            } else if (now - existingMark > 5 * 60 * 1000) {
                 await db.ref('cache/liveMatch').remove();
                 console.log('🗑️ Live match cache cleaned (5 min after post)');
             }
@@ -836,24 +760,20 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
  * ARTIK API CALL YAPMIYOR! Cache'den okuyor.
  */
 exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
-    console.log('🔔 Checking notifications...');
-
     try {
-        // 1. Cache'den maç verisi oku (API CALL YOK!)
-        const cacheSnapshot = await db.ref('cache').once('value');
-        const cache = cacheSnapshot.val();
+        const matchesSnapshot = await db.ref('cache/next3Matches').once('value');
+        const nextMatches = matchesSnapshot.val();
 
-        if (!cache || !cache.next3Matches || cache.next3Matches.length === 0) {
-            console.log('ℹ️ No matches in cache');
+        if (!nextMatches || !Array.isArray(nextMatches) || nextMatches.length === 0) {
             return;
         }
 
-        const nextMatches = cache.next3Matches;
-        const now = Date.now();
-
-        // 2. Kullanıcı tercihlerini oku
         const notifSnapshot = await db.ref('notifications').once('value');
         const allNotifications = notifSnapshot.val() || {};
+
+        if (Object.keys(allNotifications).length === 0) {
+            return;
+        }
 
         const MATCH_CONFIG = {
             threeHours: { offsetMs: 3 * 60 * 60 * 1000, timeText: '3 saat kaldı' },
@@ -862,17 +782,26 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
             fifteenMinutes: { offsetMs: 15 * 60 * 1000, timeText: '15 dakika kaldı' }
         };
 
+        const now = Date.now();
         const pendingNotifications = [];
 
-        // 3. Her kullanıcı için kontrol
-        // Daily check SADECE sabah 09:00-09:02 İstanbul saatinde çalışsın
-        const istanbulNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Istanbul' }));
-        const istanbulHour = istanbulNow.getHours();
-        const istanbulMinute = istanbulNow.getMinutes();
-        const isDailyCheckTime = istanbulHour === 9 && istanbulMinute <= 2; // 09:00-09:02 arası
+        const istanbulParts = new Intl.DateTimeFormat('en-US', {
+            timeZone: ISTANBUL_TIMEZONE,
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: false
+        }).formatToParts(new Date(now));
+        const istanbulHour = parseInt(istanbulParts.find(p => p.type === 'hour').value);
+        const istanbulMinute = parseInt(istanbulParts.find(p => p.type === 'minute').value);
+        const isDailyCheckTime = istanbulHour === 9 && istanbulMinute <= 4;
+
+        const toSentArray = (val) => {
+            if (Array.isArray(val)) return val;
+            if (val && typeof val === 'object') return Object.values(val);
+            return [];
+        };
 
         for (const [playerId, playerData] of Object.entries(allNotifications)) {
-            // Daily check - SADECE sabah 09:00-09:02 arasında
             if (playerData.dailyCheck && isDailyCheckTime) {
                 const todayStr = formatDateKey(now);
                 const nextMatch = nextMatches[0];
@@ -887,7 +816,7 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                         const timeString = matchDate.toLocaleTimeString('tr-TR', {
                             hour: '2-digit',
                             minute: '2-digit',
-                            timeZone: 'Europe/Istanbul'
+                            timeZone: ISTANBUL_TIMEZONE
                         });
 
                         pendingNotifications.push({
@@ -910,17 +839,15 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                 }
             }
 
-            // Global default options - TÜM maçlara uygulanır
             if (!playerData.defaultOptions) continue;
 
             const defaultOpts = playerData.defaultOptions;
             const sentNotificationsMap = playerData.sentNotifications || {};
 
-            // Her upcoming maç için kontrol et
             for (const match of nextMatches) {
                 const matchId = String(match.id);
                 const matchTime = match.startTimestamp * 1000;
-                const sentForMatch = sentNotificationsMap[matchId] || [];
+                const sentForMatch = toSentArray(sentNotificationsMap[matchId]);
 
                 for (const [optionKey, config] of Object.entries(MATCH_CONFIG)) {
                     if (!defaultOpts[optionKey]) continue;
@@ -935,13 +862,13 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                         const timeString = new Date(matchTime).toLocaleTimeString('tr-TR', {
                             hour: '2-digit',
                             minute: '2-digit',
-                            timeZone: 'Europe/Istanbul'
+                            timeZone: ISTANBUL_TIMEZONE
                         });
 
-                        // Gönderilen bildirimleri takip et (yeni yapı)
                         const sentPath = `notifications/${playerId}/sentNotifications/${matchId}`;
                         pendingNotifications.push({
                             playerId,
+                            matchId,
                             message: {
                                 token: playerId,
                                 notification: {
@@ -956,44 +883,57 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                                     fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
                                 }
                             },
-                            successUpdates: {
-                                [sentPath]: [...sentForMatch, optionKey]
-                            }
+                            sentPath,
+                            optionKey,
+                            baseSentList: sentForMatch
                         });
                     }
                 }
             }
         }
 
-        // 4. Bildirimleri gönder
-        const updates = {};
-        const invalidTokenDeletes = {};
-
-        if (pendingNotifications.length > 0) {
-            console.log(`🚀 Sending ${pendingNotifications.length} notifications...`);
-            const results = await Promise.allSettled(
-                pendingNotifications.map(item => admin.messaging().send(item.message))
-            );
-            const success = results.filter(r => r.status === 'fulfilled').length;
-            const failed = results.filter(r => r.status === 'rejected').length;
-            console.log(`✅ Sent: ${success}, ❌ Failed: ${failed}`);
-
-            results.forEach((result, index) => {
-                const item = pendingNotifications[index];
-                if (result.status === 'fulfilled') {
-                    Object.assign(updates, item.successUpdates);
-                    return;
-                }
-
-                const errorCode = result.reason?.code || result.reason?.errorInfo?.code;
-                if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
-                    invalidTokenDeletes[`notifications/${item.playerId}`] = null;
-                    console.log(`🧹 Removing invalid token: ${item.playerId.slice(0, 10)}...`);
-                }
-            });
+        if (pendingNotifications.length === 0) {
+            return;
         }
 
-        // 5. Database güncelle
+        console.log(`🔔 Sending ${pendingNotifications.length} notifications...`);
+        const results = await Promise.allSettled(
+            pendingNotifications.map(item => admin.messaging().send(item.message))
+        );
+        const success = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected').length;
+        console.log(`✅ Sent: ${success}, ❌ Failed: ${failed}`);
+
+        const updates = {};
+        const invalidTokenDeletes = {};
+        const sentAccumulator = {};
+
+        results.forEach((result, index) => {
+            const item = pendingNotifications[index];
+            if (result.status === 'fulfilled') {
+                if (item.successUpdates) {
+                    Object.assign(updates, item.successUpdates);
+                }
+                if (item.sentPath && item.optionKey) {
+                    if (!sentAccumulator[item.sentPath]) {
+                        sentAccumulator[item.sentPath] = [...item.baseSentList];
+                    }
+                    sentAccumulator[item.sentPath].push(item.optionKey);
+                }
+                return;
+            }
+
+            const errorCode = result.reason?.code || result.reason?.errorInfo?.code;
+            if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
+                invalidTokenDeletes[`notifications/${item.playerId}`] = null;
+                console.log(`🧹 Removing invalid token: ${item.playerId.slice(0, 10)}...`);
+            }
+        });
+
+        for (const [sentPath, sentList] of Object.entries(sentAccumulator)) {
+            updates[sentPath] = sentList;
+        }
+
         for (const deletePath of Object.keys(invalidTokenDeletes)) {
             for (const updatePath of Object.keys(updates)) {
                 if (updatePath === deletePath || updatePath.startsWith(`${deletePath}/`)) {
@@ -1244,30 +1184,29 @@ async function handleTeamImage(req, res, teamId) {
 }
 
 async function handleReminder(req, res) {
-    const { playerId, matchId, options } = req.body;
+    const { playerId, oldPlayerId, options } = req.body;
 
     if (!playerId || !options) {
         return res.status(400).json({ error: 'Missing playerId or options' });
     }
 
     try {
-        // Manuel bildirimler için kullanıcıyı genel topic'e abone et
         await admin.messaging().subscribeToTopic(playerId, 'all_fans');
-        console.log(`✅ Subscribed ${playerId.slice(0, 10)}... to topic 'all_fans'`);
     } catch (subError) {
         console.error('Topic subscription failed:', subError);
-        // Topic hatası akışı bozmasın, devam et
     }
 
     try {
+        if (oldPlayerId && oldPlayerId !== playerId) {
+            await db.ref(`notifications/${oldPlayerId}`).remove();
+            console.log(`🧹 Removed old token: ${oldPlayerId.slice(0, 15)}...`);
+        }
+
         const playerRef = db.ref(`notifications/${playerId}`);
         const snapshot = await playerRef.once('value');
         const currentData = snapshot.val() || {};
 
-        // Update dailyCheck
         currentData.dailyCheck = options.dailyCheck || false;
-
-        // Update global default options (tüm maçlara uygulanır)
         currentData.defaultOptions = {
             threeHours: options.threeHours || false,
             oneHour: options.oneHour || false,
@@ -1276,7 +1215,6 @@ async function handleReminder(req, res) {
             updatedAt: Date.now()
         };
 
-        // Eski matches verisini temizle (artık kullanılmıyor)
         if (currentData.matches) {
             delete currentData.matches;
         }
@@ -1328,7 +1266,6 @@ async function handleRefresh(req, res) {
             lastFinishedMatch: null,
             matchSummaries: existingMatchSummaries,
             squad: [],
-            standings: [],
             lastUpdate: Date.now()
         };
 
@@ -1367,49 +1304,6 @@ async function handleRefresh(req, res) {
             }
         }
 
-        await sleep(1000);
-
-        // Fetch standings (abbreviated)
-        const slResponse = await fetch(
-            'https://site.api.espn.com/apis/v2/sports/soccer/tur.1/standings?season=2025'
-        );
-        if (slResponse.ok) {
-            const slData = await slResponse.json();
-            if (slData.children && slData.children.length > 0) {
-                cache.standings.push({
-                    id: 'super-lig',
-                    name: 'Trendyol Süper Lig',
-                    rows: slData.children[0].standings.entries.map(entry => ({
-                        team: { id: entry.team.id, name: entry.team.displayName, logo: entry.team.logos?.[0]?.href || '' },
-                        rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
-                        points: entry.stats.find(s => s.name === 'points')?.value || 0,
-                        matches: entry.stats.find(s => s.name === 'gamesPlayed')?.value || 0
-                    }))
-                });
-            }
-        }
-
-        // Europa League
-        const elResponse = await fetch(
-            'https://site.api.espn.com/apis/v2/sports/soccer/uefa.europa/standings?season=2025'
-        );
-        if (elResponse.ok) {
-            const elData = await elResponse.json();
-            if (elData.children && elData.children.length > 0) {
-                const leagueStandings = elData.children.find(c => c.name === 'League Phase') || elData.children[0];
-                cache.standings.push({
-                    id: 'europa-league',
-                    name: 'UEFA Avrupa Ligi',
-                    rows: leagueStandings.standings.entries.map(entry => ({
-                        team: { id: entry.team.id, name: entry.team.displayName, logo: entry.team.logos?.[0]?.href || '' },
-                        rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
-                        points: entry.stats.find(s => s.name === 'points')?.value || 0,
-                        matches: entry.stats.find(s => s.name === 'gamesPlayed')?.value || 0
-                    }))
-                });
-            }
-        }
-
         await db.ref('cache').set(cache);
 
         return res.json({
@@ -1418,8 +1312,7 @@ async function handleRefresh(req, res) {
             lastUpdate: new Date(cache.lastUpdate).toISOString(),
             stats: {
                 matches: cache.next3Matches.length,
-                squad: cache.squad.length,
-                standings: cache.standings.length
+                squad: cache.squad.length
             }
         });
 
