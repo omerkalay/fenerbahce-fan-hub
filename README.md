@@ -6,19 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.6.0-blue)
+![Version](https://img.shields.io/badge/version-2.6.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.6.0
+## What's New in v2.6.1
 
-- **Fixture Match Summary Modal (Cache-First)** - Added `Maç İstatistikleri` flow for finished fixtures with backend endpoint `GET /api/match-summary/:matchId`
+- **FCM Token Auto-Sync** - The app now detects FCM token refreshes on every launch and silently re-registers the new token with the backend, preventing missed notifications caused by stale tokens
+- **Foreground Notification Handler** - Added `onMessage` handler so push notifications are displayed even when the app is actively open in the browser
+- **Wider Notification Trigger Window** - Expanded the scheduled notification check window from 2 minutes to 5 minutes to account for Cloud Scheduler timing variance
+
+<details>
+<summary>Previous: v2.6.0</summary>
+
+- **Fixture Match Summary Modal (Cache-First)** - Added match statistics flow for finished fixtures with backend endpoint `GET /api/match-summary/:matchId`
 - **Persistent Post-Match Continuity** - Added `cache/lastFinishedMatch` fallback so the home card can keep final score/events after `cache/liveMatch` is cleaned
 - **Stored Match Summaries** - Added `cache/matchSummaries/{matchId}` storage and preservation across daily refresh/manual refresh
 - **Live State Reliability Upgrade** - Improved `no-match` handling to prevent incorrect pre-match rendering after kickoff; frontend now uses an explicit `checking` state
 - **Event Pipeline Normalization** - Improved ESPN event normalization/deduplication to avoid conflicting event flags and support assist extraction for goal events
-- **UI and Localization Polish** - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Maç Sonu`, and improved fixture summary header visuals
+- **UI and Localization Polish** - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Mac Sonu`, and improved fixture summary header visuals
+
+</details>
 
 <details>
 <summary>Previous: v2.5.3</summary>
@@ -357,4 +366,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.6.0** | February 2026
+**v2.6.1** | February 2026
