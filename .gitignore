@@ -16,6 +16,12 @@ backend/.env
 # Generated files
 public/firebase-messaging-sw.js
 
+# Firebase CLI cache
+.firebase/
+
+# Vite PWA dev build
+dev-dist/
+
 node_modules
 dist
 dist-ssr
