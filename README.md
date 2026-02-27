@@ -43,85 +43,14 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 </details>
 
 <details>
-<summary>Previous: v2.5.3</summary>
+<summary>Previous: v2.3.0 - v2.5.3</summary>
 
-- **Live Event Feed Expanded (ESPN)** - Added substitution events by merging ESPN `summary.keyEvents` with the existing live scoreboard event feed
-- **Duplicate Event Protection** - Live event timeline now deduplicates merged events (clock/team/type/player based) while preserving chronological order
-- **Penalty Goal Labels** - Penalty goals now display a clear ` (P)` suffix in live event rows
-- **Halftime UI Polish** - `HT` / halftime states now render as `Devre Arası` in live UI (detail modal keeps the exact clock value visible)
-- **Cleaner Dashboard Event Preview** - Substitutions are shown in the detail modal timeline, but hidden from the compact dashboard event list to reduce noise
+- **Fixture Tab** (v2.5.0) - Dedicated fixture screen with ESPN integration, multi-competition coverage (Super Lig + Europa League), advanced filters, and Turkish localization
+- **Live Match System** (v2.4.0) - Auto-transition from countdown to live mode, inline score/events/stats, post-match cleanup, DB cache architecture, and daily data purge
+- **Live Event Enhancements** (v2.5.2 - v2.5.3) - Substitution events from ESPN, event deduplication, penalty labels, halftime localization, and reordered stats with card counts
+- **Formation Builder Fixes** (v2.3.0 - v2.5.1) - Web Share API, SVG pitch redesign, 4-1-2-1-2 Diamond formation, position persistence fix across formation switches, role-family remapping, and mobile scroll improvements
+- **Notification Reliability** (v2.4.2) - FCM service worker scope fix, delivery tracking, invalid token cleanup, and Istanbul timezone normalization
 
-</details>
-
-<details>
-<summary>Previous: v2.5.2</summary>
-
-- **Live Match Stats Cleanup** - Reordered live match statistics to prioritize shots, possession, corners, fouls, and cards
-- **Removed Noisy Stats** - Hidden less useful rows such as assists/goals from the live stats panel (score already covers goals)
-- **Card Stats Added** - Yellow/red card counts are now derived from ESPN live match events and displayed in the stats list
-
-</details>
-
-<details>
-<summary>Previous: v2.5.1</summary>
-
-- **Formation Builder Position Persistence Fix** - Fixed a bug where selected forwards could disappear or become unselectable after switching formations (for example from `4-2-3-1` to `4-1-2-1-2 Diamond`)
-- **Active Formation Deduplication Fix** - Player duplicate checks now consider only active formation slots, preventing hidden slots from incorrectly blocking player selection
-- **Formation Transition Mapping** - Existing players are remapped to compatible role families (defense/midfield/attack) when formation changes, reducing accidental lineup loss
-- **Mobile Scroll Performance Improvements** - Improved touch scrolling smoothness in the player pool and selection modal by tuning overscroll behavior and reducing heavy card blur effects
-
-</details>
-
-<details>
-<summary>Previous: v2.5.0</summary>
-
-- **Fixture Tab (New)** - Added a dedicated fixture screen in the bottom navigation with a modern mobile-first layout
-- **ESPN Fixture Integration** - Pulls Fenerbahçe fixtures directly from ESPN (free) with current season schedule support
-- **Played + Upcoming Merge** - Combines completed matches and upcoming matches into a single timeline view
-- **Multi-Competition Coverage** - Includes both Turkish Super Lig and UEFA Europa League fixtures
-- **Advanced Fixture Filters** - Added status filters (`All`, `Played`, `Remaining`) plus search, home/away, and competition filters
-- **Fixture UI Localization** - Displays team names in Turkish-friendly form (for example `Fenerbahce` -> `Fenerbahçe`)
-- **Venue Display Override** - Home venue display is normalized to the current stadium naming in the fixture cards
-
-</details>
-
-<details>
-<summary>Previous: v2.4.2</summary>
-
-- **Notification Reliability Fixes** - Improved FCM service worker registration scope to avoid conflicts with the PWA service worker
-- **Delivery Tracking Fix** - Notification send records are now stored only after successful FCM delivery attempts
-- **Token Cleanup** - Invalid FCM tokens are automatically removed after failed sends
-- **Timezone Consistency** - Daily match check date comparison is normalized for Istanbul time
-
-</details>
-
-<details>
-<summary>Previous: v2.4.1</summary>
-
-- **New Formation** - Added 4-1-2-1-2 Diamond (Baklava) to the Formation Builder
-
-</details>
-
-<details>
-<summary>Previous: v2.4.0</summary>
-
-**Live Match Auto-Transition System**
-- **Automatic Live Mode** - Dashboard transitions from countdown to live mode when match starts
-- **Inline Live Score** - Score, match events, and stats displayed directly in the match card
-- **Post-Match Transition** - Automatically switches to next match 30 seconds after game ends
-- **Automatic Data Cleanup** - Old poll and notification records are purged from DB daily
-- **DB Cache Architecture** - ESPN data cached in Firebase Realtime DB; all users read from cache
-- **Multi-League Support** - Live match detection covers both Super Lig and UEFA Europa League
-</details>
-
-<details>
-<summary>Previous: v2.3.0</summary>
-
-**Formation Builder Improvements**
-- **Web Share API** - Share your lineup directly to WhatsApp, Telegram, Twitter
-- **Improved Pitch Design** - Professional SVG pitch with FIFA-standard markings
-- **Optimized Positions** - Player positions aligned with pitch markings
-- **Drag and Drop Fix** - Fixed card dragging issue on desktop browsers
 </details>
 
 ## Features
