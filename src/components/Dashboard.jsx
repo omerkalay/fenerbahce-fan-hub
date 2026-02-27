@@ -3,6 +3,8 @@ import TeamLogo from './TeamLogo';
 import Poll from './Poll';
 import CustomStandings from './CustomStandings';
 import LiveMatchScore from './LiveMatchScore';
+import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import { formatMatchClock } from '../utils/matchClock';
 
 const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
     const status = String(statusDetail || '').trim().toLowerCase();
@@ -33,7 +35,6 @@ const Dashboard = ({
     const [showLiveMatchModal, setShowLiveMatchModal] = useState(false);
     const [showStandingsModal, setShowStandingsModal] = useState(false);
     const [standingsLeague, setStandingsLeague] = useState('');
-    const [postCountdown, setPostCountdown] = useState(30);
     const countdownEndedRef = useRef(false);
 
     // Reset countdownEndedRef when match changes
@@ -44,7 +45,7 @@ const Dashboard = ({
     useEffect(() => {
         if (!matchData || liveMatchState !== 'countdown') return;
 
-        const timer = setInterval(() => {
+        const updateCountdown = () => {
             const matchDate = new Date(matchData.startTimestamp * 1000);
             const now = new Date();
             const difference = matchDate - now;
@@ -63,27 +64,13 @@ const Dashboard = ({
                 }
                 setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
             }
-        }, 1000);
+        };
+
+        updateCountdown();
+        const timer = setInterval(updateCountdown, 1000);
 
         return () => clearInterval(timer);
     }, [matchData, liveMatchState, onCountdownEnd]);
-
-    // Post-match countdown (30s visual timer)
-    useEffect(() => {
-        if (liveMatchState !== 'post') {
-            setPostCountdown(30);
-            return;
-        }
-
-        const timer = setInterval(() => {
-            setPostCountdown(prev => {
-                if (prev <= 1) return 0;
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => clearInterval(timer);
-    }, [liveMatchState]);
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
@@ -186,6 +173,20 @@ const Dashboard = ({
 
                 {/* Dynamic Section: Countdown / Pre / Live / Post */}
                 <div className="mt-8 pt-6 border-t border-white/5">
+                    {/* STATE: CHECKING (prevent stale cached flicker on first paint) */}
+                    {liveMatchState === 'checking' && (
+                        <div className="text-center py-4">
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                                <span className="relative flex h-3 w-3">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-60"></span>
+                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-yellow-400"></span>
+                                </span>
+                                <span className="text-sm font-bold text-yellow-400 uppercase">Maç Durumu Kontrol Ediliyor</span>
+                            </div>
+                            <p className="text-xs text-slate-400">Son durum senkronize ediliyor...</p>
+                        </div>
+                    )}
+
                     {/* STATE: COUNTDOWN */}
                     {liveMatchState === 'countdown' && (
                         <div className="grid grid-cols-4 gap-2 text-center">
@@ -251,28 +252,32 @@ const Dashboard = ({
                                 <div className="space-y-1 mb-4 max-h-32 overflow-y-auto">
                                     {liveMatchData.events
                                         .filter((event) => !event.isSubstitution)
-                                        .map((event, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 text-xs">
-                                            <span className="text-slate-500 w-10 text-right">{event.clock}</span>
-                                            <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
-                                                {event.isGoal && (
-                                                    <svg viewBox="0 0 16 16" className="w-4 h-4"><circle cx="8" cy="8" r="7" fill="none" stroke="#eab308" strokeWidth="1.5" /><circle cx="8" cy="8" r="3" fill="#eab308" /></svg>
-                                                )}
-                                                {event.isYellowCard && (
-                                                    <svg viewBox="0 0 12 16" className="w-3 h-4"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#eab308" /></svg>
-                                                )}
-                                                {event.isRedCard && (
-                                                    <svg viewBox="0 0 12 16" className="w-3 h-4"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#ef4444" /></svg>
-                                                )}
-                                            </span>
-                                            <span className={`${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400' : 'text-slate-300'}`}>
-                                                {event.player}
-                                                {event.isGoal && event.isPenalty && (
-                                                    <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
-                                                )}
-                                            </span>
-                                        </div>
-                                    ))}
+                                        .map((event, idx) => {
+                                            const eventType = getEventVisualType(event);
+                                            const textClass = eventType === 'goal'
+                                                ? 'text-yellow-400 font-bold'
+                                                : eventType === 'red-card'
+                                                    ? 'text-red-400'
+                                                    : 'text-slate-300';
+
+                                            return (
+                                                <div key={idx} className="flex items-center gap-2 text-xs">
+                                                    <span className="text-slate-500 w-10 text-right">{formatMatchClock(event.clock)}</span>
+                                                    <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                                                        <MatchEventIcon
+                                                            event={event}
+                                                            className={eventType === 'goal' ? 'w-4 h-4' : 'w-3 h-4'}
+                                                        />
+                                                    </span>
+                                                    <span className={textClass}>
+                                                        {event.player}
+                                                        {event.isGoal && event.isPenalty && (
+                                                            <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
                                 </div>
                             )}
 
@@ -306,23 +311,21 @@ const Dashboard = ({
                                 <div className="flex flex-wrap justify-center gap-2 mb-4">
                                     {liveMatchData.events.filter(e => e.isGoal).map((event, idx) => (
                                         <span key={idx} className="text-xs text-slate-300 bg-white/5 px-2 py-1 rounded-full flex items-center gap-1">
-                                            <svg viewBox="0 0 16 16" className="w-3 h-3 inline"><circle cx="8" cy="8" r="7" fill="none" stroke="#eab308" strokeWidth="1.5" /><circle cx="8" cy="8" r="3" fill="#eab308" /></svg>
-                                            {event.clock} {event.player}
+                                            <MatchEventIcon event={{ isGoal: true }} className="w-3 h-3 inline" />
+                                            {formatMatchClock(event.clock)} {event.player}
+                                            {event.isPenalty && ' (P)'}
                                         </span>
                                     ))}
                                 </div>
                             )}
 
-                            {/* Transition Progress */}
-                            <div className="glass-panel rounded-lg p-3 text-center">
-                                <p className="text-xs text-slate-400 mb-2">Sonraki maça geçiliyor... {postCountdown}sn</p>
-                                <div className="w-full bg-white/5 rounded-full h-1">
-                                    <div
-                                        className="bg-yellow-400/50 h-1 rounded-full transition-all duration-1000"
-                                        style={{ width: `${((30 - postCountdown) / 30) * 100}%` }}
-                                    ></div>
-                                </div>
-                            </div>
+                            {/* Detail Button */}
+                            <button
+                                onClick={() => setShowLiveMatchModal(true)}
+                                className="w-full px-4 py-2 bg-yellow-400/10 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 rounded-lg text-xs font-bold transition-all duration-300"
+                            >
+                                Detaylı İstatistikler
+                            </button>
                         </div>
                     )}
                 </div>

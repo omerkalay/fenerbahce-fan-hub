@@ -17,7 +17,14 @@ const readCachedMatchData = () => {
   }
 };
 
+const shouldCheckLiveImmediately = (match) => {
+  if (!match?.startTimestamp) return false;
+  return (match.startTimestamp * 1000) <= Date.now();
+};
+
+
 function App() {
+  const [fontsReady, setFontsReady] = useState(typeof window === 'undefined');
   const [activeTab, setActiveTab] = useState('dashboard');
   const cachedData = useMemo(() => {
     if (typeof window === 'undefined') return null;
@@ -32,11 +39,46 @@ function App() {
   const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
 
   // Live match states
-  const [liveMatchState, setLiveMatchState] = useState('countdown'); // countdown | pre | in | post | idle
+  const [liveMatchState, setLiveMatchState] = useState(
+    shouldCheckLiveImmediately(cachedData?.nextMatch) ? 'checking' : 'countdown'
+  ); // checking | countdown | pre | in | post | idle
   const [liveMatchData, setLiveMatchData] = useState(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const livePollingRef = useRef(null);
-  const postTransitionRef = useRef(null);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (!document.fonts) {
+      setFontsReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    const markReady = () => {
+      if (!cancelled) setFontsReady(true);
+    };
+
+    if (document.fonts.check('1em "Outfit"')) {
+      markReady();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timeoutMs = 1200;
+    Promise.race([
+      Promise.all([
+        document.fonts.load('400 1em "Outfit"').catch(() => null),
+        document.fonts.load('700 1em "Outfit"').catch(() => null),
+        document.fonts.ready.catch(() => null)
+      ]),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs))
+    ]).then(markReady);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     hasDataRef.current = Boolean(matchData);
@@ -122,6 +164,18 @@ function App() {
     }
   }, []);
 
+  const stopLivePolling = useCallback(() => {
+    if (livePollingRef.current) {
+      clearInterval(livePollingRef.current);
+      livePollingRef.current = null;
+    }
+  }, []);
+
+  const resolveNoMatchState = useCallback(() => {
+    if (!currentMatch?.startTimestamp) return 'checking';
+    return (currentMatch.startTimestamp * 1000) > Date.now() ? 'countdown' : 'checking';
+  }, [currentMatch]);
+
   // Start live polling when countdown reaches 0
   const startLivePolling = useCallback(() => {
     if (livePollingRef.current) return; // Already polling
@@ -129,7 +183,7 @@ function App() {
     const poll = async () => {
       const state = await fetchLiveMatch();
       if (state) {
-        setLiveMatchState(state === 'no-match' ? 'pre' : state);
+        setLiveMatchState(state === 'no-match' ? resolveNoMatchState() : state);
       }
     };
 
@@ -138,52 +192,77 @@ function App() {
 
     // Poll every 30 seconds
     livePollingRef.current = setInterval(poll, 30000);
-  }, [fetchLiveMatch]);
-
-  const stopLivePolling = useCallback(() => {
-    if (livePollingRef.current) {
-      clearInterval(livePollingRef.current);
-      livePollingRef.current = null;
-    }
-  }, []);
+  }, [fetchLiveMatch, resolveNoMatchState]);
 
   // Handle countdown reaching 0 — transition to live checking
   const onCountdownEnd = useCallback(() => {
-    setLiveMatchState('pre');
+    setLiveMatchState('checking');
     startLivePolling();
   }, [startLivePolling]);
 
-  // Handle post-match: wait 30s then move to next match
+  // If cached/current match is already started, avoid rendering stale countdown/pre flashes.
   useEffect(() => {
-    if (liveMatchState === 'post') {
-      postTransitionRef.current = setTimeout(() => {
-        stopLivePolling();
-        setLiveMatchData(null);
-        setLiveMatchState('countdown');
+    if (!currentMatch?.startTimestamp) return;
 
-        // Move to next match
-        if (next3Matches.length > currentMatchIndex + 1) {
-          setCurrentMatchIndex(prev => prev + 1);
-        }
-      }, 30000); // 30 seconds
+    const started = shouldCheckLiveImmediately(currentMatch);
+
+    if (started && liveMatchState === 'countdown') {
+      setLiveMatchState('checking');
+      return;
     }
 
-    return () => {
-      if (postTransitionRef.current) {
-        clearTimeout(postTransitionRef.current);
-      }
-    };
-  }, [liveMatchState, currentMatchIndex, next3Matches.length, stopLivePolling]);
+    if (!started && (liveMatchState === 'pre' || liveMatchState === 'checking') && !liveMatchData) {
+      stopLivePolling();
+      setLiveMatchState('countdown');
+    }
+  }, [currentMatch, liveMatchState, liveMatchData, stopLivePolling]);
+
+  // Checking state reuses existing live polling flow without adding extra calls.
+  useEffect(() => {
+    if (liveMatchState === 'checking') {
+      startLivePolling();
+    }
+  }, [liveMatchState, startLivePolling]);
+
+  // Post state is stable (no auto-transition). Stop polling to avoid unnecessary requests.
+  useEffect(() => {
+    if (liveMatchState === 'post') {
+      stopLivePolling();
+    }
+  }, [liveMatchState, stopLivePolling]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopLivePolling();
-      if (postTransitionRef.current) {
-        clearTimeout(postTransitionRef.current);
-      }
     };
   }, [stopLivePolling]);
+
+  if (!fontsReady) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white pb-24 relative overflow-hidden">
+        <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
+          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-500/10 rounded-full blur-[100px]"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[100px]"></div>
+        </div>
+        <div className="relative z-10 max-w-md mx-auto h-full min-h-screen flex flex-col px-4 pt-6">
+          <div className="h-10 w-52 rounded-xl bg-white/10 animate-pulse mb-2"></div>
+          <div className="h-5 w-28 rounded-lg bg-white/5 animate-pulse mb-8"></div>
+          <div className="glass-card rounded-3xl p-6 mb-6">
+            <div className="h-6 w-56 rounded-full bg-white/10 animate-pulse mb-6"></div>
+            <div className="h-28 rounded-2xl bg-white/5 animate-pulse mb-6"></div>
+            <div className="h-24 rounded-2xl bg-white/5 animate-pulse"></div>
+          </div>
+          <div className="glass-panel rounded-2xl p-4 space-y-3">
+            <div className="h-5 w-36 rounded-lg bg-white/10 animate-pulse"></div>
+            <div className="h-14 rounded-xl bg-white/5 animate-pulse"></div>
+            <div className="h-14 rounded-xl bg-white/5 animate-pulse"></div>
+            <div className="h-14 rounded-xl bg-white/5 animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-white pb-24 relative overflow-hidden">

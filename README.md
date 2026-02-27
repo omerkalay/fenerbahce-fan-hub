@@ -6,18 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.5.3-blue)
+![Version](https://img.shields.io/badge/version-2.6.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.5.3
+## What's New in v2.6.0
+
+- **Fixture Match Summary Modal (Cache-First)** - Added `Maç İstatistikleri` flow for finished fixtures with backend endpoint `GET /api/match-summary/:matchId`
+- **Persistent Post-Match Continuity** - Added `cache/lastFinishedMatch` fallback so the home card can keep final score/events after `cache/liveMatch` is cleaned
+- **Stored Match Summaries** - Added `cache/matchSummaries/{matchId}` storage and preservation across daily refresh/manual refresh
+- **Live State Reliability Upgrade** - Improved `no-match` handling to prevent incorrect pre-match rendering after kickoff; frontend now uses an explicit `checking` state
+- **Event Pipeline Normalization** - Improved ESPN event normalization/deduplication to avoid conflicting event flags and support assist extraction for goal events
+- **UI and Localization Polish** - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Maç Sonu`, and improved fixture summary header visuals
+
+<details>
+<summary>Previous: v2.5.3</summary>
 
 - **Live Event Feed Expanded (ESPN)** - Added substitution events by merging ESPN `summary.keyEvents` with the existing live scoreboard event feed
 - **Duplicate Event Protection** - Live event timeline now deduplicates merged events (clock/team/type/player based) while preserving chronological order
 - **Penalty Goal Labels** - Penalty goals now display a clear ` (P)` suffix in live event rows
 - **Halftime UI Polish** - `HT` / halftime states now render as `Devre Arası` in live UI (detail modal keeps the exact clock value visible)
 - **Cleaner Dashboard Event Preview** - Substitutions are shown in the detail modal timeline, but hidden from the compact dashboard event list to reduce noise
+
+</details>
 
 <details>
 <summary>Previous: v2.5.2</summary>
@@ -94,7 +106,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ### Dashboard
 - **Next Match Card**: Live countdown timer with team logos and match details
-- **Live Match Auto-Transition**: Countdown → "Starting Soon" → Live Score → Finished → Next Match (fully automatic)
+- **Live Match State Flow**: Countdown → Checking → Live/Post (stable post-match fallback while preserving final data)
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
 - **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
 - **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database)
@@ -111,6 +123,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Team Search**: Search fixtures by opponent name
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
 - **Manual Refresh**: Re-fetch ESPN fixture data on demand
+- **Fixture Match Summary Modal**: For completed matches, opens cached summary data (scoreline, ordered stats, key events)
 
 ### Push Notification System
 - **5 Notification Types**:
@@ -154,6 +167,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 │  React + Vite   │     │  /api/squad          (from cache)    │
 │                 │     │  /api/reminder       (save prefs)    │
 └─────────────────┘     │  /api/live-match     (from DB cache) │
+                        │  /api/match-summary  (cache-first)    │
                         │  /api/player-image   (proxy)         │
                         │  /api/team-image     (proxy)         │
                         └──────────────────────────────────────┘
@@ -167,12 +181,14 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
                 │              │ └──────────────┘ └──────────────┘
                 │ cache/       │        ▲
                 │   liveMatch  │────────┘ updateLiveMatch (1/min)
+                │   lastFinishedMatch
+                │   matchSummaries/
                 │ match_polls/ │
                 │ notifications│
                 └──────────────┘
 ```
 
-Note: The fixture tab fetches ESPN fixture schedules directly from the frontend (CORS-enabled ESPN endpoints) for the current season. The diagram above focuses on the backend/cache-driven match, poll, and notification flows.
+Note: The fixture tab fetches ESPN fixture schedules directly from the frontend (CORS-enabled ESPN endpoints) for the current season. Finished fixture detail summaries are served by `/api/match-summary/:matchId` with cache-first backend behavior.
 
 ## Project Structure
 
@@ -274,7 +290,7 @@ firebase deploy --only functions
 |----------|----------|-------------|
 | `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match & squad data from SofaScore, standings from ESPN. Caches in Firebase. Cleans up old polls & notification records. |
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
-| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches (Süper Lig + Europa League) during match window. Caches live data to `cache/liveMatch`. Auto-cleans after match ends. |
+| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches (Süper Lig + Europa League) during match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
@@ -286,17 +302,19 @@ firebase deploy --only functions
 4. **Delivery**: Notification arrives on user's device via Service Worker
 
 ### Live Match System
-- **Flow**: ESPN → `updateLiveMatch` (1/min) → DB `cache/liveMatch` → Users read from DB
+- **Flow**: ESPN → `updateLiveMatch` (1/min) → DB `cache/liveMatch` + `cache/lastFinishedMatch` → Users read from DB
 - **Match Window**: Starts 30min before kickoff, ends 3 hours after
-- **Auto-Transition**: Countdown → Pre → Live → Post → Next Match
+- **Frontend State Flow**: Countdown → Checking → Live/Post (no misleading pre fallback after kickoff)
 - **Leagues**: Süper Lig (`tur.1`) + Europa League (`uefa.europa`)
 - **Cleanup**: Live cache deleted 5min after match ends
+- **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` fallback
 
 ### Fixture System
 - **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints (free, client-side fetch)
 - **Coverage**: Süper Lig (`tur.1`) + UEFA Europa League (`uefa.europa`)
 - **Data Merge**: Results (`schedule`) + upcoming fixtures (`schedule?fixture=true`)
 - **Filtering**: Status (All/Played/Remaining), team search, home/away, competition
+- **Summary Details**: Finished-match modal uses `GET /api/match-summary/:matchId` (cache-first, ESPN fallback on cache miss)
 
 ### API Cost Optimization
 | | Before (v2.1) | After (v2.2) |
@@ -339,4 +357,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.5.3** | February 2026
+**v2.6.0** | February 2026

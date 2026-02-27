@@ -30,6 +30,16 @@ const SOFASCORE_IMAGE_BASE = 'http://img.sofascore.com/api/v1';  // HTTP, not HT
 const IMAGE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 const DEFAULT_API_HOST = 'sofascore.p.rapidapi.com';
 const ISTANBUL_TIMEZONE = 'Europe/Istanbul';
+const ESPN_LEAGUES = ['tur.1', 'uefa.europa'];
+const SUMMARY_STAT_GROUPS = [
+    { label: 'Toplam Şut', keys: ['totalShots'] },
+    { label: 'İsabetli Şut', keys: ['shotsOnTarget'] },
+    { label: 'Topla Oynama %', keys: ['possessionPct', 'possession'] },
+    { label: 'Korner', keys: ['wonCorners', 'corners'] },
+    { label: 'Faul', keys: ['foulsCommitted', 'fouls'] },
+    { label: 'Sarı Kart', keys: ['yellowCards', 'yellowCard'] },
+    { label: 'Kırmızı Kart', keys: ['redCards', 'redCard'] }
+];
 
 // Helper to get API host (must be called inside function context)
 const getApiHost = () => rapidApiHost.value() || DEFAULT_API_HOST;
@@ -65,6 +75,257 @@ const formatDateKey = (timestamp, timeZone = ISTANBUL_TIMEZONE) => (
     }).format(new Date(timestamp))
 );
 
+const pickAssistNameFromSummaryItem = (item, scorerName = '') => {
+    const explicitAssist = (Array.isArray(item?.assists) ? item.assists : [])
+        .find((assist) => assist?.athlete?.displayName)?.athlete?.displayName || '';
+    if (explicitAssist && explicitAssist !== scorerName) {
+        return explicitAssist;
+    }
+
+    const participantAssist = (Array.isArray(item?.participants) ? item.participants : [])
+        .map((participant) => participant?.athlete?.displayName || '')
+        .find((name) => name && name !== scorerName);
+
+    return participantAssist || '';
+};
+
+const normalizeEventFlags = (event = {}) => {
+    const normalized = {
+        ...event,
+        isGoal: Boolean(event.isGoal),
+        isPenalty: Boolean(event.isPenalty),
+        isOwnGoal: Boolean(event.isOwnGoal),
+        isYellowCard: Boolean(event.isYellowCard),
+        isRedCard: Boolean(event.isRedCard),
+        isSubstitution: Boolean(event.isSubstitution)
+    };
+
+    // Aynı event birden fazla kategori taşısa bile UI'da tek anlamlı ikon gösterilsin.
+    if (normalized.isGoal) {
+        normalized.isYellowCard = false;
+        normalized.isRedCard = false;
+    } else if (normalized.isRedCard) {
+        normalized.isYellowCard = false;
+    }
+
+    return normalized;
+};
+
+const normalizeSummaryEvents = (events = []) =>
+    events
+        .map((event) => normalizeEventFlags(event))
+        .filter((event) => (event.isGoal || event.isYellowCard || event.isRedCard) && !event.isSubstitution)
+        .map((event) => ({
+            clock: event.clock || '',
+            team: String(event.team || ''),
+            type: event.type || '',
+            player: event.player || '',
+            assist: event.assist || '',
+            isGoal: Boolean(event.isGoal),
+            isPenalty: Boolean(event.isPenalty),
+            isOwnGoal: Boolean(event.isOwnGoal),
+            isYellowCard: Boolean(event.isYellowCard),
+            isRedCard: Boolean(event.isRedCard)
+        }));
+
+const pickOrderedSummaryStats = (homeStatMap, awayStatMap) => (
+    SUMMARY_STAT_GROUPS
+        .map((group) => {
+            const selectedKey = group.keys.find((key) => homeStatMap.has(key) || awayStatMap.has(key));
+            if (!selectedKey) return null;
+            return {
+                key: selectedKey,
+                label: group.label,
+                homeValue: String(homeStatMap.get(selectedKey) ?? '0'),
+                awayValue: String(awayStatMap.get(selectedKey) ?? '0')
+            };
+        })
+        .filter(Boolean)
+);
+
+const buildSummaryPayloadFromLiveData = (liveData, now, source = 'live-post') => {
+    const homeStatMap = new Map((liveData.stats || []).map((stat) => [stat.name, stat.homeValue]));
+    const awayStatMap = new Map((liveData.stats || []).map((stat) => [stat.name, stat.awayValue]));
+
+    const events = normalizeSummaryEvents(liveData.events || []);
+    const homeYellowCards = events.filter((event) => event.isYellowCard && event.team === String(liveData.homeTeam?.id || '')).length;
+    const awayYellowCards = events.filter((event) => event.isYellowCard && event.team === String(liveData.awayTeam?.id || '')).length;
+    const homeRedCards = events.filter((event) => event.isRedCard && event.team === String(liveData.homeTeam?.id || '')).length;
+    const awayRedCards = events.filter((event) => event.isRedCard && event.team === String(liveData.awayTeam?.id || '')).length;
+
+    if (!homeStatMap.has('yellowCards')) homeStatMap.set('yellowCards', String(homeYellowCards));
+    if (!awayStatMap.has('yellowCards')) awayStatMap.set('yellowCards', String(awayYellowCards));
+    if (!homeStatMap.has('redCards')) homeStatMap.set('redCards', String(homeRedCards));
+    if (!awayStatMap.has('redCards')) awayStatMap.set('redCards', String(awayRedCards));
+
+    return {
+        matchId: String(liveData.matchId),
+        league: liveData.league || null,
+        matchState: liveData.matchState || 'post',
+        statusDetail: liveData.statusDetail || 'FT',
+        displayClock: liveData.displayClock || '',
+        homeTeam: {
+            id: liveData.homeTeam?.id || null,
+            name: liveData.homeTeam?.name || 'Home',
+            logo: liveData.homeTeam?.logo || null,
+            score: String(liveData.homeTeam?.score ?? '0')
+        },
+        awayTeam: {
+            id: liveData.awayTeam?.id || null,
+            name: liveData.awayTeam?.name || 'Away',
+            logo: liveData.awayTeam?.logo || null,
+            score: String(liveData.awayTeam?.score ?? '0')
+        },
+        stats: pickOrderedSummaryStats(homeStatMap, awayStatMap),
+        events,
+        source,
+        updatedAt: now
+    };
+};
+
+const parseSummaryKeyEvent = (item) => {
+    const rawType = String(item?.type?.type || '').toLowerCase();
+    const rawText = String(item?.type?.text || item?.text || item?.shortText || '');
+    const isSubstitution = rawType === 'substitution' || /substitution/i.test(rawText);
+
+    if (isSubstitution) return null;
+
+    const isGoal = Boolean(item?.scoringPlay) || rawType.includes('goal') || /goal|penalty - scored/i.test(rawText);
+    const isYellowCard = rawType.includes('yellow-card') || /yellow card/i.test(rawText);
+    const isRedCard = rawType.includes('red-card') || /red card/i.test(rawText);
+
+    if (!(isGoal || isYellowCard || isRedCard)) {
+        return null;
+    }
+
+    const participants = Array.isArray(item?.participants) ? item.participants : [];
+    const firstParticipant = participants.find((participant) => participant?.athlete?.displayName);
+    const playerName = firstParticipant?.athlete?.displayName || item?.athlete?.displayName || item?.shortText || '';
+    const participantTeamId = firstParticipant?.team?.id || '';
+    const teamId = String(item?.team?.id || participantTeamId || '');
+    const isOwnGoal = Boolean(item?.ownGoal) || /own goal/i.test(rawText);
+    const assistName = isGoal && !isOwnGoal
+        ? pickAssistNameFromSummaryItem(item, playerName)
+        : '';
+
+    return normalizeEventFlags({
+        clock: item?.clock?.displayValue || item?.time?.displayValue || '',
+        team: teamId,
+        type: item?.type?.text || rawText,
+        player: playerName,
+        assist: assistName,
+        isGoal,
+        isPenalty: Boolean(item?.penaltyKick) || /penalty/i.test(rawText),
+        isOwnGoal,
+        isYellowCard,
+        isRedCard
+    });
+};
+
+const extractTeamStatMap = (summaryJson, teamId, fallbackStats = []) => {
+    const boxscoreTeams = Array.isArray(summaryJson?.boxscore?.teams) ? summaryJson.boxscore.teams : [];
+    const matchedTeam = boxscoreTeams.find((teamItem) => String(teamItem?.team?.id || '') === String(teamId));
+    const statsArray = Array.isArray(matchedTeam?.statistics) ? matchedTeam.statistics : fallbackStats;
+    return new Map(statsArray.map((stat) => [stat.name, stat.displayValue ?? stat.value ?? '0']));
+};
+
+const buildSummaryPayloadFromEspnSummary = (summaryJson, league, now, source = 'espn-summary') => {
+    const competition = summaryJson?.header?.competitions?.[0];
+    if (!competition) return null;
+
+    const homeCompetitor = (competition.competitors || []).find((item) => item.homeAway === 'home');
+    const awayCompetitor = (competition.competitors || []).find((item) => item.homeAway === 'away');
+
+    if (!homeCompetitor || !awayCompetitor) {
+        return null;
+    }
+
+    const homeTeamId = String(homeCompetitor?.team?.id || '');
+    const awayTeamId = String(awayCompetitor?.team?.id || '');
+
+    const homeStatMap = extractTeamStatMap(summaryJson, homeTeamId, homeCompetitor?.statistics || []);
+    const awayStatMap = extractTeamStatMap(summaryJson, awayTeamId, awayCompetitor?.statistics || []);
+
+    let events = (summaryJson?.keyEvents || [])
+        .map(parseSummaryKeyEvent)
+        .filter(Boolean);
+
+    if (events.length === 0) {
+        const detailEvents = Array.isArray(competition.details) ? competition.details : [];
+        events = detailEvents
+            .map((detail) => {
+                const playerName = detail?.athletesInvolved?.[0]?.displayName || '';
+                const assistCandidate = detail?.athletesInvolved?.[1]?.displayName || '';
+                const isOwnGoal = Boolean(detail?.ownGoal);
+                return normalizeEventFlags({
+                    clock: detail?.clock?.displayValue || '',
+                    team: String(detail?.team?.id || ''),
+                    type: detail?.type?.text || '',
+                    player: playerName,
+                    assist: !isOwnGoal && assistCandidate && assistCandidate !== playerName ? assistCandidate : '',
+                    isGoal: Boolean(detail?.scoringPlay),
+                    isPenalty: Boolean(detail?.penaltyKick),
+                    isOwnGoal,
+                    isYellowCard: Boolean(detail?.yellowCard),
+                    isRedCard: Boolean(detail?.redCard)
+                });
+            })
+            .filter((event) => event.isGoal || event.isYellowCard || event.isRedCard);
+    }
+
+    const homeYellowCards = events.filter((event) => event.isYellowCard && event.team === homeTeamId).length;
+    const awayYellowCards = events.filter((event) => event.isYellowCard && event.team === awayTeamId).length;
+    const homeRedCards = events.filter((event) => event.isRedCard && event.team === homeTeamId).length;
+    const awayRedCards = events.filter((event) => event.isRedCard && event.team === awayTeamId).length;
+
+    if (!homeStatMap.has('yellowCards')) homeStatMap.set('yellowCards', String(homeYellowCards));
+    if (!awayStatMap.has('yellowCards')) awayStatMap.set('yellowCards', String(awayYellowCards));
+    if (!homeStatMap.has('redCards')) homeStatMap.set('redCards', String(homeRedCards));
+    if (!awayStatMap.has('redCards')) awayStatMap.set('redCards', String(awayRedCards));
+
+    return {
+        matchId: String(competition?.id || summaryJson?.header?.id || ''),
+        league: league || null,
+        matchState: competition?.status?.type?.state || 'post',
+        statusDetail: competition?.status?.type?.detail || competition?.status?.type?.shortDetail || '',
+        displayClock: competition?.status?.displayClock || '',
+        homeTeam: {
+            id: homeCompetitor?.team?.id || null,
+            name: homeCompetitor?.team?.displayName || 'Home',
+            logo: homeCompetitor?.team?.logos?.[0]?.href || null,
+            score: String(homeCompetitor?.score ?? '0')
+        },
+        awayTeam: {
+            id: awayCompetitor?.team?.id || null,
+            name: awayCompetitor?.team?.displayName || 'Away',
+            logo: awayCompetitor?.team?.logos?.[0]?.href || null,
+            score: String(awayCompetitor?.score ?? '0')
+        },
+        stats: pickOrderedSummaryStats(homeStatMap, awayStatMap),
+        events: normalizeSummaryEvents(events),
+        source,
+        updatedAt: now
+    };
+};
+
+const fetchEspnSummaryForMatch = async (matchId) => {
+    for (const league of ESPN_LEAGUES) {
+        try {
+            const summaryUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${matchId}`;
+            const response = await fetch(summaryUrl);
+            if (!response.ok) continue;
+            const summaryJson = await response.json();
+            const payload = buildSummaryPayloadFromEspnSummary(summaryJson, league, Date.now(), 'espn-summary-on-demand');
+            if (payload && payload.matchId) {
+                return payload;
+            }
+        } catch (error) {
+            console.warn(`⚠️ ESPN summary fetch failed for ${matchId} (${league}):`, error.message);
+        }
+    }
+    return null;
+};
+
 // ============================================
 // SCHEDULED FUNCTIONS
 // ============================================
@@ -81,9 +342,14 @@ exports.dailyDataRefresh = onSchedule({
     console.log('⏰ Daily data refresh started (03:00 UTC = 06:00 TR)');
 
     try {
+        const existingSummariesSnapshot = await db.ref('cache/matchSummaries').once('value');
+        const existingMatchSummaries = existingSummariesSnapshot.val() || {};
+
         const cache = {
             nextMatch: null,
             next3Matches: [],
+            lastFinishedMatch: null,
+            matchSummaries: existingMatchSummaries,
             squad: [],
             standings: [],
             lastUpdate: Date.now()
@@ -305,44 +571,49 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         console.log('⚽ Checking live match from ESPN...');
 
         // 2. ESPN'den Fenerbahçe maçını ara (Süper Lig + Europa League)
-        const today = new Date();
-        const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+        const nowDate = new Date();
+        const formatEspnDate = (date) => date.toISOString().split('T')[0].replace(/-/g, '');
+        const dateCandidates = [
+            formatEspnDate(nowDate),
+            formatEspnDate(new Date(nowDate.getTime() - 24 * 60 * 60 * 1000))
+        ];
         const leagues = ['tur.1', 'uefa.europa'];
         let fenerbahceMatch = null;
         let matchLeague = null;
 
-        for (const league of leagues) {
-            try {
-                const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${dateStr}`;
-                const response = await fetch(scoreboardUrl);
-                if (!response.ok) continue;
+        outer:
+        for (const dateStr of dateCandidates) {
+            for (const league of leagues) {
+                try {
+                    const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${dateStr}`;
+                    const response = await fetch(scoreboardUrl);
+                    if (!response.ok) continue;
 
-                const data = await response.json();
-                const match = data.events?.find(event => {
-                    const competitors = event.competitions?.[0]?.competitors || [];
-                    return competitors.some(team =>
-                        team.team.displayName.toLowerCase().includes('fenerbahce') ||
-                        team.team.displayName.toLowerCase().includes('fenerbahçe')
-                    );
-                });
+                    const data = await response.json();
+                    const match = data.events?.find(event => {
+                        const competitors = event.competitions?.[0]?.competitors || [];
+                        return competitors.some(team =>
+                            team.team.displayName.toLowerCase().includes('fenerbahce') ||
+                            team.team.displayName.toLowerCase().includes('fenerbahçe')
+                        );
+                    });
 
-                if (match) {
-                    fenerbahceMatch = match;
-                    matchLeague = league;
-                    break;
+                    if (match) {
+                        fenerbahceMatch = match;
+                        matchLeague = league;
+                        break outer;
+                    }
+                } catch (err) {
+                    console.error(`ESPN ${league} (${dateStr}) error:`, err.message);
                 }
-            } catch (err) {
-                console.error(`ESPN ${league} error:`, err.message);
             }
         }
 
         if (!fenerbahceMatch) {
-            // Maç bulunamadı — pre state olarak işaretle
-            await db.ref('cache/liveMatch').set({
-                matchState: 'pre',
-                lastUpdated: now
-            });
-            console.log('ℹ️ No Fenerbahçe match found on ESPN today, setting pre state');
+            // Maç bulunamadığında liveMatch'i temizle; handleLiveMatch lastFinishedMatch'e düşsün.
+            // Böylece biten maç sonrası kart "pre" ile ezilmez.
+            await db.ref('cache/liveMatch').remove();
+            console.log('ℹ️ No Fenerbahçe match found on ESPN today, liveMatch cache cleared');
             return;
         }
 
@@ -355,29 +626,40 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         const awayTeamId = String(awayTeam?.team?.id || '');
         const rawDetails = competition?.details || [];
         const summaryUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${matchLeague}/summary?event=${fenerbahceMatch.id}`;
+        let summaryGoalAssistLookup = new Map();
 
-        const buildScoreboardEvent = (detail, index) => ({
-            type: detail.type?.text || '',
-            clock: detail.clock?.displayValue || '',
-            clockValue: Number.isFinite(Number(detail.clock?.value)) ? Number(detail.clock.value) : null,
-            sourceOrder: index,
-            team: detail.team?.id || '',
-            isGoal: detail.scoringPlay || false,
-            isYellowCard: detail.yellowCard || false,
-            isRedCard: detail.redCard || false,
-            isPenalty: detail.penaltyKick || false,
-            isOwnGoal: detail.ownGoal || false,
-            isSubstitution: false,
-            player: detail.athletesInvolved?.[0]?.displayName || '',
-            playerOut: ''
-        });
+        const buildScoreboardEvent = (detail, index) => {
+            const clock = detail.clock?.displayValue || '';
+            const playerName = detail.athletesInvolved?.[0]?.displayName || '';
+            const assistKey = `${clock}|${String(playerName).toLowerCase()}`;
+            const fallbackAssist = summaryGoalAssistLookup.get(assistKey) || '';
+            const assistCandidate = detail.athletesInvolved?.[1]?.displayName || fallbackAssist;
+            const isOwnGoal = Boolean(detail.ownGoal);
+
+            return normalizeEventFlags({
+                type: detail.type?.text || '',
+                clock,
+                clockValue: Number.isFinite(Number(detail.clock?.value)) ? Number(detail.clock.value) : null,
+                sourceOrder: index,
+                team: detail.team?.id || '',
+                isGoal: Boolean(detail.scoringPlay),
+                isYellowCard: Boolean(detail.yellowCard),
+                isRedCard: Boolean(detail.redCard),
+                isPenalty: Boolean(detail.penaltyKick),
+                isOwnGoal,
+                isSubstitution: false,
+                player: playerName,
+                playerOut: '',
+                assist: !isOwnGoal && assistCandidate && assistCandidate !== playerName ? assistCandidate : ''
+            });
+        };
 
         const buildSummarySubstitutionEvent = (item, index) => {
             const participants = Array.isArray(item.participants) ? item.participants : [];
             const playerIn = participants[0]?.athlete?.displayName || '';
             const playerOut = participants[1]?.athlete?.displayName || '';
 
-            return {
+            return normalizeEventFlags({
                 type: item.type?.text || 'Substitution',
                 clock: item.clock?.displayValue || '',
                 clockValue: Number.isFinite(Number(item.clock?.value)) ? Number(item.clock.value) : null,
@@ -390,8 +672,9 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
                 isOwnGoal: false,
                 isSubstitution: true,
                 player: playerIn || item.shortText?.replace(/\s*Substitution\s*$/i, '') || '',
-                playerOut
-            };
+                playerOut,
+                assist: ''
+            });
         };
 
         let summaryKeyEvents = [];
@@ -400,6 +683,15 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
             if (summaryResponse.ok) {
                 const summaryJson = await summaryResponse.json();
                 summaryKeyEvents = Array.isArray(summaryJson?.keyEvents) ? summaryJson.keyEvents : [];
+                summaryGoalAssistLookup = new Map(
+                    summaryKeyEvents
+                        .map(parseSummaryKeyEvent)
+                        .filter((event) => event?.isGoal && event.player && event.assist)
+                        .map((event) => [
+                            `${String(event.clock || '')}|${String(event.player || '').toLowerCase()}`,
+                            event.assist
+                        ])
+                );
             }
         } catch (summaryError) {
             console.warn(`⚠️ ESPN summary keyEvents unavailable for ${fenerbahceMatch.id}:`, summaryError.message);
@@ -417,6 +709,7 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
             String(event.type || '').toLowerCase(),
             String(event.player || '').toLowerCase(),
             String(event.playerOut || '').toLowerCase(),
+            String(event.assist || '').toLowerCase(),
             event.isGoal ? 'goal' : '',
             event.isYellowCard ? 'yellow' : '',
             event.isRedCard ? 'red' : '',
@@ -425,6 +718,7 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         ].join('|'));
 
         const events = [...scoreboardEvents, ...summarySubstitutionEvents]
+            .map((event) => normalizeEventFlags(event))
             .sort((a, b) => {
                 const aClock = Number.isFinite(a.clockValue) ? a.clockValue : Number.POSITIVE_INFINITY;
                 const bClock = Number.isFinite(b.clockValue) ? b.clockValue : Number.POSITIVE_INFINITY;
@@ -504,6 +798,20 @@ exports.updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
 
         // 4. Cache'e yaz
         await db.ref('cache/liveMatch').set(liveData);
+        if (matchState === 'post') {
+            await db.ref('cache/lastFinishedMatch').set({
+                ...liveData,
+                archivedAt: now
+            });
+
+            const summaryRef = db.ref(`cache/matchSummaries/${String(liveData.matchId)}`);
+            const summarySnapshot = await summaryRef.once('value');
+            if (!summarySnapshot.val()) {
+                const summaryPayload = buildSummaryPayloadFromLiveData(liveData, now, 'live-post-final');
+                await summaryRef.set(summaryPayload);
+                console.log(`🧾 Match summary stored for fixture: ${liveData.matchId}`);
+            }
+        }
         console.log(`✅ Live match updated: ${liveData.homeTeam.name} ${liveData.homeTeam.score} - ${liveData.awayTeam.score} ${liveData.awayTeam.name} [${matchState}]`);
 
         // 5. Maç bittiyse, 5 dk sonra temizlenmesi için işaretle
@@ -743,6 +1051,10 @@ exports.api = onRequest({
             case 'liveMatch':
                 return await handleLiveMatch(req, res);
 
+            case 'match-summary':
+            case 'matchSummary':
+                return await handleMatchSummary(req, res, param);
+
             case 'player-image':
             case 'playerImage':
                 return await handlePlayerImage(req, res, param);
@@ -773,6 +1085,7 @@ exports.api = onRequest({
                         '/squad',
                         '/standings',
                         '/live-match',
+                        '/match-summary/:matchId',
                         '/player-image/:id',
                         '/team-image/:id',
                         '/reminder (POST)',
@@ -827,15 +1140,49 @@ async function handleLiveMatch(req, res) {
     // Live match - Realtime Database cache'den oku
     // updateLiveMatch scheduled function ESPN'den çeker ve buraya yazar
     try {
-        const snapshot = await db.ref('cache/liveMatch').once('value');
-        const data = snapshot.val();
-        if (!data) {
-            return res.json({ matchState: 'no-match' });
+        const liveSnapshot = await db.ref('cache/liveMatch').once('value');
+        const liveData = liveSnapshot.val();
+        if (liveData) {
+            return res.json(liveData);
         }
-        return res.json(data);
+
+        const lastFinishedSnapshot = await db.ref('cache/lastFinishedMatch').once('value');
+        const lastFinished = lastFinishedSnapshot.val();
+        if (lastFinished) {
+            return res.json(lastFinished);
+        }
+
+        return res.json({ matchState: 'no-match' });
     } catch (error) {
         console.error('Live match error:', error);
         return res.status(500).json({ error: 'Failed to fetch live match' });
+    }
+}
+
+async function handleMatchSummary(req, res, matchId) {
+    if (!matchId) {
+        return res.status(400).json({ error: 'Match ID required' });
+    }
+
+    const normalizedMatchId = String(matchId);
+
+    try {
+        const snapshot = await db.ref(`cache/matchSummaries/${normalizedMatchId}`).once('value');
+        const cachedSummary = snapshot.val();
+        if (cachedSummary) {
+            return res.json(cachedSummary);
+        }
+
+        const fetchedSummary = await fetchEspnSummaryForMatch(normalizedMatchId);
+        if (!fetchedSummary) {
+            return res.status(404).json({ error: 'Match summary not found' });
+        }
+
+        await db.ref(`cache/matchSummaries/${normalizedMatchId}`).set(fetchedSummary);
+        return res.json(fetchedSummary);
+    } catch (error) {
+        console.error('Match summary error:', error);
+        return res.status(500).json({ error: 'Failed to fetch match summary' });
     }
 }
 
@@ -973,9 +1320,14 @@ async function handleRefresh(req, res) {
 
     // Trigger daily refresh logic inline
     try {
+        const existingSummariesSnapshot = await db.ref('cache/matchSummaries').once('value');
+        const existingMatchSummaries = existingSummariesSnapshot.val() || {};
+
         const cache = {
             nextMatch: null,
             next3Matches: [],
+            lastFinishedMatch: null,
+            matchSummaries: existingMatchSummaries,
             squad: [],
             standings: [],
             lastUpdate: Date.now()
