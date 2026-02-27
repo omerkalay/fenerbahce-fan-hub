@@ -634,13 +634,13 @@ function FixtureSchedule() {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-base font-bold text-white text-left truncate">{localizeTeamName(activeSummaryData.homeTeam?.name || '')}</p>
+                                                <p className="hidden sm:block text-base font-bold text-white text-left truncate">{localizeTeamName(activeSummaryData.homeTeam?.name || '')}</p>
                                             </div>
                                             <p className="text-3xl font-black text-white px-4">
                                                 {activeSummaryData.homeTeam?.score ?? '0'} <span className="text-slate-500">-</span> {activeSummaryData.awayTeam?.score ?? '0'}
                                             </p>
                                             <div className="flex items-center justify-end gap-2.5 min-w-0">
-                                                <p className="text-base font-bold text-white text-right truncate">{localizeTeamName(activeSummaryData.awayTeam?.name || '')}</p>
+                                                <p className="hidden sm:block text-base font-bold text-white text-right truncate">{localizeTeamName(activeSummaryData.awayTeam?.name || '')}</p>
                                                 <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
                                                     {summaryAwayLogo ? (
                                                         <img src={summaryAwayLogo} alt={localizeTeamName(activeSummaryData.awayTeam?.name || '')} className="w-full h-full object-contain p-1" loading="lazy" />
