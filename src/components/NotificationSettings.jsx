@@ -47,6 +47,58 @@ const NotificationSettings = () => {
         };
     }, [showModal]);
 
+    // FCM token otomatik sync: token değişmişse backend'e güncelle
+    useEffect(() => {
+        if (!hasActiveNotifications) return;
+
+        const syncToken = async () => {
+            try {
+                if (!('Notification' in window) || Notification.permission !== 'granted') return;
+                if (!('serviceWorker' in navigator)) return;
+
+                const { messaging } = await import('../firebase');
+                const { getToken } = await import('firebase/messaging');
+                if (!messaging) return;
+
+                const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
+                const fcmScope = `${import.meta.env.BASE_URL}firebase-cloud-messaging-push-scope`;
+
+                let registration = await navigator.serviceWorker.getRegistration(fcmScope);
+                if (!registration) {
+                    registration = await navigator.serviceWorker.register(swUrl, { scope: fcmScope });
+                }
+
+                const currentToken = await getToken(messaging, {
+                    vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
+                    serviceWorkerRegistration: registration
+                });
+
+                if (!currentToken) return;
+
+                const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
+                if (currentToken === storedToken) return;
+
+                console.log('🔄 FCM token changed, syncing with backend...');
+                localStorage.setItem(FCM_TOKEN_STORAGE_KEY, currentToken);
+
+                const savedOptions = localStorage.getItem('fb_notification_options');
+                if (!savedOptions) return;
+
+                const options = normalizeOptions(JSON.parse(savedOptions));
+                await fetch(`${BACKEND_URL}/reminder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ playerId: currentToken, options })
+                });
+                console.log('✅ FCM token synced with backend');
+            } catch (err) {
+                console.error('FCM token sync error:', err);
+            }
+        };
+
+        syncToken();
+    }, [hasActiveNotifications]);
+
     const toggleOption = (optionId) => {
         setDraftOptions(prev => {
             const base = prev ?? selectedOptions;

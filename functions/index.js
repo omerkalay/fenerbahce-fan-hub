@@ -927,9 +927,8 @@ exports.checkMatchNotifications = onSchedule("every 1 minutes", async (event) =>
                     if (sentForMatch.includes(optionKey)) continue;
 
                     const triggerTime = matchTime - config.offsetMs;
-                    const triggerWindowEnd = triggerTime + (2 * 60 * 1000); // 2 dakikalık window
+                    const triggerWindowEnd = triggerTime + (5 * 60 * 1000);
 
-                    // Tam 2 dakikalık pencere içinde mi?
                     if (now >= triggerTime && now < triggerWindowEnd) {
                         const isHome = match.homeTeam.id === FENERBAHCE_ID;
                         const opponent = isHome ? match.awayTeam.name : match.homeTeam.name;

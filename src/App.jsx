@@ -84,6 +84,37 @@ function App() {
     hasDataRef.current = Boolean(matchData);
   }, [matchData]);
 
+  // Foreground FCM: uygulama açıkken gelen bildirimleri göster
+  useEffect(() => {
+    let unsubscribe;
+    const setupForegroundMessaging = async () => {
+      try {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+        const { messaging } = await import('./firebase');
+        const { onMessage } = await import('firebase/messaging');
+        if (!messaging) return;
+
+        unsubscribe = onMessage(messaging, (payload) => {
+          console.log('📩 Foreground message:', payload);
+          const { title, body } = payload.notification || {};
+          if (title) {
+            new Notification(title, {
+              body: body || '',
+              icon: 'https://media.api-sports.io/football/teams/611.png',
+              data: payload.data
+            });
+          }
+        });
+      } catch (err) {
+        console.error('Foreground messaging setup error:', err);
+      }
+    };
+
+    setupForegroundMessaging();
+    return () => { if (unsubscribe) unsubscribe(); };
+  }, []);
+
   // Fetch match data once when app loads
   const loadMatchData = useCallback(async () => {
     const hasCached = hasDataRef.current;
