@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchEspnFenerbahceFixtures } from '../services/api';
+import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api';
+import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import { formatMatchClock } from '../utils/matchClock';
 
 const STATUS_FILTERS = [
     { id: 'all', label: 'Tümü' },
@@ -26,6 +28,18 @@ const localizeTeamName = (name = '') => {
         .replace(/\bFenerbahce\b/gi, 'Fenerbahçe')
         .replace(/\bBesiktas\b/gi, 'Beşiktaş')
         .replace(/\bIstanbul Basaksehir\b/gi, 'İstanbul Başakşehir');
+};
+
+const localizeSummaryStatus = (value = '') => {
+    const normalized = String(value || '').trim().toLowerCase();
+
+    if (!normalized) return 'Maç Sonucu';
+    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) return 'Maç Sonu';
+    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) return 'Devre Arası';
+    if (normalized === 'aet' || normalized.includes('after extra time')) return 'Uzatma Sonu';
+    if (normalized.includes('penalties')) return 'Penaltılar Sonu';
+
+    return value;
 };
 
 const getMatchTimestamp = (match) => {
@@ -84,9 +98,10 @@ const TeamInline = ({ team, isFenerbahce = false, align = 'left' }) => (
     </div>
 );
 
-const FixtureMatchCard = ({ match, featured = false, cardRef = null }) => {
+const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSummary = null }) => {
     const dateInfo = formatMatchDate(match.date);
     const scored = isScoredMatch(match);
+    const isFinished = match.status.completed || match.status.state === 'post';
     const venueName = getDisplayVenueName(match);
 
     return (
@@ -125,11 +140,23 @@ const FixtureMatchCard = ({ match, featured = false, cardRef = null }) => {
                 />
             </div>
 
-            {venueName && (
-                <div className="mt-3 pt-3 border-t border-white/5">
-                    <p className="text-[11px] text-slate-500 truncate">
-                        {venueName}
+            {(venueName || (isFinished && onOpenSummary)) && (
+                <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-3">
+                    <p className="text-[11px] text-slate-500 truncate min-w-0 flex-1">
+                        {venueName || '\u00A0'}
                     </p>
+
+                    {isFinished && onOpenSummary && (
+                        <button
+                            onClick={() => onOpenSummary(match)}
+                            className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.04] text-slate-200 hover:text-yellow-200 hover:border-yellow-400/35 hover:bg-yellow-400/10 transition-all duration-300 text-[11px] font-semibold whitespace-nowrap"
+                        >
+                            Maç İstatistikleri
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-yellow-300/90 transition-transform duration-300 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             )}
         </article>
@@ -141,6 +168,10 @@ function FixtureSchedule() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [activeSummaryMatch, setActiveSummaryMatch] = useState(null);
+    const [activeSummaryData, setActiveSummaryData] = useState(null);
+    const [summaryLoading, setSummaryLoading] = useState(false);
+    const [summaryError, setSummaryError] = useState(null);
 
     const [statusFilter, setStatusFilter] = useState('all');
     const [showFilters, setShowFilters] = useState(false);
@@ -148,6 +179,18 @@ function FixtureSchedule() {
     const [venueFilter, setVenueFilter] = useState('all');
     const [competitionFilter, setCompetitionFilter] = useState('all');
     const nextMatchFocusRef = useRef(null);
+
+    useEffect(() => {
+        if (activeSummaryMatch) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [activeSummaryMatch]);
 
     useEffect(() => {
         let isMounted = true;
@@ -266,6 +309,32 @@ function FixtureSchedule() {
         setVenueFilter('all');
         setCompetitionFilter('all');
     };
+
+    const closeSummaryModal = () => {
+        setActiveSummaryMatch(null);
+        setActiveSummaryData(null);
+        setSummaryLoading(false);
+        setSummaryError(null);
+    };
+
+    const openSummaryModal = async (match) => {
+        setActiveSummaryMatch(match);
+        setActiveSummaryData(null);
+        setSummaryError(null);
+        setSummaryLoading(true);
+
+        const summary = await fetchMatchSummary(match.id);
+        if (summary) {
+            setActiveSummaryData(summary);
+        } else {
+            setSummaryError('Bu maç için istatistik özeti henüz hazır değil.');
+        }
+
+        setSummaryLoading(false);
+    };
+
+    const summaryHomeLogo = activeSummaryData?.homeTeam?.logo || activeSummaryMatch?.homeTeam?.logo || null;
+    const summaryAwayLogo = activeSummaryData?.awayTeam?.logo || activeSummaryMatch?.awayTeam?.logo || null;
 
     return (
         <div className="min-h-screen pb-24">
@@ -434,7 +503,7 @@ function FixtureSchedule() {
                     {!error && filteredMatches.length > 0 && statusFilter !== 'all' && (
                         <div className="space-y-2.5">
                             {filteredMatches.map((match) => (
-                                <FixtureMatchCard key={match.id} match={match} />
+                                <FixtureMatchCard key={match.id} match={match} onOpenSummary={openSummaryModal} />
                             ))}
                         </div>
                     )}
@@ -449,7 +518,7 @@ function FixtureSchedule() {
                                         <div className="h-px bg-white/10 flex-1" />
                                     </div>
                                     {allFilterPlayedMatches.map((match) => (
-                                        <FixtureMatchCard key={match.id} match={match} />
+                                        <FixtureMatchCard key={match.id} match={match} onOpenSummary={openSummaryModal} />
                                     ))}
                                 </section>
                             )}
@@ -474,7 +543,7 @@ function FixtureSchedule() {
                                         <p className="text-[11px] uppercase tracking-[0.14em] text-yellow-300">Sıradaki Maç</p>
                                         <div className="h-px bg-yellow-400/20 flex-1" />
                                     </div>
-                                    <FixtureMatchCard match={allFilterNextMatch} featured cardRef={nextMatchFocusRef} />
+                                    <FixtureMatchCard match={allFilterNextMatch} featured cardRef={nextMatchFocusRef} onOpenSummary={openSummaryModal} />
 
                                     {allFilterLaterMatches.length > 0 && (
                                         <div className="flex justify-center">
@@ -499,7 +568,7 @@ function FixtureSchedule() {
                                         <div className="h-px bg-white/10 flex-1" />
                                     </div>
                                     {allFilterLaterMatches.map((match) => (
-                                        <FixtureMatchCard key={match.id} match={match} />
+                                        <FixtureMatchCard key={match.id} match={match} onOpenSummary={openSummaryModal} />
                                     ))}
                                 </section>
                             )}
@@ -507,6 +576,157 @@ function FixtureSchedule() {
                         </div>
                     )}
                 </section>
+            )}
+
+            {activeSummaryMatch && (
+                <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4">
+                    <button
+                        onClick={closeSummaryModal}
+                        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                        aria-label="Kapat"
+                    />
+
+                    <div className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20">
+                        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-bold text-yellow-300">Maç İstatistikleri</p>
+                                <p className="text-[11px] text-slate-400">
+                                    {localizeTeamName(activeSummaryMatch.homeTeam?.name)} vs {localizeTeamName(activeSummaryMatch.awayTeam?.name)}
+                                </p>
+                            </div>
+                            <button
+                                onClick={closeSummaryModal}
+                                className="p-1 text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
+                                aria-label="Kapat"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="p-4 overflow-y-auto max-h-[calc(88vh-72px)] space-y-4">
+                            {summaryLoading && (
+                                <div className="space-y-3 animate-pulse">
+                                    <div className="h-20 rounded-xl bg-white/5" />
+                                    <div className="h-28 rounded-xl bg-white/5" />
+                                    <div className="h-28 rounded-xl bg-white/5" />
+                                </div>
+                            )}
+
+                            {!summaryLoading && summaryError && (
+                                <div className="rounded-xl border border-rose-400/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                                    {summaryError}
+                                </div>
+                            )}
+
+                            {!summaryLoading && !summaryError && activeSummaryData && (
+                                <>
+                                    <div className="glass-panel rounded-xl p-4">
+                                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
+                                                    {summaryHomeLogo ? (
+                                                        <img src={summaryHomeLogo} alt={localizeTeamName(activeSummaryData.homeTeam?.name || '')} className="w-full h-full object-contain p-1" loading="lazy" />
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-300 font-bold">
+                                                            {localizeTeamName(activeSummaryData.homeTeam?.name || '').slice(0, 2).toUpperCase()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-base font-bold text-white text-left truncate">{localizeTeamName(activeSummaryData.homeTeam?.name || '')}</p>
+                                            </div>
+                                            <p className="text-3xl font-black text-white px-4">
+                                                {activeSummaryData.homeTeam?.score ?? '0'} <span className="text-slate-500">-</span> {activeSummaryData.awayTeam?.score ?? '0'}
+                                            </p>
+                                            <div className="flex items-center justify-end gap-2.5 min-w-0">
+                                                <p className="text-base font-bold text-white text-right truncate">{localizeTeamName(activeSummaryData.awayTeam?.name || '')}</p>
+                                                <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
+                                                    {summaryAwayLogo ? (
+                                                        <img src={summaryAwayLogo} alt={localizeTeamName(activeSummaryData.awayTeam?.name || '')} className="w-full h-full object-contain p-1" loading="lazy" />
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-300 font-bold">
+                                                            {localizeTeamName(activeSummaryData.awayTeam?.name || '').slice(0, 2).toUpperCase()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 mt-2 text-center">
+                                            {localizeSummaryStatus(activeSummaryData.statusDetail)}
+                                        </p>
+                                    </div>
+
+                                    {Array.isArray(activeSummaryData.stats) && activeSummaryData.stats.length > 0 && (
+                                        <div className="glass-panel rounded-xl p-4">
+                                            <h4 className="text-sm font-bold text-white mb-3">Özet İstatistikler</h4>
+                                            <div className="space-y-3">
+                                                {activeSummaryData.stats.map((stat, index) => {
+                                                    const homeVal = Number.parseFloat(String(stat.homeValue).replace(',', '.')) || 0;
+                                                    const awayVal = Number.parseFloat(String(stat.awayValue).replace(',', '.')) || 0;
+                                                    const total = homeVal + awayVal || 1;
+
+                                                    return (
+                                                        <div key={`${stat.key}-${index}`} className="space-y-1">
+                                                            <div className="flex justify-between text-xs text-slate-300">
+                                                                <span className="font-semibold text-white">{stat.homeValue}</span>
+                                                                <span>{stat.label}</span>
+                                                                <span className="font-semibold text-white">{stat.awayValue}</span>
+                                                            </div>
+                                                            <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden flex">
+                                                                <div className="h-full bg-yellow-400" style={{ width: `${(homeVal / total) * 100}%` }} />
+                                                                <div className="h-full flex-1 bg-slate-600" />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {Array.isArray(activeSummaryData.events) && activeSummaryData.events.length > 0 && (
+                                        <div className="glass-panel rounded-xl p-4">
+                                            <h4 className="text-sm font-bold text-white mb-3">Maç Olayları</h4>
+                                            <div className="space-y-2">
+                                                {activeSummaryData.events.map((event, index) => {
+                                                    const eventType = getEventVisualType(event);
+                                                    const rowClass = eventType === 'goal'
+                                                        ? 'bg-yellow-400/10'
+                                                        : eventType === 'red-card'
+                                                            ? 'bg-red-500/10'
+                                                            : 'bg-white/5';
+                                                    const textClass = eventType === 'goal'
+                                                        ? 'text-yellow-300 font-semibold'
+                                                        : eventType === 'red-card'
+                                                            ? 'text-red-300'
+                                                            : 'text-slate-200';
+
+                                                    return (
+                                                        <div key={`${event.clock}-${index}`} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${rowClass}`}>
+                                                            <span className="text-[11px] text-yellow-300 w-12">{formatMatchClock(event.clock)}</span>
+                                                            <span className="w-4 h-4 flex items-center justify-center">
+                                                                <MatchEventIcon event={event} className={eventType === 'goal' ? 'w-4 h-4' : 'w-3 h-4'} />
+                                                            </span>
+                                                            <span className={`text-sm ${textClass}`}>
+                                                                {event.player || event.type || 'Olay'}
+                                                                {event.isGoal && event.isPenalty && (
+                                                                    <span className="ml-1 text-yellow-200 font-semibold">(P)</span>
+                                                                )}
+                                                                {event.isGoal && event.assist && (
+                                                                    <span className="ml-2 text-slate-300/85 font-medium">Asist: {event.assist}</span>
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

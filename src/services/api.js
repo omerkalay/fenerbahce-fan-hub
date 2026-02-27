@@ -64,6 +64,23 @@ export const fetchNext3Matches = async () => {
     }
 };
 
+// Fetch stored match summary for fixture cards
+export const fetchMatchSummary = async (matchId) => {
+    if (!matchId) return null;
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/match-summary/${matchId}`);
+        if (!response.ok) {
+            if (response.status === 404) return null;
+            throw new Error('Match summary fetch failed');
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching match summary from backend:', error);
+        return null;
+    }
+};
+
 // Injuries - not implemented yet
 export const fetchInjuries = async () => {
     return [];

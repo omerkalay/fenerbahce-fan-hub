@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
+import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import { formatMatchClock } from '../utils/matchClock';
 
 const STAT_GROUPS = [
     { label: 'Toplam Şut', keys: ['totalShots'] },
@@ -22,6 +24,21 @@ const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
         status.includes('devre') ||
         clock === 'ht'
     );
+};
+
+const localizeStatusDetail = (statusDetail = '') => {
+    const status = String(statusDetail || '').trim();
+    const normalized = status.toLowerCase();
+
+    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) {
+        return 'Maç Sonu';
+    }
+
+    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) {
+        return 'Devre Arası';
+    }
+
+    return status;
 };
 
 const LiveMatchScore = () => {
@@ -86,7 +103,7 @@ const LiveMatchScore = () => {
     const isHalftime = isHalftimeDisplay(liveData.statusDetail, liveData.displayClock);
     const statusLabel = isHalftime
         ? 'Devre Arası'
-        : (liveData.statusDetail || (liveData.matchState === 'in' ? 'Canlı' : 'Maç Bitti'));
+        : (localizeStatusDetail(liveData.statusDetail) || (liveData.matchState === 'in' ? 'Canlı' : 'Maç Bitti'));
     const centerClockLabel = liveData.displayClock || '';
 
     return (
@@ -156,47 +173,50 @@ const LiveMatchScore = () => {
                 <div className="glass-panel rounded-2xl p-4">
                     <h3 className="text-sm font-bold text-white mb-3">Maç Olayları</h3>
                     <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                        {liveData.events.map((event, idx) => (
-                            <div
-                                key={idx}
-                                className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${event.isGoal ? 'bg-yellow-400/10' : event.isRedCard ? 'bg-red-500/10' : event.isSubstitution ? 'bg-emerald-400/10' : 'bg-white/5'
-                                    }`}
-                            >
-                                <span className="text-xs text-yellow-400 font-mono w-12">{event.clock}</span>
-                                <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
-                                    {event.isGoal && (
-                                        <svg viewBox="0 0 16 16" className="w-4 h-4"><circle cx="8" cy="8" r="7" fill="none" stroke="#eab308" strokeWidth="1.5" /><circle cx="8" cy="8" r="3" fill="#eab308" /></svg>
-                                    )}
-                                    {event.isSubstitution && (
-                                        <svg viewBox="0 0 16 16" className="w-4 h-4" fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                            <path d="M2 5h9" />
-                                            <path d="m8 2 3 3-3 3" />
-                                            <path d="M14 11H5" />
-                                            <path d="m8 8-3 3 3 3" />
-                                        </svg>
-                                    )}
-                                    {event.isYellowCard && !event.isRedCard && (
-                                        <svg viewBox="0 0 12 16" className="w-3.5 h-5"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#eab308" /></svg>
-                                    )}
-                                    {event.isRedCard && (
-                                        <svg viewBox="0 0 12 16" className="w-3.5 h-5"><rect x="1" y="1" width="10" height="14" rx="1.5" fill="#ef4444" /></svg>
-                                    )}
-                                </span>
-                                <span className={`text-sm flex-1 ${event.isGoal ? 'text-yellow-400 font-bold' : event.isRedCard ? 'text-red-400 font-semibold' : event.isSubstitution ? 'text-emerald-300 font-medium' : 'text-slate-300'
-                                    }`}>
-                                    {event.player}
-                                    {event.isSubstitution && event.playerOut && (
-                                        <span className="text-slate-400 ml-1">↔ {event.playerOut}</span>
-                                    )}
-                                    {event.isGoal && event.isPenalty && (
-                                        <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
-                                    )}
-                                    {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && !event.isSubstitution && (
-                                        <span className="text-slate-500 ml-1">({event.type})</span>
-                                    )}
-                                </span>
-                            </div>
-                        ))}
+                        {liveData.events.map((event, idx) => {
+                            const eventType = getEventVisualType(event);
+                            const rowClass = eventType === 'goal'
+                                ? 'bg-yellow-400/10'
+                                : eventType === 'red-card'
+                                    ? 'bg-red-500/10'
+                                    : eventType === 'substitution'
+                                        ? 'bg-emerald-400/10'
+                                        : 'bg-white/5';
+                            const textClass = eventType === 'goal'
+                                ? 'text-yellow-400 font-bold'
+                                : eventType === 'red-card'
+                                    ? 'text-red-400 font-semibold'
+                                    : eventType === 'substitution'
+                                        ? 'text-emerald-300 font-medium'
+                                        : 'text-slate-300';
+
+                            return (
+                                <div
+                                    key={idx}
+                                    className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${rowClass}`}
+                                >
+                                    <span className="text-xs text-yellow-400 font-mono w-12">{formatMatchClock(event.clock)}</span>
+                                    <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
+                                        <MatchEventIcon event={event} className={eventType === 'goal' ? 'w-4 h-4' : 'w-3.5 h-5'} />
+                                    </span>
+                                    <span className={`text-sm flex-1 ${textClass}`}>
+                                        {event.player}
+                                        {event.isSubstitution && event.playerOut && (
+                                            <span className="text-slate-400 ml-1">↔ {event.playerOut}</span>
+                                        )}
+                                        {event.isGoal && event.isPenalty && (
+                                            <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
+                                        )}
+                                        {event.isGoal && event.assist && (
+                                            <span className="text-slate-300/80 font-medium ml-2">Asist: {event.assist}</span>
+                                        )}
+                                        {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && !event.isSubstitution && (
+                                            <span className="text-slate-500 ml-1">({event.type})</span>
+                                        )}
+                                    </span>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
