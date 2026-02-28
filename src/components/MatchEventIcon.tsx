@@ -1,6 +1,6 @@
-import React from 'react';
+import type { MatchEvent, EventVisualType } from '../types';
 
-export const getEventVisualType = (event = {}) => {
+export const getEventVisualType = (event: Partial<MatchEvent> = {}): EventVisualType => {
     if (event.isGoal) return 'goal';
     if (event.isSubstitution) return 'substitution';
     if (event.isRedCard) return 'red-card';
@@ -8,7 +8,11 @@ export const getEventVisualType = (event = {}) => {
     return 'neutral';
 };
 
-const GoalBallIcon = ({ className = 'w-4 h-4' }) => (
+interface IconProps {
+  className?: string;
+}
+
+const GoalBallIcon = ({ className = 'w-4 h-4' }: IconProps) => (
     <svg viewBox="0 0 24 24" className={className} fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12" r="9" stroke="#eab308" strokeWidth="1.6" />
         <path d="M12 8l2.8 2-1.1 3.1h-3.4L9.2 10 12 8Z" stroke="#eab308" strokeWidth="1.3" fill="#eab308" fillOpacity="0.14" />
@@ -16,7 +20,12 @@ const GoalBallIcon = ({ className = 'w-4 h-4' }) => (
     </svg>
 );
 
-const MatchEventIcon = ({ event, className = 'w-4 h-4' }) => {
+interface MatchEventIconProps {
+  event: Partial<MatchEvent>;
+  className?: string;
+}
+
+const MatchEventIcon = ({ event, className = 'w-4 h-4' }: MatchEventIconProps) => {
     const eventType = getEventVisualType(event);
 
     if (eventType === 'goal') {

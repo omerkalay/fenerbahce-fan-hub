@@ -1,8 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
+import { getMessaging, Messaging } from "firebase/messaging";
 
-// TODO: Replace with your actual Firebase project configuration
-// You can find this in the Firebase Console -> Project Settings -> General -> Your apps
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -14,8 +13,6 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-import { getMessaging } from "firebase/messaging";
-
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -23,7 +20,7 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // Initialize Firebase Messaging
-let messaging = null;
+let messaging: Messaging | null = null;
 try {
     messaging = getMessaging(app);
     console.log('✅ Firebase Messaging initialized');

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
+import { NotificationOptions } from '../types';
 
 const FCM_TOKEN_STORAGE_KEY = 'fb_fcm_token';
 
-const createEmptyOptions = () => ({
+const createEmptyOptions = (): NotificationOptions => ({
     threeHours: false,
     oneHour: false,
     thirtyMinutes: false,
@@ -11,14 +12,14 @@ const createEmptyOptions = () => ({
     dailyCheck: false
 });
 
-const normalizeOptions = (options = {}) => ({
+const normalizeOptions = (options?: Partial<NotificationOptions>): NotificationOptions => ({
     ...createEmptyOptions(),
     ...options
 });
 
 const NotificationSettings = () => {
     const [showModal, setShowModal] = useState(false);
-    const [selectedOptions, setSelectedOptions] = useState(() => {
+    const [selectedOptions, setSelectedOptions] = useState<NotificationOptions>(() => {
         const saved = localStorage.getItem('fb_notification_options');
         if (saved) {
             try {
@@ -29,7 +30,7 @@ const NotificationSettings = () => {
         }
         return createEmptyOptions();
     });
-    const [draftOptions, setDraftOptions] = useState(null);
+    const [draftOptions, setDraftOptions] = useState<NotificationOptions | null>(null);
     const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
         const saved = localStorage.getItem('fb_has_notifications');
         return saved === 'true';
@@ -101,7 +102,7 @@ const NotificationSettings = () => {
         syncToken();
     }, [hasActiveNotifications]);
 
-    const toggleOption = (optionId) => {
+    const toggleOption = (optionId: keyof NotificationOptions) => {
         setDraftOptions(prev => {
             const base = prev ?? selectedOptions;
             return {
@@ -159,18 +160,18 @@ const NotificationSettings = () => {
                             if (token) {
                                 localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
                             }
-                        } catch (swError) {
+                        } catch (swError: unknown) {
                             console.error('FCM Service Worker registration failed:', swError);
-                            alert(`❌ Service Worker hatası: ${swError.message}`);
+                            alert(`❌ Service Worker hatası: ${(swError as Error).message}`);
                             return;
                         }
                     } else {
                         alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
                         return;
                     }
-                } catch (err) {
+                } catch (err: unknown) {
                     console.error('Token alınamadı:', err);
-                    alert(`❌ Bildirim hatası: ${err.message}`);
+                    alert(`❌ Bildirim hatası: ${(err as Error).message}`);
                     return;
                 }
             }
@@ -222,7 +223,7 @@ const NotificationSettings = () => {
         }
     };
 
-    const notificationOptions = [
+    const notificationOptions: { id: string; label: string; description: string }[] = [
         {
             id: 'threeHours',
             label: 'Maçtan 3 saat önce',
@@ -272,7 +273,7 @@ const NotificationSettings = () => {
                 >
                     <div
                         className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
                         {/* Header */}
                         <div className="flex justify-between items-start mb-6">
@@ -312,15 +313,15 @@ const NotificationSettings = () => {
                             {notificationOptions.map((option) => (
                                 <label
                                     key={option.id}
-                                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id]
+                                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id as keyof NotificationOptions]
                                         ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]'
                                         : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                                         }`}
                                 >
                                     <input
                                         type="checkbox"
-                                        checked={currentDraftOptions[option.id]}
-                                        onChange={() => toggleOption(option.id)}
+                                        checked={!!currentDraftOptions[option.id as keyof NotificationOptions]}
+                                        onChange={() => toggleOption(option.id as keyof NotificationOptions)}
                                         className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
                                     />
                                     <div className="flex-1">
@@ -369,7 +370,7 @@ const NotificationSettings = () => {
                         {/* Butonlar */}
                         <div className="flex gap-3">
                             <button
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     handleCloseModal();
                                 }}
