@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
 import NotificationSettings from './components/NotificationSettings';
 import FixtureSchedule from './components/FixtureSchedule';
 import { fetchNextMatch, fetchNext3Matches, BACKEND_URL } from './services/api';
+import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from './types';
 
-const readCachedMatchData = () => {
+type TabId = 'dashboard' | 'fixtures' | 'builder';
+
+const readCachedMatchData = (): CachedMatchPayload | null => {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem('fb_last_match');
   if (!raw) return null;
@@ -17,7 +20,7 @@ const readCachedMatchData = () => {
   }
 };
 
-const shouldCheckLiveImmediately = (match) => {
+const shouldCheckLiveImmediately = (match: MatchData | null | undefined): boolean => {
   if (!match?.startTimestamp) return false;
   return (match.startTimestamp * 1000) <= Date.now();
 };
@@ -25,26 +28,26 @@ const shouldCheckLiveImmediately = (match) => {
 
 function App() {
   const [fontsReady, setFontsReady] = useState(typeof window === 'undefined');
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const cachedData = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return readCachedMatchData();
   }, []);
-  const [matchData, setMatchData] = useState(cachedData?.nextMatch ?? null);
-  const [next3Matches, setNext3Matches] = useState(cachedData?.next3Matches ?? []);
-  const [lastUpdated, setLastUpdated] = useState(cachedData?.timestamp ?? null);
+  const [matchData, setMatchData] = useState<MatchData | null>(cachedData?.nextMatch ?? null);
+  const [next3Matches, setNext3Matches] = useState<MatchData[]>(cachedData?.next3Matches ?? []);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(cachedData?.timestamp ?? null);
   const [loading, setLoading] = useState(!cachedData);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
 
   // Live match states
-  const [liveMatchState, setLiveMatchState] = useState(
+  const [liveMatchState, setLiveMatchState] = useState<LiveMatchState>(
     shouldCheckLiveImmediately(cachedData?.nextMatch) ? 'checking' : 'countdown'
-  ); // checking | countdown | pre | in | post | idle
-  const [liveMatchData, setLiveMatchData] = useState(null);
+  );
+  const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null);
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const livePollingRef = useRef(null);
+  const livePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -86,7 +89,7 @@ function App() {
 
   // Foreground FCM: uygulama açıkken gelen bildirimleri göster
   useEffect(() => {
-    let unsubscribe;
+    let unsubscribe: (() => void) | undefined;
     const setupForegroundMessaging = async () => {
       try {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -137,7 +140,7 @@ function App() {
       if (nextMatch) {
         setMatchData(nextMatch);
         setCurrentMatchIndex(0);
-        const payload = {
+        const payload: CachedMatchPayload = {
           nextMatch,
           next3Matches: normalizedUpcoming,
           timestamp: Date.now()
@@ -175,14 +178,14 @@ function App() {
   }, [matchData, next3Matches, currentMatchIndex]);
 
   // Live match polling
-  const fetchLiveMatch = useCallback(async () => {
+  const fetchLiveMatch = useCallback(async (): Promise<string | null> => {
     try {
       const response = await fetch(`${BACKEND_URL}/live-match`);
       if (!response.ok) {
         setLiveMatchData(null);
         return null;
       }
-      const data = await response.json();
+      const data: LiveMatchData = await response.json();
       if (data.matchState === 'no-match') {
         setLiveMatchData(null);
         return 'no-match';
@@ -202,7 +205,7 @@ function App() {
     }
   }, []);
 
-  const resolveNoMatchState = useCallback(() => {
+  const resolveNoMatchState = useCallback((): LiveMatchState => {
     if (!currentMatch?.startTimestamp) return 'checking';
     return (currentMatch.startTimestamp * 1000) > Date.now() ? 'countdown' : 'checking';
   }, [currentMatch]);
@@ -214,7 +217,7 @@ function App() {
     const poll = async () => {
       const state = await fetchLiveMatch();
       if (state) {
-        setLiveMatchState(state === 'no-match' ? resolveNoMatchState() : state);
+        setLiveMatchState(state === 'no-match' ? resolveNoMatchState() : state as LiveMatchState);
       }
     };
 

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchSquad } from '../services/api';
+import type { Player } from '../types';
 
 const SquadList = () => {
-    const [players, setPlayers] = useState([]);
+    const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -14,22 +15,22 @@ const SquadList = () => {
         loadData();
     }, []);
 
-    const groupPlayersByPosition = (players) => {
-        const groups = {
+    const groupPlayersByPosition = (playerList: Player[]): Record<string, Player[]> => {
+        const groups: Record<string, string[]> = {
             'Kaleciler': ['G', 'GK'],
             'Defans': ['D', 'DF', 'LB', 'RB', 'CB'],
             'Orta Saha': ['M', 'MF', 'DM', 'CM', 'AM', 'LM', 'RM'],
             'Forvet': ['F', 'FW', 'ST', 'LW', 'RW']
         };
 
-        const grouped = {
+        const grouped: Record<string, Player[]> = {
             'Kaleciler': [],
             'Defans': [],
             'Orta Saha': [],
             'Forvet': []
         };
 
-        players.forEach(player => {
+        playerList.forEach(player => {
             let added = false;
             for (const [groupName, positions] of Object.entries(groups)) {
                 if (positions.includes(player.position)) {
@@ -39,7 +40,6 @@ const SquadList = () => {
                 }
             }
             if (!added) {
-                // Fallback for unknown positions, usually put in Midfield or separate
                 grouped['Orta Saha'].push(player);
             }
         });

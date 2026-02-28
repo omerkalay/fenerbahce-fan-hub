@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
 import { fetchEspnStandings } from '../services/api';
+import type { StandingsRow } from '../types';
 
-const CustomStandings = ({ league }) => {
-    const [standings, setStandings] = useState([]);
+interface CustomStandingsProps {
+    league: string;
+}
+
+const CustomStandings = ({ league }: CustomStandingsProps) => {
+    const [standings, setStandings] = useState<StandingsRow[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -63,7 +68,7 @@ const CustomStandings = ({ league }) => {
                         </tr>
                     </thead>
                     <tbody className="text-sm">
-                        {standings.map((row, index) => {
+                        {standings.map((row) => {
                             const isFener = row.team.name.toLowerCase().includes('fenerbahce') ||
                                 row.team.name.toLowerCase().includes('fener');
                             const isTopThree = row.rank <= 3;
@@ -98,7 +103,7 @@ const CustomStandings = ({ league }) => {
                                                         alt={row.team.name}
                                                         className="w-full h-full object-contain"
                                                         onError={(e) => {
-                                                            e.target.style.display = 'none';
+                                                            (e.target as HTMLImageElement).style.display = 'none';
                                                         }}
                                                     />
                                                 ) : null}

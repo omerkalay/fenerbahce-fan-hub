@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
+import type { LiveMatchData, MatchStat } from '../types';
 
-const STAT_GROUPS = [
+interface StatGroup {
+    label: string;
+    keys: string[];
+}
+
+const STAT_GROUPS: StatGroup[] = [
     { label: 'Toplam Şut', keys: ['totalShots'] },
     { label: 'İsabetli Şut', keys: ['shotsOnTarget'] },
     { label: 'Topla Oynama %', keys: ['possessionPct', 'possession'] },
@@ -13,7 +19,7 @@ const STAT_GROUPS = [
     { label: 'Kırmızı Kart', keys: ['redCards', 'redCard'] }
 ];
 
-const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
+const isHalftimeDisplay = (statusDetail: string = '', displayClock: string = ''): boolean => {
     const status = String(statusDetail || '').trim().toLowerCase();
     const clock = String(displayClock || '').trim().toLowerCase();
 
@@ -26,7 +32,7 @@ const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
     );
 };
 
-const localizeStatusDetail = (statusDetail = '') => {
+const localizeStatusDetail = (statusDetail: string = ''): string => {
     const status = String(statusDetail || '').trim();
     const normalized = status.toLowerCase();
 
@@ -42,9 +48,9 @@ const localizeStatusDetail = (statusDetail = '') => {
 };
 
 const LiveMatchScore = () => {
-    const [liveData, setLiveData] = useState(null);
+    const [liveData, setLiveData] = useState<LiveMatchData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchLiveScore();
@@ -58,7 +64,7 @@ const LiveMatchScore = () => {
             if (!response.ok) {
                 throw new Error('Canlı maç verisi alınamadı');
             }
-            const data = await response.json();
+            const data: LiveMatchData = await response.json();
             if (data.matchState === 'no-match') {
                 setError('Şu anda canlı maç yok');
                 setLiveData(null);
@@ -68,7 +74,7 @@ const LiveMatchScore = () => {
             }
         } catch (err) {
             console.error('Error fetching live score:', err);
-            setError(err.message || 'Canlı maç bilgisi yüklenemedi');
+            setError(err instanceof Error ? err.message : 'Canlı maç bilgisi yüklenemedi');
         } finally {
             setLoading(false);
         }
@@ -90,7 +96,7 @@ const LiveMatchScore = () => {
         );
     }
 
-    const orderedStats = STAT_GROUPS
+    const orderedStats: (MatchStat & { label: string })[] = STAT_GROUPS
         .map((group) => {
             const stat = liveData.stats?.find((item) => group.keys.includes(item.name));
             if (!stat) return null;
@@ -99,7 +105,8 @@ const LiveMatchScore = () => {
                 label: group.label
             };
         })
-        .filter(Boolean);
+        .filter((s): s is MatchStat & { label: string } => s !== null);
+
     const isHalftime = isHalftimeDisplay(liveData.statusDetail, liveData.displayClock);
     const statusLabel = isHalftime
         ? 'Devre Arası'
@@ -128,7 +135,6 @@ const LiveMatchScore = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 items-center">
-                    {/* Home Team */}
                     <div className="flex flex-col items-center gap-3">
                         <div className="w-20 h-20 rounded-full bg-white/5 p-3 border border-white/10">
                             {liveData.homeTeam?.logo && (
@@ -142,7 +148,6 @@ const LiveMatchScore = () => {
                         <span className="text-sm font-bold text-center">{liveData.homeTeam?.name}</span>
                     </div>
 
-                    {/* Score */}
                     <div className="flex flex-col items-center gap-2">
                         <div className="flex items-center gap-4">
                             <span className="text-5xl font-black text-white">{liveData.homeTeam?.score || '0'}</span>
@@ -152,7 +157,6 @@ const LiveMatchScore = () => {
                         <span className="text-xs text-slate-400">{centerClockLabel}</span>
                     </div>
 
-                    {/* Away Team */}
                     <div className="flex flex-col items-center gap-3">
                         <div className="w-20 h-20 rounded-full bg-white/5 p-3 border border-white/10">
                             {liveData.awayTeam?.logo && (

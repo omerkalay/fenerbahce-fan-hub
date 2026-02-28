@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchSquad } from '../services/api';
+import type { Player, PositionCoord } from '../types';
 
 const ProbableLineup = () => {
-    const [squad, setSquad] = useState([]);
+    const [squad, setSquad] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -14,20 +15,16 @@ const ProbableLineup = () => {
         loadSquad();
     }, []);
 
-    // Mock Probable 11 Logic: Select best players by value or just specific names if known.
-    // For now, let's pick a 4-2-3-1 formation based on positions.
-    const getProbable11 = () => {
+    const getProbable11 = (): (Player & { pos: string })[] => {
         if (!squad.length) return [];
 
-        // Helper to find player by position (simplified)
-        const find = (pos) => squad.find(p => p.position === pos && !usedIds.has(p.id));
-        const usedIds = new Set();
+        const usedIds = new Set<number>();
 
-        const lineup = [
+        const lineup: (Partial<Player> & { pos: string })[] = [
             { pos: 'GK', ...squad.find(p => p.position === 'G') },
             { pos: 'RB', ...squad.find(p => p.position === 'D' && (p.name.includes('Osayi') || p.name.includes('Müldür'))) },
             { pos: 'CB', ...squad.find(p => p.position === 'D' && p.name.includes('Becão')) },
-            { pos: 'CB', ...squad.find(p => p.position === 'D' && p.name.includes('Djiku')) }, // Fallback if Djiku not found, pick another D
+            { pos: 'CB', ...squad.find(p => p.position === 'D' && p.name.includes('Djiku')) },
             { pos: 'LB', ...squad.find(p => p.position === 'D' && (p.name.includes('Ferdi') || p.name.includes('Oosterwolde'))) },
             { pos: 'CDM', ...squad.find(p => p.position === 'M' && p.name.includes('Yüksek')) },
             { pos: 'CDM', ...squad.find(p => p.position === 'M' && p.name.includes('Fred')) },
@@ -37,10 +34,8 @@ const ProbableLineup = () => {
             { pos: 'ST', ...squad.find(p => p.position === 'F' && p.name.includes('Džeko')) },
         ];
 
-        // Fill gaps if specific players aren't found (fallback logic)
-        return lineup.map((p, index) => {
+        return lineup.map((p) => {
             if (!p.id) {
-                // Find any player of roughly correct position not used
                 const fallback = squad.find(s => !usedIds.has(s.id));
                 if (fallback) {
                     usedIds.add(fallback.id);
@@ -49,18 +44,17 @@ const ProbableLineup = () => {
             } else {
                 usedIds.add(p.id);
             }
-            return p;
+            return p as Player & { pos: string };
         }).filter(p => p && p.id);
     };
 
     const probable11 = getProbable11();
 
-    // Position coordinates for 4-2-3-1
-    const positions = {
+    const positions: Record<string, PositionCoord> = {
         'GK': { top: '85%', left: '50%' },
         'RB': { top: '70%', left: '85%' },
-        'CB': { top: '70%', left: '65%' }, // Right CB
-        'CB2': { top: '70%', left: '35%' }, // Left CB (mapped manually in render)
+        'CB': { top: '70%', left: '65%' },
+        'CB2': { top: '70%', left: '35%' },
         'LB': { top: '70%', left: '15%' },
         'CDM': { top: '50%', left: '65%' },
         'CDM2': { top: '50%', left: '35%' },
@@ -77,7 +71,6 @@ const ProbableLineup = () => {
             <h2 className="text-2xl font-bold text-white mb-4 text-center text-glow">Muhtemel 11</h2>
 
             <div className="flex-1 relative bg-green-800/80 rounded-xl border-2 border-white/20 overflow-hidden shadow-2xl mx-4 mb-20">
-                {/* Pitch Markings */}
                 <div className="absolute inset-0 opacity-30 pointer-events-none">
                     <div className="absolute top-0 bottom-0 left-0 right-0 border-2 border-white m-4"></div>
                     <div className="absolute top-0 bottom-0 left-1/2 border-l-2 border-white -translate-x-1/2"></div>
@@ -86,9 +79,7 @@ const ProbableLineup = () => {
                     <div className="absolute bottom-0 left-1/2 w-48 h-24 border-2 border-b-0 border-white -translate-x-1/2"></div>
                 </div>
 
-                {/* Players */}
                 {probable11.map((player, index) => {
-                    // Map index to position key for 4-2-3-1 specific layout
                     const posKeys = ['GK', 'RB', 'CB', 'CB2', 'LB', 'CDM', 'CDM2', 'RW', 'CAM', 'LW', 'ST'];
                     const posKey = posKeys[index] || 'GK';
                     const style = positions[posKey];

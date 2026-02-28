@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, X, AlertCircle, Ban } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, X, AlertCircle } from 'lucide-react';
 import { fetchSquad, fetchInjuries } from '../services/api';
+import type { Player, PlayerStatus, PositionCoord } from '../types';
 
-const POSITIONS = {
+const POSITIONS: Record<string, PositionCoord> = {
     GK: { top: '85%', left: '50%' },
     LB: { top: '65%', left: '15%' },
     CB1: { top: '70%', left: '35%' },
@@ -17,45 +18,38 @@ const POSITIONS = {
 };
 
 const SquadBuilder = () => {
-    const [squad, setSquad] = useState({});
-    const [players, setPlayers] = useState([]);
-    const [injuries, setInjuries] = useState([]);
-    const [selectedPos, setSelectedPos] = useState(null);
+    const [squad, setSquad] = useState<Record<string, Player>>({});
+    const [players, setPlayers] = useState<Player[]>([]);
+    const [selectedPos, setSelectedPos] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadData = async () => {
-            const [squadData, injuryData] = await Promise.all([fetchSquad(), fetchInjuries()]);
+            const [squadData] = await Promise.all([fetchSquad(), fetchInjuries()]);
             setPlayers(squadData);
-            // setInjuries(injuryData); // Injuries disabled for now
             setLoading(false);
         };
         loadData();
     }, []);
 
-    const getPlayerStatus = (player) => {
-        // const injury = injuries.find(i => i.player.id === player.id);
-        // if (injury) {
-        //     return { type: 'injured', reason: injury.player.reason };
-        // }
-        // API-Football doesn't always provide suspension data in the same way, 
-        // but for now we will focus on injuries which are critical.
+    const getPlayerStatus = (_player: Player): PlayerStatus | null => {
         return null;
     };
 
-    const handlePositionClick = (pos) => {
+    const handlePositionClick = (pos: string) => {
         setSelectedPos(pos);
         setIsModalOpen(true);
     };
 
-    const handlePlayerSelect = (player) => {
+    const handlePlayerSelect = (player: Player) => {
+        if (!selectedPos) return;
         const status = getPlayerStatus(player);
         setSquad(prev => ({ ...prev, [selectedPos]: { ...player, status } }));
         setIsModalOpen(false);
     };
 
-    const removePlayer = (e, pos) => {
+    const removePlayer = (e: React.MouseEvent, pos: string) => {
         e.stopPropagation();
         setSquad(prev => {
             const newSquad = { ...prev };
@@ -75,19 +69,15 @@ const SquadBuilder = () => {
                 <p className="text-blue-200 text-xs">Kadronu Kur, Paylaş</p>
             </div>
 
-            {/* Pitch Container */}
             <div className="flex-1 relative mx-4 my-2 bg-green-800 rounded-xl border-4 border-white/20 shadow-2xl overflow-hidden perspective-1000">
-                {/* Pitch Markings */}
                 <div className="absolute inset-0 opacity-30 pointer-events-none">
                     <div className="absolute top-0 left-0 right-0 h-1/2 border-b-2 border-white/50"></div>
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-white/50 rounded-full"></div>
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-24 border-b-2 border-x-2 border-white/50 rounded-b-lg"></div>
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-24 border-t-2 border-x-2 border-white/50 rounded-t-lg"></div>
-                    {/* Grass Pattern */}
                     <div className="w-full h-full bg-[linear-gradient(0deg,transparent_50%,rgba(0,0,0,0.1)_50%)] bg-[length:100%_10%]"></div>
                 </div>
 
-                {/* Players on Pitch */}
                 {Object.entries(POSITIONS).map(([posKey, style]) => {
                     const player = squad[posKey];
                     return (
@@ -134,7 +124,6 @@ const SquadBuilder = () => {
                 })}
             </div>
 
-            {/* Player Selection Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4">
                     <div className="bg-slate-900 w-full max-w-md rounded-2xl max-h-[80vh] flex flex-col border border-slate-800 shadow-2xl">

@@ -1,7 +1,7 @@
 {
   "name": "football",
   "private": true,
-  "version": "2.6.2",
+  "version": "2.7.0",
   "type": "module",
   "scripts": {
     "generate-sw": "node scripts/generate-sw.js",
@@ -26,6 +26,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "@tailwindcss/postcss": "^4.1.17",
+    "@types/node": "^25.3.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.7.0",
@@ -37,6 +38,7 @@
     "globals": "^16.5.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3",
     "vite": "^5.4.21",
     "vite-plugin-pwa": "^1.1.0"
   }

@@ -1,25 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { database } from '../firebase';
 import { ref, onValue, runTransaction, get, set } from "firebase/database";
 import { BarChart3 } from 'lucide-react';
 
-// Generate or retrieve a unique user ID
-const getUserId = () => {
+const getUserId = (): string => {
     let userId = localStorage.getItem('fenerbahce_user_id');
     if (!userId) {
-        // Generate a unique ID using timestamp and random string
         userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         localStorage.setItem('fenerbahce_user_id', userId);
     }
     return userId;
 };
 
-const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
-    const [votes, setVotes] = useState({ home: 0, away: 0, draw: 0 });
+interface PollProps {
+    opponentName?: string;
+    matchId: number | string;
+}
+
+type VoteOption = 'home' | 'away' | 'draw';
+
+interface Votes {
+    home: number;
+    away: number;
+    draw: number;
+}
+
+const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
+    const [votes, setVotes] = useState<Votes>({ home: 0, away: 0, draw: 0 });
     const [hasVoted, setHasVoted] = useState(false);
-    const [userVote, setUserVote] = useState(null);
+    const [userVote, setUserVote] = useState<VoteOption | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState<string | null>(null);
 
     const match = {
         home: "Fenerbahçe",
@@ -35,7 +46,6 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
             return;
         }
 
-        // Listen for vote updates for this specific match
         const votesRef = ref(database, `match_polls/${matchId}/votes`);
         const unsubscribeVotes = onValue(votesRef, (snapshot) => {
             const data = snapshot.val();
@@ -46,22 +56,19 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
                     draw: data.draw || 0
                 });
             } else {
-                // Initialize if empty
                 setVotes({ home: 0, away: 0, draw: 0 });
             }
             setLoading(false);
-        }, (error) => {
-            console.error("Firebase read error:", error);
+        }, () => {
             setError("Anket verileri yüklenemedi.");
             setLoading(false);
         });
 
-        // Check if this user has already voted for this match
         const userVoteRef = ref(database, `match_polls/${matchId}/users/${userId}`);
         get(userVoteRef).then((snapshot) => {
             if (snapshot.exists()) {
                 setHasVoted(true);
-                setUserVote(snapshot.val());
+                setUserVote(snapshot.val() as VoteOption);
             } else {
                 setHasVoted(false);
                 setUserVote(null);
@@ -75,31 +82,26 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
         };
     }, [matchId, userId]);
 
-    const handleVote = async (option) => {
+    const handleVote = async (option: VoteOption) => {
         if (hasVoted || !matchId) return;
 
         try {
-            // First, check one more time if user has voted (prevent race conditions)
             const userVoteRef = ref(database, `match_polls/${matchId}/users/${userId}`);
             const userSnapshot = await get(userVoteRef);
 
             if (userSnapshot.exists()) {
-                // User already voted, just update UI
                 setHasVoted(true);
-                setUserVote(userSnapshot.val());
+                setUserVote(userSnapshot.val() as VoteOption);
                 return;
             }
 
-            // Atomically increment the vote count
             const votesRef = ref(database, `match_polls/${matchId}/votes/${option}`);
-            await runTransaction(votesRef, (currentVote) => {
+            await runTransaction(votesRef, (currentVote: number | null) => {
                 return (currentVote || 0) + 1;
             });
 
-            // Record that this user voted for this option
             await set(userVoteRef, option);
 
-            // Update UI
             setHasVoted(true);
             setUserVote(option);
         } catch (error) {
@@ -110,16 +112,16 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
 
     const totalVotes = (votes.home || 0) + (votes.away || 0) + (votes.draw || 0);
 
-    const getPercentage = (count) => {
+    const getPercentage = (count: number): number => {
         if (!totalVotes || totalVotes === 0) return 0;
         return Math.round(((count || 0) / totalVotes) * 100);
     };
 
     const [isExpanded, setIsExpanded] = useState(false);
 
-    if (loading) return null; // Don't show anything while loading
-    if (error) return null; // Hide on error
-    if (!matchId) return null; // Don't show if no match ID
+    if (loading) return null;
+    if (error) return null;
+    if (!matchId) return null;
 
     return (
         <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-xl overflow-hidden transition-all duration-500">
@@ -147,7 +149,6 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
 
             <div className={`transition-all duration-500 ease-in-out ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
                 <div className="p-4 pt-0 space-y-3 border-t border-white/5 mt-2">
-                    {/* Home Win */}
                     <PollOption
                         label={match.home}
                         count={votes.home}
@@ -157,8 +158,6 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
                         isWinner={hasVoted && votes.home >= votes.away && votes.home >= votes.draw}
                         isUserChoice={userVote === 'home'}
                     />
-
-                    {/* Draw */}
                     <PollOption
                         label="Beraberlik"
                         count={votes.draw}
@@ -168,8 +167,6 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
                         isWinner={hasVoted && votes.draw >= votes.home && votes.draw >= votes.away}
                         isUserChoice={userVote === 'draw'}
                     />
-
-                    {/* Away Win */}
                     <PollOption
                         label={match.away}
                         count={votes.away}
@@ -185,7 +182,17 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }) => {
     );
 };
 
-const PollOption = ({ label, count, percentage, onClick, disabled, isWinner, isUserChoice }) => {
+interface PollOptionProps {
+    label: string;
+    count: number;
+    percentage: number;
+    onClick: () => void;
+    disabled: boolean;
+    isWinner: boolean;
+    isUserChoice: boolean;
+}
+
+const PollOption = ({ label, percentage, onClick, disabled, isWinner, isUserChoice }: PollOptionProps) => {
     return (
         <button
             onClick={onClick}
@@ -193,7 +200,6 @@ const PollOption = ({ label, count, percentage, onClick, disabled, isWinner, isU
             className={`relative w-full h-12 rounded-xl overflow-hidden transition-all duration-300 group ${disabled ? 'cursor-default' : 'hover:scale-[1.02] active:scale-[0.98] cursor-pointer'
                 }`}
         >
-            {/* Background Bar */}
             <div className="absolute inset-0 bg-white/5" />
             <div
                 className={`absolute inset-y-0 left-0 transition-all duration-1000 ease-out ${isUserChoice ? 'bg-green-500/30' : isWinner ? 'bg-yellow-400/20' : 'bg-blue-600/30'
@@ -201,7 +207,6 @@ const PollOption = ({ label, count, percentage, onClick, disabled, isWinner, isU
                 style={{ width: `${percentage}%` }}
             />
 
-            {/* Content */}
             <div className="absolute inset-0 flex items-center justify-between px-4">
                 <span className={`font-medium transition-colors ${isUserChoice ? 'text-green-400' : isWinner ? 'text-yellow-400' : 'text-white'
                     }`}>

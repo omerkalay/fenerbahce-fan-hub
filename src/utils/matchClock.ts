@@ -1,9 +1,9 @@
-export const formatMatchClock = (clockValue = '') => {
+export const formatMatchClock = (clockValue: string = ''): string => {
     const raw = String(clockValue || '').trim();
     if (!raw) return '';
 
     const normalized = raw
-        .replace(/[’′]/g, "'")
+        .replace(/['′]/g, "'")
         .replace(/\s+/g, '');
 
     const stoppage = normalized.match(/^(\d+)'?\+(\d+)'?$/);

@@ -6,12 +6,25 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.6.2-blue)
+![Version](https://img.shields.io/badge/version-2.7.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.6.2
+## What's New in v2.7.0
+
+- **Full TypeScript Migration** - Entire frontend codebase migrated from JavaScript/JSX to TypeScript/TSX with strict mode enabled. All components, hooks, services, and utilities are now fully typed with zero build errors
+- **Centralized Type System** - Created `src/types/index.ts` with comprehensive type definitions for all API responses (ESPN, SofaScore, Firebase), component props, and application state
+- **Component Refactoring** - Large monolithic components split into focused sub-components and custom hooks:
+  - `FixtureSchedule` (766 → 466 lines): Extracted `useFixtureData` hook and `MatchSummaryModal` component
+  - `Dashboard` (502 → 352 lines): Extracted `MatchCountdown`, `NextMatchesPanel`, `StandingsModal`, `LiveMatchModal`
+  - `FormationBuilder` (576 → 371 lines): Extracted `PlayerSelectionModal`, `PlayerPool`, and `formations` data module
+- **Custom Hooks** - New `src/hooks/useFixtureData.ts` encapsulates all fixture data fetching, filtering, and modal state management
+- **TypeScript Infrastructure** - Added `tsconfig.json` with strict mode, `vite-env.d.ts` with typed environment variables, and `@types/node` for Node.js type support
+
+<details>
+<summary>Previous: v2.6.2</summary>
 
 - **Standings Direct from ESPN** - Standings are now fetched directly from ESPN on the client side instead of going through the backend cache, providing always up-to-date league tables without 24-hour staleness
 - **Backend Standings Removal** - Removed standings fetch from `dailyDataRefresh` and `handleRefresh` Cloud Functions, reducing scheduled function runtime and Firebase read/write costs
@@ -20,6 +33,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Post-Match Cleanup Fix** - Fixed `postMarkedAt` logic that never triggered because it read from the freshly built live data object instead of the existing cache value
 - **Token Lifecycle Cleanup** - Both manual save and auto-sync now send the previous token to the backend for immediate deletion, preventing zombie token accumulation in the database
 - **Daily Cleanup Date Format Fix** - Fixed `lastDailyNotification` cleanup using mismatched date formats (`toDateString` vs `formatDateKey`)
+
+</details>
 
 <details>
 <summary>Previous: v2.6.1</summary>
@@ -97,9 +112,9 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ## Tech Stack
 
-- **Frontend**: React 19.2 + Vite 5.4
+- **Frontend**: React 19.2 + Vite 5.4 + TypeScript 5.9
 - **Styling**: Tailwind CSS v4
-- **Backend**: Firebase Cloud Functions (Serverless)
+- **Backend**: Firebase Cloud Functions (Serverless, JS)
 - **Database**: Firebase Realtime Database (Polls, Cache & User Preferences)
 - **APIs**: 
   - SofaScore (via RapidAPI) - Match data, Squad
@@ -150,24 +165,43 @@ fenerbahce-fan-hub/
 │   └── package.json       # Functions dependencies
 ├── src/
 │   ├── components/
-│   │   ├── Dashboard.jsx          # Main dashboard with matches & poll
-│   │   ├── FixtureSchedule.jsx    # Fixture tab with ESPN-backed filters
-│   │   ├── NotificationSettings.jsx # Global notification preferences
-│   │   ├── Poll.jsx               # Real-time voting component
-│   │   ├── FormationBuilder.jsx   # Interactive pitch & formations
-│   │   ├── CustomStandings.jsx    # Standings table
-│   │   └── LiveMatchScore.jsx     # Live match tracker
+│   │   ├── Dashboard.tsx          # Main dashboard with matches & poll
+│   │   ├── MatchCountdown.tsx     # Countdown timer sub-component
+│   │   ├── NextMatchesPanel.tsx   # Upcoming 3 matches panel
+│   │   ├── LiveMatchModal.tsx     # Live match detail modal
+│   │   ├── StandingsModal.tsx     # Standings modal wrapper
+│   │   ├── FixtureSchedule.tsx    # Fixture tab with ESPN-backed filters
+│   │   ├── MatchSummaryModal.tsx  # Match statistics modal
+│   │   ├── FormationBuilder.tsx   # Interactive pitch & formations
+│   │   ├── PlayerSelectionModal.tsx # Player picker modal
+│   │   ├── PlayerPool.tsx         # Draggable player grid
+│   │   ├── NotificationSettings.tsx # Global notification preferences
+│   │   ├── Poll.tsx               # Real-time voting component
+│   │   ├── CustomStandings.tsx    # Standings table
+│   │   ├── LiveMatchScore.tsx     # Live match tracker
+│   │   ├── MatchEventIcon.tsx     # Match event icon renderer
+│   │   └── TeamLogo.tsx           # Team logo with fallback
+│   ├── hooks/
+│   │   └── useFixtureData.ts      # Fixture data fetching & filtering hook
 │   ├── services/
-│   │   └── api.js                 # Firebase API integration + ESPN fixture aggregation
-│   ├── firebase.js                # Firebase client initialization
-│   ├── App.jsx                    # Main app & routing
-│   └── main.jsx                   # React entry point
+│   │   └── api.ts                 # Firebase API integration + ESPN fixture aggregation
+│   ├── data/
+│   │   ├── formations.ts          # Formation position definitions
+│   │   └── mockData.ts            # Mock player data
+│   ├── types/
+│   │   └── index.ts               # Centralized TypeScript type definitions
+│   ├── utils/
+│   │   └── matchClock.ts          # Match clock formatting utility
+│   ├── firebase.ts                # Firebase client initialization
+│   ├── App.tsx                    # Main app & routing
+│   └── main.tsx                   # React entry point
+├── tsconfig.json                  # TypeScript configuration (strict mode)
 ├── public/                        # Static assets & PWA icons
 ├── backend/                       # [DEPRECATED] Old Render.com backend (kept for rollback)
 └── firebase.json                  # Firebase configuration
 ```
 
-> **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, change `BACKEND_URL` in `src/services/api.js` back to `https://fenerbahce-backend.onrender.com`.
+> **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, change `BACKEND_URL` in `src/services/api.ts` back to `https://fenerbahce-backend.onrender.com`.
 
 ## Installation & Setup
 
@@ -308,4 +342,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.6.2** | February 2026
+**v2.7.0** | February 2026

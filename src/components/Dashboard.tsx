@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import TeamLogo from './TeamLogo';
 import Poll from './Poll';
-import CustomStandings from './CustomStandings';
-import LiveMatchScore from './LiveMatchScore';
+import MatchCountdown from './MatchCountdown';
+import NextMatchesPanel from './NextMatchesPanel';
+import StandingsModal from './StandingsModal';
+import LiveMatchModal from './LiveMatchModal';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
+import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent } from '../types';
 
-const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
+const isHalftimeDisplay = (statusDetail = '', displayClock = ''): boolean => {
     const status = String(statusDetail || '').trim().toLowerCase();
     const clock = String(displayClock || '').trim().toLowerCase();
 
@@ -19,7 +22,20 @@ const isHalftimeDisplay = (statusDetail = '', displayClock = '') => {
     );
 };
 
-const Dashboard = ({
+interface DashboardProps {
+    matchData: MatchData | null;
+    next3Matches: MatchData[];
+    loading: boolean;
+    onRetry: (() => void) | undefined;
+    errorMessage: string | null;
+    lastUpdated: number | null;
+    isRefreshing: boolean;
+    liveMatchState: LiveMatchState;
+    liveMatchData: LiveMatchData | null;
+    onCountdownEnd: () => void;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({
     matchData,
     next3Matches = [],
     loading,
@@ -31,46 +47,9 @@ const Dashboard = ({
     liveMatchData = null,
     onCountdownEnd
 }) => {
-    const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-    const [showLiveMatchModal, setShowLiveMatchModal] = useState(false);
-    const [showStandingsModal, setShowStandingsModal] = useState(false);
-    const [standingsLeague, setStandingsLeague] = useState('');
-    const countdownEndedRef = useRef(false);
-
-    // Reset countdownEndedRef when match changes
-    useEffect(() => {
-        countdownEndedRef.current = false;
-    }, [matchData?.id]);
-
-    useEffect(() => {
-        if (!matchData || liveMatchState !== 'countdown') return;
-
-        const updateCountdown = () => {
-            const matchDate = new Date(matchData.startTimestamp * 1000);
-            const now = new Date();
-            const difference = matchDate - now;
-
-            if (difference > 0) {
-                const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
-                const minutes = Math.floor((difference / 1000 / 60) % 60);
-                const seconds = Math.floor((difference / 1000) % 60);
-                setTimeLeft({ days, hours, minutes, seconds });
-            } else {
-                // Countdown reached 0 — trigger live checking
-                if (!countdownEndedRef.current && onCountdownEnd) {
-                    countdownEndedRef.current = true;
-                    onCountdownEnd();
-                }
-                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-            }
-        };
-
-        updateCountdown();
-        const timer = setInterval(updateCountdown, 1000);
-
-        return () => clearInterval(timer);
-    }, [matchData, liveMatchState, onCountdownEnd]);
+    const [showLiveMatchModal, setShowLiveMatchModal] = useState<boolean>(false);
+    const [showStandingsModal, setShowStandingsModal] = useState<boolean>(false);
+    const [standingsLeague, setStandingsLeague] = useState<string>('');
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
@@ -105,7 +84,7 @@ const Dashboard = ({
     }
 
     const matchDate = new Date(matchData.startTimestamp * 1000);
-    const FENERBAHCE_ID = 3052;
+    const FENERBAHCE_ID: number = 3052;
     const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
     const isLiveHalftime = liveMatchState === 'in' && liveMatchData
@@ -188,26 +167,11 @@ const Dashboard = ({
                     )}
 
                     {/* STATE: COUNTDOWN */}
-                    {liveMatchState === 'countdown' && (
-                        <div className="grid grid-cols-4 gap-2 text-center">
-                            <div className="glass-panel rounded-lg p-2">
-                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.days}</span>
-                                <span className="text-[10px] text-slate-400 uppercase">Gün</span>
-                            </div>
-                            <div className="glass-panel rounded-lg p-2">
-                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.hours}</span>
-                                <span className="text-[10px] text-slate-400 uppercase">Saat</span>
-                            </div>
-                            <div className="glass-panel rounded-lg p-2">
-                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.minutes}</span>
-                                <span className="text-[10px] text-slate-400 uppercase">Dk</span>
-                            </div>
-                            <div className="glass-panel rounded-lg p-2">
-                                <span className="block text-xl font-bold text-yellow-400">{timeLeft.seconds}</span>
-                                <span className="text-[10px] text-slate-400 uppercase">Sn</span>
-                            </div>
-                        </div>
-                    )}
+                    <MatchCountdown
+                        matchData={matchData}
+                        liveMatchState={liveMatchState}
+                        onCountdownEnd={onCountdownEnd}
+                    />
 
                     {/* STATE: PRE (match about to start) */}
                     {liveMatchState === 'pre' && (
@@ -251,8 +215,8 @@ const Dashboard = ({
                             {liveMatchData.events && liveMatchData.events.length > 0 && (
                                 <div className="space-y-1 mb-4 max-h-32 overflow-y-auto">
                                     {liveMatchData.events
-                                        .filter((event) => !event.isSubstitution)
-                                        .map((event, idx) => {
+                                        .filter((event: MatchEvent) => !event.isSubstitution)
+                                        .map((event: MatchEvent, idx: number) => {
                                             const eventType = getEventVisualType(event);
                                             const textClass = eventType === 'goal'
                                                 ? 'text-yellow-400 font-bold'
@@ -307,9 +271,9 @@ const Dashboard = ({
                             </div>
 
                             {/* Goals Summary */}
-                            {liveMatchData.events && liveMatchData.events.filter(e => e.isGoal).length > 0 && (
+                            {liveMatchData.events && liveMatchData.events.filter((e: MatchEvent) => e.isGoal).length > 0 && (
                                 <div className="flex flex-wrap justify-center gap-2 mb-4">
-                                    {liveMatchData.events.filter(e => e.isGoal).map((event, idx) => (
+                                    {liveMatchData.events.filter((e: MatchEvent) => e.isGoal).map((event: MatchEvent, idx: number) => (
                                         <span key={idx} className="text-xs text-slate-300 bg-white/5 px-2 py-1 rounded-full flex items-center gap-1">
                                             <MatchEventIcon event={{ isGoal: true }} className="w-3 h-3 inline" />
                                             {formatMatchClock(event.clock)} {event.player}
@@ -332,49 +296,7 @@ const Dashboard = ({
             </div>
 
             {/* Next 3 Matches */}
-            {/* Next 3 Matches */}
-            <div className="glass-panel rounded-2xl p-4 mb-6">
-                <div className="flex items-center gap-2 mb-4">
-                    <span className="text-sm font-bold">Sonraki Maçlar</span>
-                </div>
-                <div className="space-y-3">
-                    {next3Matches.length > 0 ? next3Matches.map((match, idx) => {
-                        const date = new Date(match.startTimestamp * 1000);
-                        const homeTeam = match.homeTeam;
-                        const awayTeam = match.awayTeam;
-                        const isFbHome = homeTeam.id === FENERBAHCE_ID;
-
-                        return (
-                            <div key={idx} className="glass-panel rounded-xl p-3 flex items-center justify-between">
-                                <div className="flex items-center gap-2 flex-1">
-                                    <TeamLogo
-                                        teamId={isFbHome ? FENERBAHCE_ID : homeTeam.id}
-                                        name={homeTeam.name}
-                                        wrapperClassName="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0 border border-white/10"
-                                        imageClassName="object-contain"
-                                    />
-                                    <span className="text-xs font-medium truncate">{homeTeam.name}</span>
-                                </div>
-                                <div className="flex flex-col items-center px-3">
-                                    <span className="text-[10px] text-slate-400">{date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
-                                    <span className="text-xs font-bold">{date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                                <div className="flex items-center gap-2 flex-1 justify-end">
-                                    <span className="text-xs font-medium truncate text-right">{awayTeam.name}</span>
-                                    <TeamLogo
-                                        teamId={!isFbHome ? FENERBAHCE_ID : awayTeam.id}
-                                        name={awayTeam.name}
-                                        wrapperClassName="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0 border border-white/10"
-                                        imageClassName="object-contain"
-                                    />
-                                </div>
-                            </div>
-                        );
-                    }) : (
-                        <div className="text-center text-slate-500 text-xs py-4">Maç bilgisi yükleniyor...</div>
-                    )}
-                </div>
-            </div>
+            <NextMatchesPanel next3Matches={next3Matches} />
 
             {/* Puan Durumu Buttons */}
             <div className="glass-panel rounded-2xl p-4 mb-6">
@@ -412,75 +334,17 @@ const Dashboard = ({
 
 
             {/* Live Match Modal */}
-            {/* Live Match Modal */}
-            {showLiveMatchModal && (
-                <div
-                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
-                    onClick={() => setShowLiveMatchModal(false)}
-                >
-                    <div
-                        className="bg-[#0f172a] border-2 border-yellow-400/30 rounded-2xl p-6 max-w-4xl w-full max-h-[85vh] overflow-hidden animate-slideUp shadow-[0_0_40px_rgba(234,179,8,0.2)]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-yellow-400/20">
-                            <div className="flex items-center gap-3">
-                                <span className="relative flex h-3 w-3">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                </span>
-                                <h2 className="text-xl font-bold text-yellow-400">Canlı Maç Detayları</h2>
-                            </div>
-                            <button
-                                onClick={() => setShowLiveMatchModal(false)}
-                                className="text-yellow-400 hover:text-white transition-all duration-300 hover:rotate-90"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Live Match Component */}
-                        <div className="w-full">
-                            <LiveMatchScore />
-                        </div>
-                    </div>
-                </div>
-            )}
+            <LiveMatchModal
+                visible={showLiveMatchModal}
+                onClose={() => setShowLiveMatchModal(false)}
+            />
 
             {/* Standings Modal */}
-            {showStandingsModal && (
-                <div
-                    className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
-                    onClick={() => setShowStandingsModal(false)}
-                >
-                    <div
-                        className="bg-[#0f172a] border-2 border-yellow-400/30 rounded-2xl p-6 max-w-4xl w-full max-h-[85vh] overflow-hidden animate-slideUp shadow-[0_0_40px_rgba(234,179,8,0.2)]"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        {/* Header */}
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-yellow-400/20">
-                            <h2 className="text-xl font-bold text-yellow-400">
-                                {standingsLeague === 'superlig' ? 'Süper Lig Puan Durumu' : 'UEFA Avrupa Ligi Puan Durumu'}
-                            </h2>
-                            <button
-                                onClick={() => setShowStandingsModal(false)}
-                                className="text-yellow-400 hover:text-white hover:rotate-90 transition-all duration-300"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        {/* Custom Standings Component */}
-                        <div className="w-full">
-                            <CustomStandings league={standingsLeague} />
-                        </div>
-                    </div>
-                </div>
-            )}
+            <StandingsModal
+                visible={showStandingsModal}
+                league={standingsLeague}
+                onClose={() => setShowStandingsModal(false)}
+            />
         </div>
     );
 };

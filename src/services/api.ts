@@ -1,14 +1,18 @@
-/**
- * API Service - Firebase Cloud Functions Backend
- * 
- * Artık Render.com yerine Firebase kullanıyor!
- */
+import type {
+  Player,
+  MatchData,
+  StandingsRow,
+  StandingsData,
+  EspnFixtureMatch,
+  EspnFixtureData,
+  EspnTeam,
+  EspnMatchStatus,
+  MatchSummaryData,
+} from '../types';
 
-// Backend API URL - Firebase Cloud Functions
-// Local development da production backend'e bağlanıyor
 export const BACKEND_URL = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
 
-const ensureAbsolutePhoto = (player = {}) => {
+const ensureAbsolutePhoto = (player: Partial<Player> = {}): string => {
     const fallbackPath = `/player-image/${player.id ?? ''}`;
     const value = player.photo || fallbackPath;
 
@@ -24,8 +28,7 @@ const ensureAbsolutePhoto = (player = {}) => {
     return `${BACKEND_URL}${normalizedPath}`;
 };
 
-// Fetch next match from backend
-export const fetchNextMatch = async () => {
+export const fetchNextMatch = async (): Promise<MatchData | null> => {
     try {
         const response = await fetch(`${BACKEND_URL}/next-match`);
         if (!response.ok) throw new Error('Backend fetch failed');
@@ -36,12 +39,11 @@ export const fetchNextMatch = async () => {
     }
 };
 
-// Fetch squad from backend
-export const fetchSquad = async () => {
+export const fetchSquad = async (): Promise<Player[]> => {
     try {
         const response = await fetch(`${BACKEND_URL}/squad`);
         if (!response.ok) throw new Error('Backend fetch failed');
-        const squad = await response.json();
+        const squad: Player[] = await response.json();
         return squad.map(player => ({
             ...player,
             photo: ensureAbsolutePhoto(player)
@@ -52,8 +54,7 @@ export const fetchSquad = async () => {
     }
 };
 
-// Fetch next 3 matches from backend
-export const fetchNext3Matches = async () => {
+export const fetchNext3Matches = async (): Promise<MatchData[]> => {
     try {
         const response = await fetch(`${BACKEND_URL}/next-3-matches`);
         if (!response.ok) throw new Error('Backend fetch failed');
@@ -64,8 +65,7 @@ export const fetchNext3Matches = async () => {
     }
 };
 
-// Fetch stored match summary for fixture cards
-export const fetchMatchSummary = async (matchId) => {
+export const fetchMatchSummary = async (matchId: string): Promise<MatchSummaryData | null> => {
     if (!matchId) return null;
 
     try {
@@ -81,18 +81,33 @@ export const fetchMatchSummary = async (matchId) => {
     }
 };
 
-// Injuries - not implemented yet
-export const fetchInjuries = async () => {
+export const fetchInjuries = async (): Promise<never[]> => {
     return [];
 };
 
-// Fetch standings directly from ESPN (free, CORS-enabled)
-const ESPN_STANDINGS_LEAGUES = [
+// ─── ESPN Standings ──────────────────────────────────────
+
+interface EspnStandingsLeague {
+  slug: string;
+  id: string;
+  name: string;
+}
+
+const ESPN_STANDINGS_LEAGUES: EspnStandingsLeague[] = [
     { slug: 'tur.1', id: 'super-lig', name: 'Trendyol Süper Lig' },
     { slug: 'uefa.europa', id: 'europa-league', name: 'UEFA Avrupa Ligi' }
 ];
 
-const parseEspnStandingsEntries = (entries = []) =>
+interface EspnStandingsEntry {
+  team: {
+    id: string;
+    displayName: string;
+    logos?: Array<{ href: string }>;
+  };
+  stats: Array<{ name: string; value: number }>;
+}
+
+const parseEspnStandingsEntries = (entries: EspnStandingsEntry[] = []): StandingsRow[] =>
     entries.map(entry => ({
         team: {
             id: entry.team.id,
@@ -110,7 +125,7 @@ const parseEspnStandingsEntries = (entries = []) =>
         goalDiff: entry.stats.find(s => s.name === 'pointDifferential')?.value || 0
     }));
 
-export const fetchEspnStandings = async (leagueId) => {
+export const fetchEspnStandings = async (leagueId: string): Promise<StandingsData | null> => {
     const league = ESPN_STANDINGS_LEAGUES.find(l => l.id === leagueId);
     if (!league) return null;
 
@@ -127,7 +142,7 @@ export const fetchEspnStandings = async (leagueId) => {
         if (!data.children || data.children.length === 0) return null;
 
         const group = league.slug === 'uefa.europa'
-            ? (data.children.find(c => c.name === 'League Phase') || data.children[0])
+            ? (data.children.find((c: { name: string }) => c.name === 'League Phase') || data.children[0])
             : data.children[0];
 
         return {
@@ -141,25 +156,49 @@ export const fetchEspnStandings = async (leagueId) => {
     }
 };
 
+// ─── ESPN Fixtures ───────────────────────────────────────
+
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
-const ESPN_FIXTURE_COMPETITIONS = [
+
+interface EspnFixtureCompetition {
+  slug: string;
+  group: string;
+  label: string;
+}
+
+const ESPN_FIXTURE_COMPETITIONS: EspnFixtureCompetition[] = [
     { slug: 'tur.1', group: 'superlig', label: 'Süper Lig' },
     { slug: 'uefa.europa', group: 'europe', label: 'Avrupa' }
 ];
 
-const getCurrentSeasonStartYear = (referenceDate = new Date()) => {
-    const month = referenceDate.getMonth(); // 0-indexed
+const getCurrentSeasonStartYear = (referenceDate = new Date()): number => {
+    const month = referenceDate.getMonth();
     const year = referenceDate.getFullYear();
     return month >= 6 ? year : year - 1;
 };
 
-const buildEspnTeamScheduleUrl = (leagueSlug, params = {}) => {
+const buildEspnTeamScheduleUrl = (leagueSlug: string, params: Record<string, string> = {}): string => {
     const searchParams = new URLSearchParams(params);
     return `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/schedule?${searchParams.toString()}`;
 };
 
-const parseEspnTeam = (competitor) => ({
+interface EspnCompetitorRaw {
+  team?: {
+    id?: string;
+    displayName?: string;
+    name?: string;
+    shortDisplayName?: string;
+    abbreviation?: string;
+    logos?: Array<{ href: string }>;
+  };
+  id?: string;
+  homeAway?: string;
+  score?: { displayValue?: string; value?: number };
+  winner?: boolean;
+}
+
+const parseEspnTeam = (competitor: EspnCompetitorRaw | undefined): EspnTeam => ({
     id: competitor?.team?.id ?? competitor?.id ?? null,
     name: competitor?.team?.displayName ?? competitor?.team?.name ?? 'Takım',
     shortName: competitor?.team?.shortDisplayName ?? competitor?.team?.displayName ?? competitor?.team?.name ?? 'Takım',
@@ -169,7 +208,25 @@ const parseEspnTeam = (competitor) => ({
     winner: Boolean(competitor?.winner)
 });
 
-const normalizeEspnMatch = (event, sourceCompetition = null) => {
+interface EspnEventRaw {
+  id?: string;
+  date?: string;
+  season?: { displayName?: string };
+  seasonType?: { name?: string };
+  competitions?: Array<{
+    id?: string;
+    date?: string;
+    competitors?: EspnCompetitorRaw[];
+    status?: { type?: Record<string, unknown> };
+    type?: { text?: string };
+    venue?: {
+      fullName?: string;
+      address?: { city?: string };
+    };
+  }>;
+}
+
+const normalizeEspnMatch = (event: EspnEventRaw, sourceCompetition: EspnFixtureCompetition | null = null): EspnFixtureMatch | null => {
     const competition = event?.competitions?.[0];
     const competitors = competition?.competitors ?? [];
     const homeCompetitor = competitors.find((item) => item.homeAway === 'home');
@@ -184,13 +241,13 @@ const normalizeEspnMatch = (event, sourceCompetition = null) => {
     const isFbHome = homeTeam.id === ESPN_FENERBAHCE_TEAM_ID;
     const fbTeam = isFbHome ? homeTeam : awayTeam;
     const opponentTeam = isFbHome ? awayTeam : homeTeam;
-    const statusType = competition?.status?.type ?? {};
+    const statusType = (competition?.status?.type ?? {}) as Record<string, unknown>;
     const homeScoreValue = Number(homeCompetitor?.score?.value);
     const awayScoreValue = Number(awayCompetitor?.score?.value);
     const hasNumericScore = Number.isFinite(homeScoreValue) && Number.isFinite(awayScoreValue);
 
-    let resultCode = null;
-    let resultLabel = null;
+    let resultCode: 'G' | 'M' | 'B' | null = null;
+    let resultLabel: string | null = null;
     if (statusType.completed && hasNumericScore) {
         const fbScore = isFbHome ? homeScoreValue : awayScoreValue;
         const opponentScore = isFbHome ? awayScoreValue : homeScoreValue;
@@ -209,20 +266,20 @@ const normalizeEspnMatch = (event, sourceCompetition = null) => {
 
     return {
         id: String(event.id ?? competition.id ?? `${event.date}-${homeTeam.id}-${awayTeam.id}`),
-        date: event.date ?? competition.date,
-        competitionName: event?.season?.displayName ?? event?.seasonType?.name ?? 'Süper Lig',
+        date: (event.date ?? competition.date) as string,
+        competitionName: (event?.season?.displayName ?? event?.seasonType?.name ?? 'Süper Lig') as string,
         competitionKey: sourceCompetition?.slug ?? null,
         competitionGroup: sourceCompetition?.group ?? null,
         competitionLabel: sourceCompetition?.label ?? null,
-        roundLabel: competition?.type?.text ?? null,
-        venueName: competition?.venue?.fullName ?? null,
-        venueCity: competition?.venue?.address?.city ?? null,
+        roundLabel: (competition?.type?.text as string) ?? null,
+        venueName: (competition?.venue?.fullName as string) ?? null,
+        venueCity: (competition?.venue?.address?.city as string) ?? null,
         status: {
-            state: statusType.state ?? 'pre',
+            state: (statusType.state as string) ?? 'pre',
             completed: Boolean(statusType.completed),
-            description: statusType.description ?? null,
-            detail: statusType.detail ?? null,
-            shortDetail: statusType.shortDetail ?? null
+            description: (statusType.description as string) ?? null,
+            detail: (statusType.detail as string) ?? null,
+            shortDetail: (statusType.shortDetail as string) ?? null
         },
         homeTeam,
         awayTeam,
@@ -234,7 +291,7 @@ const normalizeEspnMatch = (event, sourceCompetition = null) => {
     };
 };
 
-export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSeasonStartYear()) => {
+export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSeasonStartYear()): Promise<EspnFixtureData> => {
     try {
         const perCompetitionResults = await Promise.all(
             ESPN_FIXTURE_COMPETITIONS.map(async (competition) => {
@@ -246,8 +303,8 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
                 if (!resultsResponse.ok && !fixturesResponse.ok) {
                     return {
                         competition,
-                        resultsJson: {},
-                        fixturesJson: {}
+                        resultsJson: {} as Record<string, unknown>,
+                        fixturesJson: {} as Record<string, unknown>
                     };
                 }
 
@@ -268,7 +325,7 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
             const resultEvents = Array.isArray(resultsJson?.events) ? resultsJson.events : [];
             const fixtureEvents = Array.isArray(fixturesJson?.events) ? fixturesJson.events : [];
 
-            return [...resultEvents, ...fixtureEvents].map((event) => ({
+            return [...resultEvents, ...fixtureEvents].map((event: EspnEventRaw) => ({
                 event,
                 sourceCompetition: competition
             }));
@@ -289,13 +346,13 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
 
         const matches = uniqueEvents
             .map(({ event, sourceCompetition }) => normalizeEspnMatch(event, sourceCompetition))
-            .filter(Boolean)
-            .sort((a, b) => new Date(a.date) - new Date(b.date));
+            .filter((m): m is EspnFixtureMatch => m !== null)
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         const firstAvailable = perCompetitionResults.find(
             ({ resultsJson, fixturesJson }) =>
-                Array.isArray(resultsJson?.events) && resultsJson.events.length > 0 ||
-                Array.isArray(fixturesJson?.events) && fixturesJson.events.length > 0
+                (Array.isArray(resultsJson?.events) && resultsJson.events.length > 0) ||
+                (Array.isArray(fixturesJson?.events) && fixturesJson.events.length > 0)
         );
 
         return {

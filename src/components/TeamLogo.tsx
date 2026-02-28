@@ -1,17 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { BACKEND_URL } from '../services/api';
 
-const buildLogoUrl = (teamId) => `${BACKEND_URL}/team-image/${teamId}`;
+const buildLogoUrl = (teamId: number): string => `${BACKEND_URL}/team-image/${teamId}`;
+
+interface TeamLogoProps {
+    teamId: number | null | undefined;
+    name?: string;
+    wrapperClassName?: string;
+    imageClassName?: string;
+}
 
 const TeamLogo = ({
     teamId,
     name = 'Takım',
     wrapperClassName = '',
     imageClassName = ''
-}) => {
-    const [src, setSrc] = useState(() => (teamId ? buildLogoUrl(teamId) : null));
-    const [status, setStatus] = useState(teamId ? 'loading' : 'idle');
+}: TeamLogoProps) => {
+    const [src, setSrc] = useState<string | null>(() => (teamId ? buildLogoUrl(teamId) : null));
+    const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'idle'>(teamId ? 'loading' : 'idle');
     const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
@@ -73,4 +80,3 @@ const TeamLogo = ({
 };
 
 export default TeamLogo;
-
