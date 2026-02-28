@@ -8,19 +8,19 @@ const localizeTeamName = (name: string = ''): string => {
     if (!name) return name;
 
     return name
-        .replace(/\bFenerbahce\b/gi, 'Fenerbah\u00e7e')
-        .replace(/\bBesiktas\b/gi, 'Be\u015fikta\u015f')
-        .replace(/\bIstanbul Basaksehir\b/gi, '\u0130stanbul Ba\u015fak\u015fehir');
+        .replace(/\bFenerbahce\b/gi, 'Fenerbahçe')
+        .replace(/\bBesiktas\b/gi, 'Beşiktaş')
+        .replace(/\bIstanbul Basaksehir\b/gi, 'İstanbul Başakşehir');
 };
 
 const localizeSummaryStatus = (value: string = ''): string => {
     const normalized = String(value || '').trim().toLowerCase();
 
-    if (!normalized) return 'Ma\u00e7 Sonucu';
-    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) return 'Ma\u00e7 Sonu';
-    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) return 'Devre Aras\u0131';
+    if (!normalized) return 'Maç Sonucu';
+    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) return 'Maç Sonu';
+    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) return 'Devre Arası';
     if (normalized === 'aet' || normalized.includes('after extra time')) return 'Uzatma Sonu';
-    if (normalized.includes('penalties')) return 'Penalt\u0131lar Sonu';
+    if (normalized.includes('penalties')) return 'Penaltılar Sonu';
 
     return value;
 };
@@ -61,7 +61,7 @@ function MatchSummaryModal({
             <div className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between">
                     <div>
-                        <p className="text-sm font-bold text-yellow-300">Ma\u00e7 \u0130statistikleri</p>
+                        <p className="text-sm font-bold text-yellow-300">Maç İstatistikleri</p>
                         <p className="text-[11px] text-slate-400">
                             {localizeTeamName(activeSummaryMatch.homeTeam?.name)} vs {localizeTeamName(activeSummaryMatch.awayTeam?.name)}
                         </p>
@@ -131,7 +131,7 @@ function MatchSummaryModal({
 
                             {Array.isArray(activeSummaryData.stats) && activeSummaryData.stats.length > 0 && (
                                 <div className="glass-panel rounded-xl p-4">
-                                    <h4 className="text-sm font-bold text-white mb-3">\u00d6zet \u0130statistikler</h4>
+                                    <h4 className="text-sm font-bold text-white mb-3">Özet İstatistikler</h4>
                                     <div className="space-y-3">
                                         {activeSummaryData.stats.map((stat, index) => {
                                             const homeVal = Number.parseFloat(String(stat.homeValue).replace(',', '.')) || 0;
@@ -158,7 +158,7 @@ function MatchSummaryModal({
 
                             {Array.isArray(activeSummaryData.events) && activeSummaryData.events.length > 0 && (
                                 <div className="glass-panel rounded-xl p-4">
-                                    <h4 className="text-sm font-bold text-white mb-3">Ma\u00e7 Olaylar\u0131</h4>
+                                    <h4 className="text-sm font-bold text-white mb-3">Maç Olayları</h4>
                                     <div className="space-y-2">
                                         {activeSummaryData.events.map((event, index) => {
                                             const eventType = getEventVisualType(event);
