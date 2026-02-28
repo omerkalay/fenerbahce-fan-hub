@@ -8,9 +8,9 @@ const localizeTeamName = (name: string = ''): string => {
     if (!name) return name;
 
     return name
-        .replace(/\bFenerbahce\b/gi, 'Fenerbah\u00e7e')
-        .replace(/\bBesiktas\b/gi, 'Be\u015fikta\u015f')
-        .replace(/\bIstanbul Basaksehir\b/gi, '\u0130stanbul Ba\u015fak\u015fehir');
+        .replace(/\bFenerbahce\b/gi, 'Fenerbahçe')
+        .replace(/\bBesiktas\b/gi, 'Beşiktaş')
+        .replace(/\bIstanbul Basaksehir\b/gi, 'İstanbul Başakşehir');
 };
 
 const getMatchTimestamp = (match: EspnFixtureMatch): number => {
@@ -62,7 +62,7 @@ export function useFixtureData() {
             if (!isMounted) return;
 
             if (data?.error) {
-                setError('Fikst\u00fcr verisi al\u0131namad\u0131. L\u00fctfen tekrar dene.');
+                setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
             }
 
             setFixtureData(data);
@@ -81,7 +81,7 @@ export function useFixtureData() {
         setIsRefreshing(true);
         const data = await fetchEspnFenerbahceFixtures();
         if (data?.error) {
-            setError('Fikst\u00fcr verisi al\u0131namad\u0131. L\u00fctfen tekrar dene.');
+            setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
         }
         setFixtureData(data);
         setIsRefreshing(false);
@@ -190,7 +190,7 @@ export function useFixtureData() {
         if (summary) {
             setActiveSummaryData(summary);
         } else {
-            setSummaryError('Bu ma\u00e7 i\u00e7in istatistik \u00f6zeti hen\u00fcz haz\u0131r de\u011fil.');
+            setSummaryError('Bu maç için istatistik özeti henüz hazır değil.');
         }
 
         setSummaryLoading(false);
