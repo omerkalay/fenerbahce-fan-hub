@@ -136,8 +136,8 @@ const LiveMatchScore = () => {
     return (
         <div className="w-full space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
             {/* Score Board */}
-            <div className="glass-card rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
+            <div className="glass-panel rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-bold text-yellow-400 uppercase">
                         {statusLabel}
                     </span>
@@ -154,20 +154,54 @@ const LiveMatchScore = () => {
                     )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 items-center">
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-20 h-20 rounded-full bg-white/5 p-3 border border-white/10">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
                             {liveData.homeTeam?.logo && (
                                 <img
                                     src={liveData.homeTeam.logo}
                                     alt={liveData.homeTeam.name}
-                                    className="w-full h-full object-contain"
+                                    className="w-full h-full object-contain p-1"
                                 />
                             )}
+                            {!liveData.homeTeam?.logo && (
+                                <span className="text-[10px] text-slate-300 font-bold">
+                                    {String(liveData.homeTeam?.name || '').slice(0, 2).toUpperCase()}
+                                </span>
+                            )}
                         </div>
-                        <span className="text-sm font-bold text-center">{liveData.homeTeam?.name}</span>
-                        {homeIncidents.length > 0 && (
-                            <div className="w-full pt-1 space-y-1">
+                        <p className="hidden sm:block text-base font-bold text-white text-left truncate">{liveData.homeTeam?.name}</p>
+                    </div>
+
+                    <p className="text-3xl font-black text-white px-4">
+                        {liveData.homeTeam?.score || '0'} <span className="text-slate-500">-</span> {liveData.awayTeam?.score || '0'}
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2.5 min-w-0">
+                        <p className="hidden sm:block text-base font-bold text-white text-right truncate">{liveData.awayTeam?.name}</p>
+                        <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
+                            {liveData.awayTeam?.logo && (
+                                <img
+                                    src={liveData.awayTeam.logo}
+                                    alt={liveData.awayTeam.name}
+                                    className="w-full h-full object-contain p-1"
+                                />
+                            )}
+                            {!liveData.awayTeam?.logo && (
+                                <span className="text-[10px] text-slate-300 font-bold">
+                                    {String(liveData.awayTeam?.name || '').slice(0, 2).toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <p className="text-[11px] text-slate-400 mt-2 text-center">{centerClockLabel}</p>
+
+                {incidentEvents.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
+                            <div className="space-y-1 min-w-0">
                                 {homeIncidents.map((event, idx) => (
                                     <div key={`home-incident-${idx}`} className="flex items-center gap-1 text-[11px] min-w-0">
                                         <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
@@ -178,18 +212,22 @@ const LiveMatchScore = () => {
                                     </div>
                                 ))}
                             </div>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col items-center gap-2">
-                        <div className="flex items-center gap-4">
-                            <span className="text-5xl font-black text-white">{liveData.homeTeam?.score || '0'}</span>
-                            <span className="text-3xl font-bold text-slate-600">-</span>
-                            <span className="text-5xl font-black text-white">{liveData.awayTeam?.score || '0'}</span>
+                            <div className="text-slate-500 text-xs pt-1">•</div>
+                            <div className="space-y-1 min-w-0">
+                                {awayIncidents.map((event, idx) => (
+                                    <div key={`away-incident-${idx}`} className="flex items-center justify-end gap-1 text-[11px] min-w-0">
+                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate text-right' : 'text-red-300 font-medium truncate text-right'}>
+                                            {formatIncidentLabel(event)}
+                                        </span>
+                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                        <span className="text-slate-400 shrink-0 w-10 tabular-nums">{formatMatchClock(event.clock)}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                        <span className="text-xs text-slate-400">{centerClockLabel}</span>
+
                         {neutralIncidents.length > 0 && (
-                            <div className="w-full pt-1 space-y-1">
+                            <div className="space-y-1">
                                 {neutralIncidents.map((event, idx) => (
                                     <div key={`neutral-incident-${idx}`} className="flex items-center justify-center gap-1 text-[11px] min-w-0">
                                         <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
@@ -202,34 +240,38 @@ const LiveMatchScore = () => {
                             </div>
                         )}
                     </div>
+                )}
+            </div>
 
-                    <div className="flex flex-col items-center gap-3">
-                        <div className="w-20 h-20 rounded-full bg-white/5 p-3 border border-white/10">
-                            {liveData.awayTeam?.logo && (
-                                <img
-                                    src={liveData.awayTeam.logo}
-                                    alt={liveData.awayTeam.name}
-                                    className="w-full h-full object-contain"
-                                />
-                            )}
-                        </div>
-                        <span className="text-sm font-bold text-center">{liveData.awayTeam?.name}</span>
-                        {awayIncidents.length > 0 && (
-                            <div className="w-full pt-1 space-y-1">
-                                {awayIncidents.map((event, idx) => (
-                                    <div key={`away-incident-${idx}`} className="flex items-center justify-end gap-1 text-[11px] min-w-0">
-                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate text-right' : 'text-red-300 font-medium truncate text-right'}>
-                                            {formatIncidentLabel(event)}
-                                        </span>
-                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                        <span className="text-slate-400 shrink-0 w-10 tabular-nums">{formatMatchClock(event.clock)}</span>
+            {/* Stats */}
+            {orderedStats.length > 0 && (
+                <div className="glass-panel rounded-2xl p-4">
+                    <h3 className="text-sm font-bold text-white mb-3">İstatistikler</h3>
+                    <div className="space-y-3">
+                        {orderedStats.map((stat, idx) => {
+                                const homeVal = parseFloat(stat.homeValue) || 0;
+                                const awayVal = parseFloat(stat.awayValue) || 0;
+                                const total = homeVal + awayVal || 1;
+                                return (
+                                    <div key={idx} className="space-y-1">
+                                        <div className="flex justify-between text-xs text-slate-400">
+                                            <span className="font-medium text-white">{stat.homeValue}</span>
+                                            <span>{stat.label}</span>
+                                            <span className="font-medium text-white">{stat.awayValue}</span>
+                                        </div>
+                                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
+                                            <div
+                                                className="bg-yellow-400 h-full transition-all duration-500"
+                                                style={{ width: `${(homeVal / total) * 100}%` }}
+                                            />
+                                            <div className="bg-slate-600 h-full flex-1" />
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
-                        )}
+                                );
+                            })}
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* Match Events */}
             {liveData.events && liveData.events.length > 0 && (
@@ -297,36 +339,6 @@ const LiveMatchScore = () => {
                                 </div>
                             );
                         })}
-                    </div>
-                </div>
-            )}
-
-            {/* Stats */}
-            {orderedStats.length > 0 && (
-                <div className="glass-panel rounded-2xl p-4">
-                    <h3 className="text-sm font-bold text-white mb-3">İstatistikler</h3>
-                    <div className="space-y-3">
-                        {orderedStats.map((stat, idx) => {
-                                const homeVal = parseFloat(stat.homeValue) || 0;
-                                const awayVal = parseFloat(stat.awayValue) || 0;
-                                const total = homeVal + awayVal || 1;
-                                return (
-                                    <div key={idx} className="space-y-1">
-                                        <div className="flex justify-between text-xs text-slate-400">
-                                            <span className="font-medium text-white">{stat.homeValue}</span>
-                                            <span>{stat.label}</span>
-                                            <span className="font-medium text-white">{stat.awayValue}</span>
-                                        </div>
-                                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
-                                            <div
-                                                className="bg-yellow-400 h-full transition-all duration-500"
-                                                style={{ width: `${(homeVal / total) * 100}%` }}
-                                            />
-                                            <div className="bg-slate-600 h-full flex-1" />
-                                        </div>
-                                    </div>
-                                );
-                            })}
                     </div>
                 </div>
             )}
