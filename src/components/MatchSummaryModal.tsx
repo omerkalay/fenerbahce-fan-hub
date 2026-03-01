@@ -1,5 +1,6 @@
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
+import { localizePlayerName } from '../utils/playerDisplay';
 import type { EspnFixtureMatch, MatchSummaryData } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -23,6 +24,16 @@ const localizeSummaryStatus = (value: string = ''): string => {
     if (normalized.includes('penalties')) return 'Penaltılar Sonu';
 
     return value;
+};
+
+const formatIncidentLabel = (event: MatchSummaryData['events'][number]): string => {
+    const playerName = localizePlayerName(event?.player || event?.type || 'Olay');
+    const suffixes: string[] = [];
+
+    if (event?.isGoal && event?.isPenalty) suffixes.push('(P)');
+    if (event?.isGoal && event?.isOwnGoal) suffixes.push('(K.K)');
+
+    return [playerName, ...suffixes].join(' ');
 };
 
 // ─── Props ───────────────────────────────────────────────
@@ -49,6 +60,15 @@ function MatchSummaryModal({
     onClose,
 }: MatchSummaryModalProps) {
     if (!activeSummaryMatch) return null;
+    const homeIncidentTeamId = String(activeSummaryMatch.homeTeam?.id || activeSummaryData?.homeTeam?.id || '');
+    const awayIncidentTeamId = String(activeSummaryMatch.awayTeam?.id || activeSummaryData?.awayTeam?.id || '');
+    const summaryIncidentEvents = (activeSummaryData?.events || []).filter((event) => event.isGoal || event.isRedCard);
+    const homeSummaryIncidents = summaryIncidentEvents.filter((event) => String(event.team || '') === homeIncidentTeamId);
+    const awaySummaryIncidents = summaryIncidentEvents.filter((event) => String(event.team || '') === awayIncidentTeamId);
+    const neutralSummaryIncidents = summaryIncidentEvents.filter((event) => {
+        const teamId = String(event.team || '');
+        return teamId !== homeIncidentTeamId && teamId !== awayIncidentTeamId;
+    });
 
     return (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4">
@@ -127,6 +147,49 @@ function MatchSummaryModal({
                                 <p className="text-[11px] text-slate-400 mt-2 text-center">
                                     {localizeSummaryStatus(activeSummaryData.statusDetail)}
                                 </p>
+                                {summaryIncidentEvents.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                                        <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
+                                            <div className="space-y-1 min-w-0">
+                                                {homeSummaryIncidents.map((event, index) => (
+                                                    <div key={`summary-home-incident-${index}`} className="flex items-center gap-1 text-[11px] min-w-0">
+                                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
+                                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
+                                                            {formatIncidentLabel(event)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="text-slate-500 text-xs pt-1">•</div>
+                                            <div className="space-y-1 min-w-0">
+                                                {awaySummaryIncidents.map((event, index) => (
+                                                    <div key={`summary-away-incident-${index}`} className="flex items-center justify-end gap-1 text-[11px] min-w-0">
+                                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate text-right' : 'text-red-300 font-medium truncate text-right'}>
+                                                            {formatIncidentLabel(event)}
+                                                        </span>
+                                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                                        <span className="text-slate-400 shrink-0 w-10 tabular-nums">{formatMatchClock(event.clock)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {neutralSummaryIncidents.length > 0 && (
+                                            <div className="space-y-1">
+                                                {neutralSummaryIncidents.map((event, index) => (
+                                                    <div key={`summary-neutral-incident-${index}`} className="flex items-center justify-center gap-1 text-[11px] min-w-0">
+                                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
+                                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
+                                                            {formatIncidentLabel(event)}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {Array.isArray(activeSummaryData.stats) && activeSummaryData.stats.length > 0 && (
@@ -180,12 +243,12 @@ function MatchSummaryModal({
                                                         <MatchEventIcon event={event} className={eventType === 'goal' ? 'w-4 h-4' : 'w-3 h-4'} />
                                                     </span>
                                                     <span className={`text-sm ${textClass}`}>
-                                                        {event.player || event.type || 'Olay'}
+                                                        {localizePlayerName(event.player || '') || event.type || 'Olay'}
                                                         {event.isGoal && event.isPenalty && (
                                                             <span className="ml-1 text-yellow-200 font-semibold">(P)</span>
                                                         )}
-                                                        {event.isGoal && event.assist && (
-                                                            <span className="ml-2 text-slate-300/85 font-medium">Asist: {event.assist}</span>
+                                                        {event.isGoal && event.isOwnGoal && (
+                                                            <span className="ml-1 text-yellow-200 font-semibold">(K.K)</span>
                                                         )}
                                                     </span>
                                                 </div>

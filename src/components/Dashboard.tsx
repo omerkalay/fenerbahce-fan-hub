@@ -7,6 +7,7 @@ import StandingsModal from './StandingsModal';
 import LiveMatchModal from './LiveMatchModal';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
+import { localizePlayerName } from '../utils/playerDisplay';
 import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent } from '../types';
 
 const isHalftimeDisplay = (statusDetail = '', displayClock = ''): boolean => {
@@ -20,6 +21,17 @@ const isHalftimeDisplay = (statusDetail = '', displayClock = ''): boolean => {
         status.includes('devre') ||
         clock === 'ht'
     );
+};
+
+const resolveGoalTeamId = (event: MatchEvent): string => String(event.team || '');
+
+const formatGoalSummaryText = (event: MatchEvent): string => {
+    const parts: string[] = [localizePlayerName(event.player || '') || 'Gol'];
+
+    if (event.isPenalty) parts.push('(P)');
+    if (event.isOwnGoal) parts.push('(K.K)');
+
+    return parts.join(' ');
 };
 
 interface DashboardProps {
@@ -90,6 +102,17 @@ const Dashboard: React.FC<DashboardProps> = ({
     const isLiveHalftime = liveMatchState === 'in' && liveMatchData
         ? isHalftimeDisplay(liveMatchData.statusDetail, liveMatchData.displayClock)
         : false;
+    const liveHomeTeamId = String(liveMatchData?.homeTeam?.id ?? '');
+    const liveAwayTeamId = String(liveMatchData?.awayTeam?.id ?? '');
+    const timelineEvents = (liveMatchData?.events || []).filter((event: MatchEvent) => !event.isSubstitution);
+    const goalEvents = timelineEvents.filter((event: MatchEvent) => event.isGoal);
+    const homeGoalEvents = goalEvents.filter((event: MatchEvent) => resolveGoalTeamId(event) === liveHomeTeamId);
+    const awayGoalEvents = goalEvents.filter((event: MatchEvent) => resolveGoalTeamId(event) === liveAwayTeamId);
+    const neutralGoalEvents = goalEvents.filter((event: MatchEvent) => {
+        const scoringTeamId = resolveGoalTeamId(event);
+        return scoringTeamId !== liveHomeTeamId && scoringTeamId !== liveAwayTeamId;
+    });
+    const nonGoalEvents = timelineEvents.filter((event: MatchEvent) => !event.isGoal);
 
     // Live state is now managed by App.jsx via liveMatchState prop
 
@@ -196,10 +219,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                                 </span>
-                                <span className="text-sm font-bold text-red-400 uppercase">
-                                    {isLiveHalftime ? 'Devre Arası' : 'Canlı'}
-                                </span>
-                                {!isLiveHalftime && liveMatchData.displayClock && (
+                                <span className="text-sm font-bold text-red-400 uppercase">Canlı</span>
+                                {isLiveHalftime ? (
+                                    <span className="text-[11px] font-semibold text-yellow-300 uppercase px-2 py-0.5 rounded-full border border-yellow-400/30 bg-yellow-400/10">
+                                        Devre Arası
+                                    </span>
+                                ) : liveMatchData.displayClock && (
                                     <span className="text-xs text-slate-400 ml-1">{liveMatchData.displayClock}</span>
                                 )}
                             </div>
@@ -212,36 +237,66 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
 
                             {/* Events */}
-                            {liveMatchData.events && liveMatchData.events.length > 0 && (
-                                <div className="space-y-1 mb-4 max-h-32 overflow-y-auto">
-                                    {liveMatchData.events
-                                        .filter((event: MatchEvent) => !event.isSubstitution)
-                                        .map((event: MatchEvent, idx: number) => {
-                                            const eventType = getEventVisualType(event);
-                                            const textClass = eventType === 'goal'
-                                                ? 'text-yellow-400 font-bold'
-                                                : eventType === 'red-card'
+                            {timelineEvents.length > 0 && (
+                                <div className="mb-4 space-y-2 max-h-36 overflow-y-auto custom-scrollbar">
+                                    {goalEvents.length > 0 && (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                {homeGoalEvents.map((event: MatchEvent, idx: number) => (
+                                                    <div key={`home-goal-${idx}`} className="flex items-center gap-1 text-xs">
+                                                        <span className="text-slate-500 w-10 text-right">{formatMatchClock(event.clock)}</span>
+                                                        <MatchEventIcon event={{ isGoal: true }} className="w-3.5 h-3.5 shrink-0" />
+                                                        <span className="text-yellow-300 font-semibold truncate">{formatGoalSummaryText(event)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="space-y-1">
+                                                {awayGoalEvents.map((event: MatchEvent, idx: number) => (
+                                                    <div key={`away-goal-${idx}`} className="flex items-center justify-end gap-1 text-xs">
+                                                        <span className="text-yellow-300 font-semibold truncate text-right">{formatGoalSummaryText(event)}</span>
+                                                        <MatchEventIcon event={{ isGoal: true }} className="w-3.5 h-3.5 shrink-0" />
+                                                        <span className="text-slate-500 w-10">{formatMatchClock(event.clock)}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {neutralGoalEvents.length > 0 && (
+                                        <div className="space-y-1">
+                                            {neutralGoalEvents.map((event: MatchEvent, idx: number) => (
+                                                <div key={`neutral-goal-${idx}`} className="flex items-center justify-center gap-1 text-xs">
+                                                    <span className="text-slate-500">{formatMatchClock(event.clock)}</span>
+                                                    <MatchEventIcon event={{ isGoal: true }} className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="text-yellow-300 font-semibold">{formatGoalSummaryText(event)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {nonGoalEvents.length > 0 && (
+                                        <div className={`space-y-1 ${goalEvents.length > 0 ? 'pt-2 border-t border-white/5' : ''}`}>
+                                            {nonGoalEvents.map((event: MatchEvent, idx: number) => {
+                                                const eventType = getEventVisualType(event);
+                                                const textClass = eventType === 'red-card'
                                                     ? 'text-red-400'
                                                     : 'text-slate-300';
 
-                                            return (
-                                                <div key={idx} className="flex items-center gap-2 text-xs">
-                                                    <span className="text-slate-500 w-10 text-right">{formatMatchClock(event.clock)}</span>
-                                                    <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
-                                                        <MatchEventIcon
-                                                            event={event}
-                                                            className={eventType === 'goal' ? 'w-4 h-4' : 'w-3 h-4'}
-                                                        />
-                                                    </span>
-                                                    <span className={textClass}>
-                                                        {event.player}
-                                                        {event.isGoal && event.isPenalty && (
-                                                            <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
+                                                return (
+                                                    <div key={`other-${idx}`} className="flex items-center gap-2 text-xs">
+                                                        <span className="text-slate-500 w-10 text-right">{formatMatchClock(event.clock)}</span>
+                                                        <span className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                                                            <MatchEventIcon
+                                                                event={event}
+                                                                className={eventType === 'red-card' ? 'w-3 h-4' : 'w-3.5 h-4'}
+                                                            />
+                                                        </span>
+                                                        <span className={textClass}>{localizePlayerName(event.player)}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -271,15 +326,40 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </div>
 
                             {/* Goals Summary */}
-                            {liveMatchData.events && liveMatchData.events.filter((e: MatchEvent) => e.isGoal).length > 0 && (
-                                <div className="flex flex-wrap justify-center gap-2 mb-4">
-                                    {liveMatchData.events.filter((e: MatchEvent) => e.isGoal).map((event: MatchEvent, idx: number) => (
-                                        <span key={idx} className="text-xs text-slate-300 bg-white/5 px-2 py-1 rounded-full flex items-center gap-1">
-                                            <MatchEventIcon event={{ isGoal: true }} className="w-3 h-3 inline" />
-                                            {formatMatchClock(event.clock)} {event.player}
-                                            {event.isPenalty && ' (P)'}
-                                        </span>
-                                    ))}
+                            {goalEvents.length > 0 && (
+                                <div className="mb-4 space-y-2">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            {homeGoalEvents.map((event: MatchEvent, idx: number) => (
+                                                <div key={`post-home-${idx}`} className="flex items-center gap-1 text-xs">
+                                                    <span className="text-slate-500 w-10 text-right">{formatMatchClock(event.clock)}</span>
+                                                    <MatchEventIcon event={{ isGoal: true }} className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="text-yellow-300 font-semibold truncate">{formatGoalSummaryText(event)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="space-y-1">
+                                            {awayGoalEvents.map((event: MatchEvent, idx: number) => (
+                                                <div key={`post-away-${idx}`} className="flex items-center justify-end gap-1 text-xs">
+                                                    <span className="text-yellow-300 font-semibold truncate text-right">{formatGoalSummaryText(event)}</span>
+                                                    <MatchEventIcon event={{ isGoal: true }} className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="text-slate-500 w-10">{formatMatchClock(event.clock)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {neutralGoalEvents.length > 0 && (
+                                        <div className="space-y-1">
+                                            {neutralGoalEvents.map((event: MatchEvent, idx: number) => (
+                                                <div key={`post-neutral-${idx}`} className="flex items-center justify-center gap-1 text-xs">
+                                                    <span className="text-slate-500">{formatMatchClock(event.clock)}</span>
+                                                    <MatchEventIcon event={{ isGoal: true }} className="w-3.5 h-3.5 shrink-0" />
+                                                    <span className="text-yellow-300 font-semibold">{formatGoalSummaryText(event)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

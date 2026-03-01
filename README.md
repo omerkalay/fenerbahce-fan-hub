@@ -6,13 +6,24 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.7.0-blue)
+![Version](https://img.shields.io/badge/version-2.7.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.7.0
+## What's New in v2.7.1
+
+- **Side-Based Incident Layout** - Live match detail and fixture summary cards now render goals and red cards under each team logo (left/right distribution), matching broadcast-style readability
+- **Clock Alignment Fix** - Incident minute columns now use fixed-width and tabular numerals, preventing 1-digit/2-digit minute shift
+- **Live Halftime UX Update** - Red live badge remains `CANLI`; halftime appears as a separate indicator and center clock localizes to `Devre Arası`
+- **Own Goal Standardization** - `(K.K)` rendering is consistently applied across dashboard and detail surfaces
+- **Cross-Platform Substitution Icon** - Replaced unicode arrow with SVG swap icon for consistent iOS/desktop rendering
+- **Display Name Override** - `Munir Mercan` is now shown as `Levent Mercan` in match event UI
+- **Assist Changes Paused** - Assist parser/backfill experiments were intentionally rolled back in this release for stability
+
+<details>
+<summary>Previous: v2.7.0</summary>
 
 - **Full TypeScript Migration** - Entire frontend codebase migrated from JavaScript/JSX to TypeScript/TSX with strict mode enabled. All components, hooks, services, and utilities are now fully typed with zero build errors
 - **Centralized Type System** - Created `src/types/index.ts` with comprehensive type definitions for all API responses (ESPN, SofaScore, Firebase), component props, and application state
@@ -22,6 +33,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
   - `FormationBuilder` (576 → 371 lines): Extracted `PlayerSelectionModal`, `PlayerPool`, and `formations` data module
 - **Custom Hooks** - New `src/hooks/useFixtureData.ts` encapsulates all fixture data fetching, filtering, and modal state management
 - **TypeScript Infrastructure** - Added `tsconfig.json` with strict mode, `vite-env.d.ts` with typed environment variables, and `@types/node` for Node.js type support
+
+</details>
 
 <details>
 <summary>Previous: v2.6.2</summary>
@@ -342,4 +355,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.7.0** | February 2026
+**v2.7.1** | March 2026

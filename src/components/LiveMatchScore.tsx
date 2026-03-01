@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
+import { localizePlayerName } from '../utils/playerDisplay';
 import type { LiveMatchData, MatchStat } from '../types';
 
 interface StatGroup {
@@ -45,6 +46,16 @@ const localizeStatusDetail = (statusDetail: string = ''): string => {
     }
 
     return status;
+};
+
+const formatIncidentLabel = (event: LiveMatchData['events'][number]): string => {
+    const playerName = localizePlayerName(event?.player || event?.type || 'Olay');
+    const suffixes: string[] = [];
+
+    if (event?.isGoal && event?.isPenalty) suffixes.push('(P)');
+    if (event?.isGoal && event?.isOwnGoal) suffixes.push('(K.K)');
+
+    return [playerName, ...suffixes].join(' ');
 };
 
 const LiveMatchScore = () => {
@@ -111,7 +122,16 @@ const LiveMatchScore = () => {
     const statusLabel = isHalftime
         ? 'Devre Arası'
         : (localizeStatusDetail(liveData.statusDetail) || (liveData.matchState === 'in' ? 'Canlı' : 'Maç Bitti'));
-    const centerClockLabel = liveData.displayClock || '';
+    const centerClockLabel = isHalftime ? 'Devre Arası' : (liveData.displayClock || '');
+    const homeTeamId = String(liveData.homeTeam?.id ?? '');
+    const awayTeamId = String(liveData.awayTeam?.id ?? '');
+    const incidentEvents = (liveData.events || []).filter((event) => event.isGoal || event.isRedCard);
+    const homeIncidents = incidentEvents.filter((event) => String(event.team || '') === homeTeamId);
+    const awayIncidents = incidentEvents.filter((event) => String(event.team || '') === awayTeamId);
+    const neutralIncidents = incidentEvents.filter((event) => {
+        const teamId = String(event.team || '');
+        return teamId !== homeTeamId && teamId !== awayTeamId;
+    });
 
     return (
         <div className="w-full space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
@@ -128,7 +148,7 @@ const LiveMatchScore = () => {
                                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                             </span>
                             <span className="text-sm font-bold text-red-400">
-                                {isHalftime ? 'DEVRE ARASI' : 'CANLI'}
+                                CANLI
                             </span>
                         </div>
                     )}
@@ -146,6 +166,19 @@ const LiveMatchScore = () => {
                             )}
                         </div>
                         <span className="text-sm font-bold text-center">{liveData.homeTeam?.name}</span>
+                        {homeIncidents.length > 0 && (
+                            <div className="w-full pt-1 space-y-1">
+                                {homeIncidents.map((event, idx) => (
+                                    <div key={`home-incident-${idx}`} className="flex items-center gap-1 text-[11px] min-w-0">
+                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
+                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
+                                            {formatIncidentLabel(event)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col items-center gap-2">
@@ -155,6 +188,19 @@ const LiveMatchScore = () => {
                             <span className="text-5xl font-black text-white">{liveData.awayTeam?.score || '0'}</span>
                         </div>
                         <span className="text-xs text-slate-400">{centerClockLabel}</span>
+                        {neutralIncidents.length > 0 && (
+                            <div className="w-full pt-1 space-y-1">
+                                {neutralIncidents.map((event, idx) => (
+                                    <div key={`neutral-incident-${idx}`} className="flex items-center justify-center gap-1 text-[11px] min-w-0">
+                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
+                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
+                                            {formatIncidentLabel(event)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex flex-col items-center gap-3">
@@ -168,6 +214,19 @@ const LiveMatchScore = () => {
                             )}
                         </div>
                         <span className="text-sm font-bold text-center">{liveData.awayTeam?.name}</span>
+                        {awayIncidents.length > 0 && (
+                            <div className="w-full pt-1 space-y-1">
+                                {awayIncidents.map((event, idx) => (
+                                    <div key={`away-incident-${idx}`} className="flex items-center justify-end gap-1 text-[11px] min-w-0">
+                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate text-right' : 'text-red-300 font-medium truncate text-right'}>
+                                            {formatIncidentLabel(event)}
+                                        </span>
+                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
+                                        <span className="text-slate-400 shrink-0 w-10 tabular-nums">{formatMatchClock(event.clock)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -204,15 +263,32 @@ const LiveMatchScore = () => {
                                         <MatchEventIcon event={event} className={eventType === 'goal' ? 'w-4 h-4' : 'w-3.5 h-5'} />
                                     </span>
                                     <span className={`text-sm flex-1 ${textClass}`}>
-                                        {event.player}
+                                        {localizePlayerName(event.player)}
                                         {event.isSubstitution && event.playerOut && (
-                                            <span className="text-slate-400 ml-1">↔ {event.playerOut}</span>
+                                            <span className="text-slate-400 ml-1 inline-flex items-center gap-1">
+                                                <svg
+                                                    viewBox="0 0 16 16"
+                                                    className="w-3 h-3"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    strokeWidth="1.6"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    aria-hidden="true"
+                                                >
+                                                    <path d="M2 5h9" />
+                                                    <path d="m8 2 3 3-3 3" />
+                                                    <path d="M14 11H5" />
+                                                    <path d="m8 8-3 3 3 3" />
+                                                </svg>
+                                                <span>{localizePlayerName(event.playerOut)}</span>
+                                            </span>
                                         )}
                                         {event.isGoal && event.isPenalty && (
                                             <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
                                         )}
-                                        {event.isGoal && event.assist && (
-                                            <span className="text-slate-300/80 font-medium ml-2">Asist: {event.assist}</span>
+                                        {event.isGoal && event.isOwnGoal && (
+                                            <span className="text-yellow-300/90 font-semibold ml-1">(K.K)</span>
                                         )}
                                         {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && !event.isSubstitution && (
                                             <span className="text-slate-500 ml-1">({event.type})</span>

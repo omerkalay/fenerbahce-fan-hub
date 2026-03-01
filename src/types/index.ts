@@ -66,6 +66,7 @@ export interface MockPlayer {
 // ─── Live Match (ESPN via backend) ───────────────────────
 
 export interface LiveMatchTeam {
+  id?: string | number;
   name: string;
   logo?: string;
   score?: string;
@@ -79,6 +80,7 @@ export interface MatchEvent {
   type?: string;
   isGoal?: boolean;
   isPenalty?: boolean;
+  isOwnGoal?: boolean;
   isYellowCard?: boolean;
   isRedCard?: boolean;
   isSubstitution?: boolean;
@@ -184,6 +186,7 @@ export interface StandingsData {
 // ─── Match Summary (backend cached) ─────────────────────
 
 export interface MatchSummaryTeam {
+  id?: string | number;
   name?: string;
   logo?: string;
   score?: string;
