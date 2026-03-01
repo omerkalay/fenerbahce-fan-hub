@@ -19,6 +19,7 @@ const normalizeOptions = (options?: Partial<NotificationOptions>): NotificationO
 
 const NotificationSettings = () => {
     const [showModal, setShowModal] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [selectedOptions, setSelectedOptions] = useState<NotificationOptions>(() => {
         const saved = localStorage.getItem('fb_notification_options');
         if (saved) {
@@ -123,6 +124,8 @@ const NotificationSettings = () => {
     };
 
     const saveNotifications = async () => {
+        if (isSaving) return;
+        setIsSaving(true);
         const optionsToSave = normalizeOptions(currentDraftOptions);
         const count = Object.entries(optionsToSave).filter(([k, v]) => v && k !== 'updatedAt').length;
         const isDisablingAll = count === 0;
@@ -152,6 +155,9 @@ const NotificationSettings = () => {
                                     scope: fcmScope
                                 });
                             }
+
+                            // Service worker'ın aktif olmasını bekle
+                            await navigator.serviceWorker.ready;
 
                             token = await getToken(messaging, {
                                 vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
@@ -220,6 +226,8 @@ const NotificationSettings = () => {
         } catch (error) {
             console.error('Bildirim kaydetme hatası:', error);
             alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -380,13 +388,13 @@ const NotificationSettings = () => {
                             </button>
                             <button
                                 onClick={saveNotifications}
-                                disabled={!hasDraftChanges}
-                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${!hasDraftChanges
+                                disabled={!hasDraftChanges || isSaving}
+                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${!hasDraftChanges || isSaving
                                     ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50'
                                     : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'
                                     }`}
                             >
-                                Kaydet
+                                {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
                             </button>
                         </div>
                     </div>
