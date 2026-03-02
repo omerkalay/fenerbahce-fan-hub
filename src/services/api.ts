@@ -380,39 +380,89 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
     }
 };
 
-// ─── Statistics (Firebase Direct Reads) ─────────────────
+// ─── Statistics (ESPN + Firebase) ────────────────────────
 
-interface SquadCacheEntry {
-    id?: number;
+interface EspnRosterStat {
     name?: string;
-    goals?: number;
-    assists?: number;
-    appearances?: number;
+    value?: number;
 }
+
+interface EspnRosterAthlete {
+    id?: string;
+    displayName?: string;
+    statistics?: {
+        splits?: {
+            categories?: Array<{
+                stats?: EspnRosterStat[];
+            }>;
+        };
+    };
+}
+
+const getAthleteStat = (athlete: EspnRosterAthlete, statName: string): number => {
+    const categories = athlete.statistics?.splits?.categories ?? [];
+    for (const cat of categories) {
+        const found = cat.stats?.find(s => s.name === statName);
+        if (found?.value != null) return found.value;
+    }
+    return 0;
+};
+
+const fetchRosterFromLeague = async (leagueSlug: string): Promise<Map<string, { name: string; goals: number; assists: number; appearances: number }>> => {
+    const map = new Map<string, { name: string; goals: number; assists: number; appearances: number }>();
+    try {
+        const url = `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/roster`;
+        const response = await fetch(url);
+        if (!response.ok) return map;
+        const data = await response.json();
+        const athletes: EspnRosterAthlete[] = data?.athletes ?? [];
+        for (const a of athletes) {
+            const id = String(a.id ?? '');
+            if (!id) continue;
+            map.set(id, {
+                name: String(a.displayName ?? ''),
+                goals: getAthleteStat(a, 'totalGoals'),
+                assists: getAthleteStat(a, 'goalAssists'),
+                appearances: getAthleteStat(a, 'appearances'),
+            });
+        }
+    } catch { /* silently fail for individual league */ }
+    return map;
+};
 
 export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
     try {
-        const snapshot = await get(ref(database, 'cache/squad'));
-        const raw = snapshot.val();
-        if (!raw || !Array.isArray(raw)) return [];
+        const [leagueMap, europaMap] = await Promise.all([
+            fetchRosterFromLeague('tur.1'),
+            fetchRosterFromLeague('uefa.europa'),
+        ]);
 
-        const squad = raw as SquadCacheEntry[];
+        const allIds = new Set([...leagueMap.keys(), ...europaMap.keys()]);
+        const players: PlayerStat[] = [];
 
-        const hasAnyStats = squad.some(
-            p => typeof p.goals === 'number' || typeof p.assists === 'number'
-        );
+        for (const id of allIds) {
+            const lg = leagueMap.get(id);
+            const eu = europaMap.get(id);
+            const name = lg?.name || eu?.name || '';
+            const leagueGoals = lg?.goals ?? 0;
+            const leagueAssists = lg?.assists ?? 0;
+            const europaGoals = eu?.goals ?? 0;
+            const europaAssists = eu?.assists ?? 0;
 
-        if (!hasAnyStats) {
-            console.warn('fetchPlayerStats: goals/assists fields absent for all players in cache/squad');
+            players.push({
+                playerId: id,
+                name,
+                goals: leagueGoals + europaGoals,
+                assists: leagueAssists + europaAssists,
+                appearances: (lg?.appearances ?? 0) + (eu?.appearances ?? 0),
+                leagueGoals,
+                leagueAssists,
+                europaGoals,
+                europaAssists,
+            });
         }
 
-        return squad.map(p => ({
-            playerId: String(p.id ?? ''),
-            name: String(p.name ?? ''),
-            goals: typeof p.goals === 'number' ? p.goals : 0,
-            assists: typeof p.assists === 'number' ? p.assists : 0,
-            appearances: typeof p.appearances === 'number' ? p.appearances : 0,
-        }));
+        return players;
     } catch (error) {
         console.error('Error fetching player stats:', error);
         return [];
@@ -420,6 +470,8 @@ export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
 };
 
 const RESULT_CODE_MAP: Record<string, FormResult['result']> = { G: 'W', M: 'L', B: 'D' };
+
+const POSSESSION_KEYS = ['possessionPct', 'possession'];
 
 export const fetchFormResults = async (): Promise<FormResult[]> => {
     try {
@@ -438,7 +490,29 @@ export const fetchFormResults = async (): Promise<FormResult[]> => {
         }));
 
         results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        return results.slice(0, 6);
+        const recent = results.slice(0, 6);
+
+        // Enrich with possession data from match summaries
+        try {
+            const summaryPromises = recent.map(r =>
+                get(ref(database, `cache/matchSummaries/${r.matchId}`))
+            );
+            const snapshots = await Promise.all(summaryPromises);
+            snapshots.forEach((snap, i) => {
+                const summary = snap.val();
+                if (!summary?.stats) return;
+                const stats: Array<{ key?: string; label?: string; homeValue?: string; awayValue?: string }> = summary.stats;
+                const possessionStat = stats.find(s => s.key && POSSESSION_KEYS.includes(s.key));
+                if (!possessionStat) return;
+                const fbValue = recent[i].isHome ? possessionStat.homeValue : possessionStat.awayValue;
+                const parsed = parseFloat(String(fbValue).replace('%', ''));
+                if (!isNaN(parsed)) recent[i].possession = parsed;
+            });
+        } catch (e) {
+            console.warn('Could not enrich form results with possession data:', e);
+        }
+
+        return recent;
     } catch (error) {
         console.error('Error fetching form results:', error);
         return [];

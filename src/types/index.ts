@@ -242,6 +242,10 @@ export interface PlayerStat {
   goals: number;
   assists: number;
   appearances: number;
+  leagueGoals: number;
+  leagueAssists: number;
+  europaGoals: number;
+  europaAssists: number;
   photoUrl?: string;
 }
 
@@ -252,6 +256,7 @@ export interface FormResult {
   result: "W" | "D" | "L";
   score: string;
   isHome: boolean;
+  possession?: number;
 }
 
 export interface PlayerStatusEntry {

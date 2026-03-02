@@ -6,20 +6,33 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.8.0-blue)
+![Version](https://img.shields.io/badge/version-2.8.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.8.0
+## What's New in v2.8.1
+
+- **ESPN Direct Player Stats** - Goal and assist data now fetched directly from ESPN roster endpoints (`tur.1` + `uefa.europa`) instead of Firebase `cache/squad`, eliminating dependency on daily cache refresh
+- **League / Europa Filtering** - Scorers and assisters sections now have Toplam / Süper Lig / Avrupa tab filters with underline-style tab navigation, allowing users to view stats broken down by competition
+- **Expand/Collapse Lists** - Top scorers and assisters show top 5 by default with a "Daha Fazla" toggle to reveal up to 10 players
+- **Interactive Form Chart** - Replaced static W/D/L colored boxes with an SVG line chart showing form trajectory (G/B/M), with expandable details including per-match goal performance bars and possession trend line
+- **Possession Data Enrichment** - Form results are enriched with ball possession percentage from cached match summaries, displayed as an interactive trend chart
+- **Refined Injury/Status Design** - Player name and injury detail shown inline, status indicator uses typographic uppercase labels instead of pill badges, return date displayed below
+- **Underline Tab Design** - Competition filter tabs use minimal underline indicator style matching the site's premium dark theme, replacing generic rounded-pill buttons
+
+<details>
+<summary>Previous: v2.8.0</summary>
 
 - **Statistics Tab** - New fourth bottom navigation tab ("İstatistikler") positioned between Fixture and Formation Builder, providing team statistics at a glance
-- **Top Scorers & Assisters** - Ranked player lists sourced from `cache/squad` in Firebase Realtime Database, with graceful empty state when season stats are not yet populated
-- **Team Form** - Last 6 match results displayed as color-coded W/D/L indicators with opponent names and dates, derived from `cache/matchSummaries`
+- **Top Scorers & Assisters** - Ranked player lists with graceful empty state when season stats are not yet populated
+- **Team Form** - Last 6 match results displayed as color-coded W/D/L indicators with opponent names and dates
 - **Injury & Suspension Status** - Reads from `admin/playerStatus` (manually managed via Firebase Console), showing injured, suspended, and doubtful players with color-coded badges and return estimates
 - **Independent Section States** - Each of the four statistics sections manages its own loading skeleton, error, and empty state independently; a failure in one section does not affect the others
 - **Mobile-First Layout** - All cards full-width, form indicators flex-wrap safe, player names truncated, status badges legible at small sizes
+
+</details>
 
 <details>
 <summary>Previous: v2.7.0 - v2.7.1</summary>
@@ -379,4 +392,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.8.0** | March 2026
+**v2.8.1** | March 2026
