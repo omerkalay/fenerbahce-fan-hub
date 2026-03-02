@@ -233,3 +233,39 @@ export type PitchPlayers = Record<string, Player>;
 // ─── Event Visual Type ───────────────────────────────────
 
 export type EventVisualType = 'goal' | 'substitution' | 'red-card' | 'yellow-card' | 'neutral';
+
+// ─── Statistics ─────────────────────────────────────────
+
+export interface PlayerStat {
+  playerId: string;
+  name: string;
+  goals: number;
+  assists: number;
+  appearances: number;
+  photoUrl?: string;
+}
+
+export interface FormResult {
+  matchId: string;
+  date: string;
+  opponent: string;
+  result: "W" | "D" | "L";
+  score: string;
+  isHome: boolean;
+}
+
+export interface PlayerStatusEntry {
+  name: string;
+  status: "injured" | "suspended" | "doubtful" | "fit";
+  detail: string;
+  returnDate: string;
+  updatedAt: number;
+}
+
+export interface StatisticsData {
+  topScorers: PlayerStat[];
+  topAssisters: PlayerStat[];
+  form: FormResult[];
+  playerStatus: PlayerStatusEntry[];
+  lastUpdated: number | null;
+}

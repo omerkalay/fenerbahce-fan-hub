@@ -8,7 +8,12 @@ import type {
   EspnTeam,
   EspnMatchStatus,
   MatchSummaryData,
+  PlayerStat,
+  FormResult,
+  PlayerStatusEntry,
 } from '../types';
+import { database } from '../firebase';
+import { ref, get } from 'firebase/database';
 
 export const BACKEND_URL = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
 
@@ -372,5 +377,148 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
             matches: [],
             error: true
         };
+    }
+};
+
+// ─── Statistics (Firebase Direct Reads) ─────────────────
+
+interface SquadCacheEntry {
+    id?: number;
+    name?: string;
+    goals?: number;
+    assists?: number;
+    appearances?: number;
+}
+
+export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
+    try {
+        const snapshot = await get(ref(database, 'cache/squad'));
+        const raw = snapshot.val();
+        if (!raw || !Array.isArray(raw)) return [];
+
+        const squad = raw as SquadCacheEntry[];
+
+        const hasAnyStats = squad.some(
+            p => typeof p.goals === 'number' || typeof p.assists === 'number'
+        );
+
+        if (!hasAnyStats) {
+            console.warn('fetchPlayerStats: goals/assists fields absent for all players in cache/squad');
+        }
+
+        return squad.map(p => ({
+            playerId: String(p.id ?? ''),
+            name: String(p.name ?? ''),
+            goals: typeof p.goals === 'number' ? p.goals : 0,
+            assists: typeof p.assists === 'number' ? p.assists : 0,
+            appearances: typeof p.appearances === 'number' ? p.appearances : 0,
+        }));
+    } catch (error) {
+        console.error('Error fetching player stats:', error);
+        return [];
+    }
+};
+
+interface MatchSummaryCacheTeam {
+    id?: string | number;
+    name?: string;
+    score?: string;
+}
+
+interface MatchSummaryCacheEntry {
+    homeTeam?: MatchSummaryCacheTeam;
+    awayTeam?: MatchSummaryCacheTeam;
+    updatedAt?: number;
+}
+
+const FB_ESPN_ID = '436';
+
+const isFenerbahceTeam = (team: MatchSummaryCacheTeam): boolean =>
+    String(team.id) === FB_ESPN_ID ||
+    (team.name || '').toLowerCase().includes('fenerbah');
+
+export const fetchFormResults = async (): Promise<FormResult[]> => {
+    try {
+        const snapshot = await get(ref(database, 'cache/matchSummaries'));
+        const raw = snapshot.val();
+        if (!raw || typeof raw !== 'object') return [];
+
+        const summaries = raw as Record<string, MatchSummaryCacheEntry>;
+        const results: FormResult[] = [];
+
+        for (const [matchId, summary] of Object.entries(summaries)) {
+            const { homeTeam, awayTeam, updatedAt } = summary;
+            if (!homeTeam || !awayTeam) continue;
+
+            const homeScore = Number(homeTeam.score);
+            const awayScore = Number(awayTeam.score);
+            if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) continue;
+
+            const isFbHome = isFenerbahceTeam(homeTeam);
+            const isFbAway = isFenerbahceTeam(awayTeam);
+            if (!isFbHome && !isFbAway) continue;
+
+            const fbScore = isFbHome ? homeScore : awayScore;
+            const oppScore = isFbHome ? awayScore : homeScore;
+            const opponent = (isFbHome ? awayTeam.name : homeTeam.name) || 'Rakip';
+
+            let result: 'W' | 'D' | 'L';
+            if (fbScore > oppScore) result = 'W';
+            else if (fbScore < oppScore) result = 'L';
+            else result = 'D';
+
+            const dateValue =
+                typeof updatedAt === 'number' && updatedAt > 0
+                    ? new Date(updatedAt).toISOString()
+                    : '';
+
+            results.push({
+                matchId,
+                date: dateValue,
+                opponent,
+                result,
+                score: `${homeTeam.score ?? '0'}-${awayTeam.score ?? '0'}`,
+                isHome: isFbHome,
+            });
+        }
+
+        results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        return results.slice(0, 6);
+    } catch (error) {
+        console.error('Error fetching form results:', error);
+        return [];
+    }
+};
+
+export const fetchPlayerStatus = async (): Promise<PlayerStatusEntry[]> => {
+    try {
+        const snapshot = await get(ref(database, 'admin/playerStatus'));
+        const raw = snapshot.val();
+        if (!raw) return [];
+
+        const entries: unknown[] = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>);
+
+        return entries
+            .filter((entry): entry is Record<string, unknown> =>
+                entry !== null && typeof entry === 'object'
+            )
+            .map(entry => {
+                const statusValue = String(entry.status ?? 'fit');
+                const validStatuses: PlayerStatusEntry['status'][] = ['injured', 'suspended', 'doubtful', 'fit'];
+                const status: PlayerStatusEntry['status'] = validStatuses.includes(statusValue as PlayerStatusEntry['status'])
+                    ? (statusValue as PlayerStatusEntry['status'])
+                    : 'fit';
+
+                return {
+                    name: String(entry.name ?? ''),
+                    status,
+                    detail: String(entry.detail ?? ''),
+                    returnDate: String(entry.returnDate ?? ''),
+                    updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : 0,
+                };
+            });
+    } catch (error) {
+        console.error('Error fetching player status:', error);
+        return [];
     }
 };

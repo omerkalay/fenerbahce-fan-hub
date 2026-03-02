@@ -3,10 +3,12 @@ import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
 import NotificationSettings from './components/NotificationSettings';
 import FixtureSchedule from './components/FixtureSchedule';
+import Statistics from './components/Statistics';
+import { BarChart2 } from 'lucide-react';
 import { fetchNextMatch, fetchNext3Matches, BACKEND_URL } from './services/api';
 import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from './types';
 
-type TabId = 'dashboard' | 'fixtures' | 'builder';
+type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
 
 const readCachedMatchData = (): CachedMatchPayload | null => {
   if (typeof window === 'undefined') return null;
@@ -342,6 +344,7 @@ function App() {
             />
           )}
           {activeTab === 'fixtures' && <FixtureSchedule />}
+          {activeTab === 'statistics' && <Statistics />}
           {activeTab === 'builder' && <FormationBuilder />}
         </main>
 
@@ -365,6 +368,14 @@ function App() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z" />
             </svg>
             <span className="text-[10px] mt-1 font-medium">Fikstür</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('statistics')}
+            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'statistics' ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-slate-400 hover:text-white'}`}
+          >
+            <BarChart2 className="h-7 w-7" />
+            <span className="text-[10px] mt-1 font-medium">İstatistikler</span>
           </button>
 
           <button

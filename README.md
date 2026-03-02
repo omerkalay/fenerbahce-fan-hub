@@ -6,67 +6,59 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.7.1-blue)
+![Version](https://img.shields.io/badge/version-2.8.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.7.1
+## What's New in v2.8.0
 
-- **Side-Based Incident Layout** - Live match detail and fixture summary cards now render goals and red cards under each team logo (left/right distribution), matching broadcast-style readability
-- **Clock Alignment Fix** - Incident minute columns now use fixed-width and tabular numerals, preventing 1-digit/2-digit minute shift
-- **Live Halftime UX Update** - Red live badge remains `CANLI`; halftime appears as a separate indicator and center clock localizes to `Devre Arası`
-- **Own Goal Standardization** - `(K.K)` rendering is consistently applied across dashboard and detail surfaces
-- **Cross-Platform Substitution Icon** - Replaced unicode arrow with SVG swap icon for consistent iOS/desktop rendering
-- **Display Name Override** - `Munir Mercan` is now shown as `Levent Mercan` in match event UI
-- **Assist Changes Paused** - Assist parser/backfill experiments were intentionally rolled back in this release for stability
+- **Statistics Tab** - New fourth bottom navigation tab ("İstatistikler") positioned between Fixture and Formation Builder, providing team statistics at a glance
+- **Top Scorers & Assisters** - Ranked player lists sourced from `cache/squad` in Firebase Realtime Database, with graceful empty state when season stats are not yet populated
+- **Team Form** - Last 6 match results displayed as color-coded W/D/L indicators with opponent names and dates, derived from `cache/matchSummaries`
+- **Injury & Suspension Status** - Reads from `admin/playerStatus` (manually managed via Firebase Console), showing injured, suspended, and doubtful players with color-coded badges and return estimates
+- **Independent Section States** - Each of the four statistics sections manages its own loading skeleton, error, and empty state independently; a failure in one section does not affect the others
+- **Mobile-First Layout** - All cards full-width, form indicators flex-wrap safe, player names truncated, status badges legible at small sizes
 
 <details>
-<summary>Previous: v2.7.0</summary>
+<summary>Previous: v2.7.0 - v2.7.1</summary>
 
-- **Full TypeScript Migration** - Entire frontend codebase migrated from JavaScript/JSX to TypeScript/TSX with strict mode enabled. All components, hooks, services, and utilities are now fully typed with zero build errors
-- **Centralized Type System** - Created `src/types/index.ts` with comprehensive type definitions for all API responses (ESPN, SofaScore, Firebase), component props, and application state
-- **Component Refactoring** - Large monolithic components split into focused sub-components and custom hooks:
+- **Side-Based Incident Layout** (v2.7.1) - Live match detail and fixture summary cards now render goals and red cards under each team logo (left/right distribution), matching broadcast-style readability
+- **Clock Alignment Fix** (v2.7.1) - Incident minute columns now use fixed-width and tabular numerals, preventing 1-digit/2-digit minute shift
+- **Live Halftime UX Update** (v2.7.1) - Red live badge remains `CANLI`; halftime appears as a separate indicator and center clock localizes to `Devre Arası`
+- **Own Goal Standardization** (v2.7.1) - `(K.K)` rendering is consistently applied across dashboard and detail surfaces
+- **Cross-Platform Substitution Icon** (v2.7.1) - Replaced unicode arrow with SVG swap icon for consistent iOS/desktop rendering
+- **Display Name Override** (v2.7.1) - `Munir Mercan` is now shown as `Levent Mercan` in match event UI
+- **Full TypeScript Migration** (v2.7.0) - Entire frontend codebase migrated from JavaScript/JSX to TypeScript/TSX with strict mode enabled. All components, hooks, services, and utilities are now fully typed with zero build errors
+- **Centralized Type System** (v2.7.0) - Created `src/types/index.ts` with comprehensive type definitions for all API responses (ESPN, SofaScore, Firebase), component props, and application state
+- **Component Refactoring** (v2.7.0) - Large monolithic components split into focused sub-components and custom hooks:
   - `FixtureSchedule` (766 → 466 lines): Extracted `useFixtureData` hook and `MatchSummaryModal` component
   - `Dashboard` (502 → 352 lines): Extracted `MatchCountdown`, `NextMatchesPanel`, `StandingsModal`, `LiveMatchModal`
   - `FormationBuilder` (576 → 371 lines): Extracted `PlayerSelectionModal`, `PlayerPool`, and `formations` data module
-- **Custom Hooks** - New `src/hooks/useFixtureData.ts` encapsulates all fixture data fetching, filtering, and modal state management
-- **TypeScript Infrastructure** - Added `tsconfig.json` with strict mode, `vite-env.d.ts` with typed environment variables, and `@types/node` for Node.js type support
+- **Custom Hooks** (v2.7.0) - New `src/hooks/useFixtureData.ts` encapsulates all fixture data fetching, filtering, and modal state management
+- **TypeScript Infrastructure** (v2.7.0) - Added `tsconfig.json` with strict mode, `vite-env.d.ts` with typed environment variables, and `@types/node` for Node.js type support
 
 </details>
 
 <details>
-<summary>Previous: v2.6.2</summary>
+<summary>Previous: v2.6.0 - v2.6.2</summary>
 
-- **Standings Direct from ESPN** - Standings are now fetched directly from ESPN on the client side instead of going through the backend cache, providing always up-to-date league tables without 24-hour staleness
-- **Backend Standings Removal** - Removed standings fetch from `dailyDataRefresh` and `handleRefresh` Cloud Functions, reducing scheduled function runtime and Firebase read/write costs
-- **Notification Scheduler Hardening** - Rewrote `checkMatchNotifications` to read only `cache/next3Matches` instead of the full cache tree, use `Intl.DateTimeFormat.formatToParts` for reliable Istanbul timezone calculation, widen daily check window, add `sentForMatch` type safety, and fix `Object.assign` accumulation bug for sent records
-- **Live Match Cache Read Optimization** - `updateLiveMatch` now reads only `cache/nextMatch` instead of the full cache tree
-- **Post-Match Cleanup Fix** - Fixed `postMarkedAt` logic that never triggered because it read from the freshly built live data object instead of the existing cache value
-- **Token Lifecycle Cleanup** - Both manual save and auto-sync now send the previous token to the backend for immediate deletion, preventing zombie token accumulation in the database
-- **Daily Cleanup Date Format Fix** - Fixed `lastDailyNotification` cleanup using mismatched date formats (`toDateString` vs `formatDateKey`)
-
-</details>
-
-<details>
-<summary>Previous: v2.6.1</summary>
-
-- **FCM Token Auto-Sync** - The app now detects FCM token refreshes on every launch and silently re-registers the new token with the backend, preventing missed notifications caused by stale tokens
-- **Foreground Notification Handler** - Added `onMessage` handler so push notifications are displayed even when the app is actively open in the browser
-- **Wider Notification Trigger Window** - Expanded the scheduled notification check window from 2 minutes to 5 minutes to account for Cloud Scheduler timing variance
-
-</details>
-
-<details>
-<summary>Previous: v2.6.0</summary>
-
-- **Fixture Match Summary Modal (Cache-First)** - Added match statistics flow for finished fixtures with backend endpoint `GET /api/match-summary/:matchId`
-- **Persistent Post-Match Continuity** - Added `cache/lastFinishedMatch` fallback so the home card can keep final score/events after `cache/liveMatch` is cleaned
-- **Stored Match Summaries** - Added `cache/matchSummaries/{matchId}` storage and preservation across daily refresh/manual refresh
-- **Live State Reliability Upgrade** - Improved `no-match` handling to prevent incorrect pre-match rendering after kickoff; frontend now uses an explicit `checking` state
-- **Event Pipeline Normalization** - Improved ESPN event normalization/deduplication to avoid conflicting event flags and support assist extraction for goal events
-- **UI and Localization Polish** - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Mac Sonu`, and improved fixture summary header visuals
+- **Standings Direct from ESPN** (v2.6.2) - Standings are now fetched directly from ESPN on the client side instead of going through the backend cache, providing always up-to-date league tables without 24-hour staleness
+- **Backend Standings Removal** (v2.6.2) - Removed standings fetch from `dailyDataRefresh` and `handleRefresh` Cloud Functions, reducing scheduled function runtime and Firebase read/write costs
+- **Notification Scheduler Hardening** (v2.6.2) - Rewrote `checkMatchNotifications` to read only `cache/next3Matches` instead of the full cache tree, use `Intl.DateTimeFormat.formatToParts` for reliable Istanbul timezone calculation, widen daily check window, add `sentForMatch` type safety, and fix `Object.assign` accumulation bug for sent records
+- **Live Match Cache Read Optimization** (v2.6.2) - `updateLiveMatch` now reads only `cache/nextMatch` instead of the full cache tree
+- **Post-Match Cleanup Fix** (v2.6.2) - Fixed `postMarkedAt` logic that never triggered because it read from the freshly built live data object instead of the existing cache value
+- **Token Lifecycle Cleanup** (v2.6.2) - Both manual save and auto-sync now send the previous token to the backend for immediate deletion, preventing zombie token accumulation in the database
+- **FCM Token Auto-Sync** (v2.6.1) - The app now detects FCM token refreshes on every launch and silently re-registers the new token with the backend, preventing missed notifications caused by stale tokens
+- **Foreground Notification Handler** (v2.6.1) - Added `onMessage` handler so push notifications are displayed even when the app is actively open in the browser
+- **Wider Notification Trigger Window** (v2.6.1) - Expanded the scheduled notification check window from 2 minutes to 5 minutes to account for Cloud Scheduler timing variance
+- **Fixture Match Summary Modal (Cache-First)** (v2.6.0) - Added match statistics flow for finished fixtures with backend endpoint `GET /api/match-summary/:matchId`
+- **Persistent Post-Match Continuity** (v2.6.0) - Added `cache/lastFinishedMatch` fallback so the home card can keep final score/events after `cache/liveMatch` is cleaned
+- **Stored Match Summaries** (v2.6.0) - Added `cache/matchSummaries/{matchId}` storage and preservation across daily refresh/manual refresh
+- **Live State Reliability Upgrade** (v2.6.0) - Improved `no-match` handling to prevent incorrect pre-match rendering after kickoff; frontend now uses an explicit `checking` state
+- **Event Pipeline Normalization** (v2.6.0) - Improved ESPN event normalization/deduplication to avoid conflicting event flags and support assist extraction for goal events
+- **UI and Localization Polish** (v2.6.0) - Added `(P)` penalty marker, normalized stoppage-time clock format (`90+5'`), localized `FT` to `Mac Sonu`, and improved fixture summary header visuals
 
 </details>
 
@@ -115,6 +107,34 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Cross-Platform**: Works on mobile & desktop (PWA support)
 - **Beautiful Format**: `Fenerbahce - Opponent | 20:45 - 1 saat kaldi`
 
+### Statistics
+- **Top Scorers**: Ranked list of up to 10 players by goals scored this season, sourced from `cache/squad` in Firebase Realtime Database
+- **Top Assisters**: Ranked list of up to 10 players by assists, same data source as Top Scorers
+- **Team Form**: Last 6 match results displayed as color-coded W/D/L indicators with opponent names and dates, derived from `cache/matchSummaries`
+- **Injury & Suspension Status**: Reads from `admin/playerStatus` in Firebase Realtime Database. Displays injured, suspended, and doubtful players with color-coded status badges and return estimates
+
+#### `admin/playerStatus` Schema
+
+This node is managed manually via the Firebase Console. Each entry:
+
+```json
+{
+  "name": "Player Name",
+  "status": "injured | suspended | doubtful | fit",
+  "detail": "Right knee ligament injury",
+  "returnDate": "March 2026",
+  "updatedAt": 1709500000000
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Player display name |
+| `status` | `"injured" \| "suspended" \| "doubtful" \| "fit"` | Current status. Only non-fit entries are rendered. |
+| `detail` | `string` | Description of injury/suspension |
+| `returnDate` | `string` | Estimated return date (free text) |
+| `updatedAt` | `number` | Unix timestamp in milliseconds. Used to show "Last updated: X hours ago" |
+
 ### Formation Builder
 - **6 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2, 4-1-2-1-2 Diamond
 - **Realistic Pitch**: SVG-based football field with accurate FIFA-standard markings
@@ -161,7 +181,10 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
                 │ cache/       │        ▲
                 │   liveMatch  │────────┘ updateLiveMatch (1/min)
                 │   lastFinishedMatch
+                │   squad          ← Statistics tab reads directly
                 │   matchSummaries/
+                │ admin/       │
+                │   playerStatus   ← Manual (Firebase Console)
                 │ match_polls/ │
                 │ notifications│
                 └──────────────┘
@@ -185,6 +208,7 @@ fenerbahce-fan-hub/
 │   │   ├── StandingsModal.tsx     # Standings modal wrapper
 │   │   ├── FixtureSchedule.tsx    # Fixture tab with ESPN-backed filters
 │   │   ├── MatchSummaryModal.tsx  # Match statistics modal
+│   │   ├── Statistics.tsx          # Statistics tab (scorers, assists, form, injuries)
 │   │   ├── FormationBuilder.tsx   # Interactive pitch & formations
 │   │   ├── PlayerSelectionModal.tsx # Player picker modal
 │   │   ├── PlayerPool.tsx         # Draggable player grid
@@ -355,4 +379,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.7.1** | March 2026
+**v2.8.0** | March 2026
