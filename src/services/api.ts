@@ -419,68 +419,23 @@ export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
     }
 };
 
-interface MatchSummaryCacheTeam {
-    id?: string | number;
-    name?: string;
-    score?: string;
-}
-
-interface MatchSummaryCacheEntry {
-    homeTeam?: MatchSummaryCacheTeam;
-    awayTeam?: MatchSummaryCacheTeam;
-    updatedAt?: number;
-}
-
-const FB_ESPN_ID = '436';
-
-const isFenerbahceTeam = (team: MatchSummaryCacheTeam): boolean =>
-    String(team.id) === FB_ESPN_ID ||
-    (team.name || '').toLowerCase().includes('fenerbah');
+const RESULT_CODE_MAP: Record<string, FormResult['result']> = { G: 'W', M: 'L', B: 'D' };
 
 export const fetchFormResults = async (): Promise<FormResult[]> => {
     try {
-        const snapshot = await get(ref(database, 'cache/matchSummaries'));
-        const raw = snapshot.val();
-        if (!raw || typeof raw !== 'object') return [];
+        const fixtureData = await fetchEspnFenerbahceFixtures();
+        if (!fixtureData.matches || fixtureData.matches.length === 0) return [];
 
-        const summaries = raw as Record<string, MatchSummaryCacheEntry>;
-        const results: FormResult[] = [];
+        const completed = fixtureData.matches.filter(m => m.status.completed && m.resultCode);
 
-        for (const [matchId, summary] of Object.entries(summaries)) {
-            const { homeTeam, awayTeam, updatedAt } = summary;
-            if (!homeTeam || !awayTeam) continue;
-
-            const homeScore = Number(homeTeam.score);
-            const awayScore = Number(awayTeam.score);
-            if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) continue;
-
-            const isFbHome = isFenerbahceTeam(homeTeam);
-            const isFbAway = isFenerbahceTeam(awayTeam);
-            if (!isFbHome && !isFbAway) continue;
-
-            const fbScore = isFbHome ? homeScore : awayScore;
-            const oppScore = isFbHome ? awayScore : homeScore;
-            const opponent = (isFbHome ? awayTeam.name : homeTeam.name) || 'Rakip';
-
-            let result: 'W' | 'D' | 'L';
-            if (fbScore > oppScore) result = 'W';
-            else if (fbScore < oppScore) result = 'L';
-            else result = 'D';
-
-            const dateValue =
-                typeof updatedAt === 'number' && updatedAt > 0
-                    ? new Date(updatedAt).toISOString()
-                    : '';
-
-            results.push({
-                matchId,
-                date: dateValue,
-                opponent,
-                result,
-                score: `${homeTeam.score ?? '0'}-${awayTeam.score ?? '0'}`,
-                isHome: isFbHome,
-            });
-        }
+        const results: FormResult[] = completed.map(m => ({
+            matchId: m.id,
+            date: m.date,
+            opponent: m.opponentTeam.shortName || m.opponentTeam.name,
+            result: RESULT_CODE_MAP[m.resultCode!] || 'D',
+            score: `${m.homeTeam.score ?? '0'}-${m.awayTeam.score ?? '0'}`,
+            isHome: m.isFbHome,
+        }));
 
         results.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return results.slice(0, 6);
