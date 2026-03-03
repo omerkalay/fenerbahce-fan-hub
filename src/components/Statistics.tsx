@@ -140,7 +140,7 @@ const Statistics: React.FC = () => {
                 <SkeletonCard lines={2} />
             ) : (
                 <section className="glass-panel rounded-2xl p-4">
-                    <h3 className="text-[15px] font-bold text-white mb-3">Son Form</h3>
+                    <h3 className="text-sm font-bold text-white mb-3">Son Form</h3>
                     {formError ? (
                         <p className="text-xs text-rose-300">{formError}</p>
                     ) : form.length === 0 ? (
@@ -171,16 +171,16 @@ const Statistics: React.FC = () => {
                                                 <div className="flex items-baseline gap-2">
                                                     <span className="text-sm text-white font-semibold truncate">{entry.name}</span>
                                                     {entry.detail && (
-                                                        <span className="text-xs text-slate-400">{entry.detail}</span>
+                                                        <span className="text-[13px] text-slate-400">{entry.detail}</span>
                                                     )}
                                                 </div>
                                                 {entry.returnDate && (
-                                                    <span className="text-[11px] text-slate-500 block mt-0.5">
+                                                    <span className="text-[13px] text-slate-500 block mt-0.5">
                                                         Tahmini donus: {entry.returnDate}
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className={`text-[11px] uppercase tracking-wider font-semibold shrink-0 ${badge.text} opacity-70 -ml-1`}>
+                                            <span className={`text-[13px] uppercase tracking-wider font-semibold shrink-0 ${badge.text} opacity-70 -ml-1`}>
                                                 {badge.label}
                                             </span>
                                         </div>
@@ -188,7 +188,7 @@ const Statistics: React.FC = () => {
                                 })}
                             </div>
                             {latestUpdatedAt > 0 && (
-                                <p className="text-[11px] text-slate-500 mt-3 text-right">
+                                <p className="text-[13px] text-slate-500 mt-3 text-right">
                                     Son guncelleme: {formatRelativeTime(latestUpdatedAt)}
                                 </p>
                             )}
