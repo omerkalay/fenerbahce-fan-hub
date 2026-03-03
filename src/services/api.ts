@@ -15,6 +15,7 @@ import type {
 import { database } from '../firebase';
 import { ref, get } from 'firebase/database';
 import { localizePlayerName } from '../utils/playerDisplay';
+import { localizeCompetitionName, localizeTeamName } from '../utils/localize';
 
 export const BACKEND_URL = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
 
@@ -117,7 +118,7 @@ const parseEspnStandingsEntries = (entries: EspnStandingsEntry[] = []): Standing
     entries.map(entry => ({
         team: {
             id: entry.team.id,
-            name: entry.team.displayName,
+            name: localizeTeamName(entry.team.displayName),
             logo: entry.team.logos?.[0]?.href || ''
         },
         rank: entry.stats.find(s => s.name === 'rank')?.value || 0,
@@ -273,11 +274,11 @@ const normalizeEspnMatch = (event: EspnEventRaw, sourceCompetition: EspnFixtureC
     return {
         id: String(event.id ?? competition.id ?? `${event.date}-${homeTeam.id}-${awayTeam.id}`),
         date: (event.date ?? competition.date) as string,
-        competitionName: (event?.season?.displayName ?? event?.seasonType?.name ?? 'Süper Lig') as string,
+        competitionName: localizeCompetitionName((event?.season?.displayName ?? event?.seasonType?.name ?? 'Süper Lig') as string),
         competitionKey: sourceCompetition?.slug ?? null,
         competitionGroup: sourceCompetition?.group ?? null,
-        competitionLabel: sourceCompetition?.label ?? null,
-        roundLabel: (competition?.type?.text as string) ?? null,
+        competitionLabel: sourceCompetition?.label ? localizeCompetitionName(sourceCompetition.label) : null,
+        roundLabel: competition?.type?.text ? localizeCompetitionName(competition.type.text as string) : null,
         venueName: (competition?.venue?.fullName as string) ?? null,
         venueCity: (competition?.venue?.address?.city as string) ?? null,
         status: {

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { FormResult } from '../../types';
+import { localizeTeamName } from '../../utils/localize';
 
 const SVG_W = 320;
 const SVG_H = 100;
@@ -134,7 +135,7 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
                             className="absolute flex flex-col items-center -translate-x-1/2"
                             style={{ left: `${xPct}%` }}
                         >
-                            <span className="text-[11px] text-slate-400 truncate max-w-[54px] text-center">{m.opponent}</span>
+                            <span className="text-[11px] text-slate-400 truncate max-w-[54px] text-center">{localizeTeamName(m.opponent)}</span>
                             <span className="text-[10px] text-slate-500">{formatShortDate(m.date)}</span>
                         </div>
                     );
@@ -145,14 +146,14 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
                 onClick={() => setExpanded((value) => !value)}
                 className="w-full flex items-center justify-center gap-1.5 mt-3 pt-2.5 pb-1 border-t border-white/5 text-[11px] text-slate-400 hover:text-slate-300 transition-colors"
             >
-                <span>{expanded ? 'Detaylari Gizle' : 'Detaylari Gor'}</span>
+                <span>{expanded ? 'Detayları Gizle' : 'Detayları Gör'}</span>
                 <ChevronDown size={13} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </button>
 
             {expanded && (
                 <>
                     <div className="pt-2">
-                        <p className="text-[13px] font-semibold text-slate-300 mb-2">Gol Performansi</p>
+                        <p className="text-[13px] font-semibold text-slate-300 mb-2">Gol Performansı</p>
                         <div className="relative" style={{ height: `${BAR_H + 20}px` }}>
                             {goals.map((g, i) => {
                                 const xPct = (pts[i].x / SVG_W) * 100;
@@ -183,7 +184,7 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
                         <div className="flex items-center gap-4 mt-2 justify-center">
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-sm bg-emerald-400/70" />
-                                <span className="text-xs text-slate-500">Atilan</span>
+                                <span className="text-xs text-slate-500">Atılan</span>
                             </span>
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-sm bg-rose-400/50" />
@@ -251,7 +252,7 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
                             </svg>
                             {hasMissingPossession && (
                                 <p className="text-[11px] text-slate-500 mt-2 text-right">
-                                    Bazi maclarda topla oynama verisi yok.
+                                    Bazı maçlarda topla oynama verisi yok.
                                 </p>
                             )}
                         </div>

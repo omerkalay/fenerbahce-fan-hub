@@ -8,6 +8,7 @@ import LiveMatchModal from './LiveMatchModal';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
+import { localizeTeamName, localizeCompetitionName } from '../utils/localize';
 import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent } from '../types';
 
 const isHalftimeDisplay = (statusDetail = '', displayClock = ''): boolean => {
@@ -124,11 +125,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 <div className="flex justify-between items-center mb-6 relative z-10">
                     <span className="text-xs font-bold tracking-wider text-yellow-400 uppercase bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20">
-                        {matchData.tournament.name}
+                        {localizeCompetitionName(matchData.tournament.name)}
                     </span>
 
                     <span className="text-xs text-slate-400 font-medium">
-                        {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                        {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
                     </span>
                 </div>
 
@@ -139,13 +140,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="w-16 h-16 rounded-full bg-white/5 p-2 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                             <TeamLogo
                                 teamId={isHome ? FENERBAHCE_ID : opponent.id}
-                                name={isHome ? 'Fenerbahçe' : opponent.name}
+                                name={isHome ? 'Fenerbahçe' : localizeTeamName(opponent.name)}
                                 wrapperClassName="w-full h-full"
                                 imageClassName="object-contain"
                             />
                         </div>
                         <span className="text-sm font-bold text-center leading-tight">
-                            {isHome ? "Fenerbahçe" : opponent.name}
+                            {isHome ? "Fenerbahçe" : localizeTeamName(opponent.name)}
                         </span>
                     </div>
 
@@ -162,13 +163,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="w-16 h-16 rounded-full bg-white/5 p-2 border border-white/10 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
                             <TeamLogo
                                 teamId={!isHome ? FENERBAHCE_ID : opponent.id}
-                                name={!isHome ? 'Fenerbahçe' : opponent.name}
+                                name={!isHome ? 'Fenerbahçe' : localizeTeamName(opponent.name)}
                                 wrapperClassName="w-full h-full"
                                 imageClassName="object-contain"
                             />
                         </div>
                         <span className="text-sm font-bold text-center leading-tight">
-                            {!isHome ? "Fenerbahçe" : opponent.name}
+                            {!isHome ? "Fenerbahçe" : localizeTeamName(opponent.name)}
                         </span>
                     </div>
                 </div>
@@ -380,14 +381,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Puan Durumu Buttons */}
             <div className="glass-panel rounded-2xl p-4 mb-6">
-                <h3 className="text-sm font-bold text-white mb-4">Puan Durumu</h3>
+                <h3 className="text-sm font-bold text-white mb-3">Puan Durumu</h3>
                 <div className="grid grid-cols-2 gap-3">
                     <button
                         onClick={() => {
                             setStandingsLeague('superlig');
                             setShowStandingsModal(true);
                         }}
-                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 hover:border-yellow-400 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400/90 text-yellow-400/80 hover:text-black border border-yellow-400/20 hover:border-yellow-400/80 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)]"
                     >
                         Süper Lig
                     </button>
@@ -396,7 +397,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             setStandingsLeague('europa');
                             setShowStandingsModal(true);
                         }}
-                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400 text-yellow-400 hover:text-black border border-yellow-400/30 hover:border-yellow-400 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.3)]"
+                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400/90 text-yellow-400/80 hover:text-black border border-yellow-400/20 hover:border-yellow-400/80 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)]"
                     >
                         Avrupa Ligi
                     </button>

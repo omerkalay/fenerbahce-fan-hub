@@ -1,18 +1,11 @@
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
+import { localizeTeamName } from '../utils/localize';
 import type { EspnFixtureMatch, MatchSummaryData } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────
 
-const localizeTeamName = (name: string = ''): string => {
-    if (!name) return name;
-
-    return name
-        .replace(/\bFenerbahce\b/gi, 'Fenerbahçe')
-        .replace(/\bBesiktas\b/gi, 'Beşiktaş')
-        .replace(/\bIstanbul Basaksehir\b/gi, 'İstanbul Başakşehir');
-};
 
 const localizeSummaryStatus = (value: string = ''): string => {
     const normalized = String(value || '').trim().toLowerCase();

@@ -10,7 +10,7 @@ const getStatusBadge = (status: PlayerStatusEntry['status']): { label: string; t
         case 'injured':
             return { label: 'Sakat', text: 'text-red-400' };
         case 'suspended':
-            return { label: 'Cezali', text: 'text-yellow-400' };
+            return { label: 'Cezalı', text: 'text-yellow-400' };
         case 'doubtful':
             return { label: 'Belirsiz', text: 'text-orange-400' };
         default:
@@ -20,10 +20,10 @@ const getStatusBadge = (status: PlayerStatusEntry['status']): { label: string; t
 
 const formatRelativeTime = (timestamp: number): string => {
     const hoursAgo = Math.floor((Date.now() - timestamp) / (1000 * 60 * 60));
-    if (hoursAgo < 1) return 'Az once';
-    if (hoursAgo < 24) return `${hoursAgo} saat once`;
+    if (hoursAgo < 1) return 'Az önce';
+    if (hoursAgo < 24) return `${hoursAgo} saat önce`;
     const daysAgo = Math.floor(hoursAgo / 24);
-    return `${daysAgo} gun once`;
+    return `${daysAgo} gün önce`;
 };
 
 const Statistics: React.FC = () => {
@@ -55,8 +55,8 @@ const Statistics: React.FC = () => {
                 setAssisters(stats);
             } catch {
                 if (!cancelled) {
-                    setScorersError('Gol kralligi verileri yuklenemedi.');
-                    setAssistersError('Asist kralligi verileri yuklenemedi.');
+                    setScorersError('Gol krallığı verileri yüklenemedi.');
+                    setAssistersError('Asist krallığı verileri yüklenemedi.');
                 }
             } finally {
                 if (!cancelled) {
@@ -80,7 +80,7 @@ const Statistics: React.FC = () => {
                 setFormError(null);
                 setForm(results);
             } catch {
-                if (!cancelled) setFormError('Form verileri yuklenemedi.');
+                if (!cancelled) setFormError('Form verileri yüklenemedi.');
             } finally {
                 if (!cancelled) setFormLoading(false);
             }
@@ -100,7 +100,7 @@ const Statistics: React.FC = () => {
                 setStatusError(null);
                 setPlayerStatus(entries);
             } catch {
-                if (!cancelled) setStatusError('Sakatlık verileri yuklenemedi.');
+                if (!cancelled) setStatusError('Sakatlık verileri yüklenemedi.');
             } finally {
                 if (!cancelled) setStatusLoading(false);
             }
@@ -117,22 +117,22 @@ const Statistics: React.FC = () => {
     return (
         <div className="min-h-screen pb-24 space-y-4">
             <PlayerRankingSection
-                title="Gol Kralligi"
+                title="Gol Krallığı"
                 players={scorers}
                 loading={scorersLoading}
                 error={scorersError}
                 metric="goals"
-                emptyMessage="Gol istatistigi henuz mevcut degil."
+                emptyMessage="Gol istatistiği henüz mevcut değil."
                 emptyTabMessage="Bu kategoride gol verisi bulunmuyor."
             />
 
             <PlayerRankingSection
-                title="Asist Kralligi"
+                title="Asist Krallığı"
                 players={assisters}
                 loading={assistersLoading}
                 error={assistersError}
                 metric="assists"
-                emptyMessage="Asist istatistigi henuz mevcut degil."
+                emptyMessage="Asist istatistiği henüz mevcut değil."
                 emptyTabMessage="Bu kategoride asist verisi bulunmuyor."
             />
 
@@ -144,7 +144,7 @@ const Statistics: React.FC = () => {
                     {formError ? (
                         <p className="text-xs text-rose-300">{formError}</p>
                     ) : form.length === 0 ? (
-                        <p className="text-xs text-slate-400">Form verisi henuz mevcut degil.</p>
+                        <p className="text-xs text-slate-400">Form verisi henüz mevcut değil.</p>
                     ) : (
                         <FormChart matches={form} />
                     )}
@@ -176,7 +176,7 @@ const Statistics: React.FC = () => {
                                                 </div>
                                                 {entry.returnDate && (
                                                     <span className="text-[13px] text-slate-500 block mt-0.5">
-                                                        Tahmini donus: {entry.returnDate}
+                                                        Tahmini dönüş: {entry.returnDate}
                                                     </span>
                                                 )}
                                             </div>
@@ -189,7 +189,7 @@ const Statistics: React.FC = () => {
                             </div>
                             {latestUpdatedAt > 0 && (
                                 <p className="text-[13px] text-slate-500 mt-3 text-right">
-                                    Son guncelleme: {formatRelativeTime(latestUpdatedAt)}
+                                    Son güncelleme: {formatRelativeTime(latestUpdatedAt)}
                                 </p>
                             )}
                         </>

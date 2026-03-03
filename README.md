@@ -6,18 +6,29 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.8.2-blue)
+![Version](https://img.shields.io/badge/version-2.8.3-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.8.2
+## What's New in v2.8.3
+
+- **Standings Redesign** - Puan durumu modal now uses `glass-card` styling matching the fixture match statistics modal, with `border-white/10` separators, subtle Fenerbahçe row glow, and compact mobile-friendly layout (no horizontal scrolling)
+- **League Position Zones** - Standings table displays colored zone indicators: Champions League, CL qualifying, Europa League qualifying, Conference League qualifying, and relegation for Süper Lig; Round of 16, seeded/unseeded playoff, and elimination zones for Europa League
+- **Centralized Turkish Localization** - Created `src/utils/localize.ts` with 30+ team name corrections (Kasımpaşa, Göztepe, Ankaragücü, Başakşehir, Eyüpspor, etc.) and 15+ competition name translations (Turkish Cup → Türkiye Kupası, Group A → Grup A, Matchday 1 → 1. Hafta, etc.). Eliminated 3 duplicate `localizeTeamName` functions across components
+- **Turkish Character Fixes** - Fixed 17 user-visible strings with missing Turkish diacritics (ç, ş, ğ, ı, ö, ü) across Statistics and FormChart components: Gol Krallığı, Detayları Gör, Gol Performansı, Son güncelleme, etc.
+- **Dashboard Day Label** - Next match date now includes weekday name (e.g., "4 Mart Çarşamba")
+
+<details>
+<summary>Previous: v2.8.2</summary>
 
 - **Statistics Error-State Reliability** - Statistics service calls now propagate real fetch errors, so section-level error states render correctly instead of silently falling back to empty lists
 - **Possession Chart Data Integrity** - Form possession trend now plots only matches that actually have possession data; removed implicit `%50` fallback that could create misleading visuals
 - **Statistics Code Refactor** - Split monolithic `Statistics.tsx` internals into focused subcomponents (`FormChart`, `PlayerRankingSection`, `SkeletonCard`) to reduce duplication and improve maintainability
 - **Release Version Sync** - Aligned project version metadata for this release (`README`, `package.json`, `package-lock.json`)
+
+</details>
 
 <details>
 <summary>Previous: v2.8.1</summary>
@@ -251,6 +262,7 @@ fenerbahce-fan-hub/
 │   ├── types/
 │   │   └── index.ts               # Centralized TypeScript type definitions
 │   ├── utils/
+│   │   ├── localize.ts            # Turkish localization for ESPN team/competition names
 │   │   └── matchClock.ts          # Match clock formatting utility
 │   ├── firebase.ts                # Firebase client initialization
 │   ├── App.tsx                    # Main app & routing
@@ -402,4 +414,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.8.2** | March 2026
+**v2.8.3** | March 2026

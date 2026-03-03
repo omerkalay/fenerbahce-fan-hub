@@ -1,5 +1,6 @@
 import { useFixtureData } from '../hooks/useFixtureData';
 import MatchSummaryModal from './MatchSummaryModal';
+import { localizeTeamName } from '../utils/localize';
 import type { EspnFixtureMatch, EspnTeam } from '../types';
 
 // ─── Filter types ────────────────────────────────────────
@@ -46,14 +47,6 @@ const COMPETITION_FILTERS: FilterItem[] = [
 
 // ─── Helpers ─────────────────────────────────────────────
 
-const localizeTeamName = (name: string = ''): string => {
-    if (!name) return name;
-
-    return name
-        .replace(/\bFenerbahce\b/gi, 'Fenerbahçe')
-        .replace(/\bBesiktas\b/gi, 'Beşiktaş')
-        .replace(/\bIstanbul Basaksehir\b/gi, 'İstanbul Başakşehir');
-};
 
 const formatMatchDate = (date: string): { full: string; time: string } => {
     const value = new Date(date);

@@ -2,16 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api';
 import type { EspnFixtureMatch, EspnFixtureData, MatchSummaryData } from '../types';
 
-// ─── Helpers (duplicated from FixtureSchedule for filtering) ─
-
-const localizeTeamName = (name: string = ''): string => {
-    if (!name) return name;
-
-    return name
-        .replace(/\bFenerbahce\b/gi, 'Fenerbahçe')
-        .replace(/\bBesiktas\b/gi, 'Beşiktaş')
-        .replace(/\bIstanbul Basaksehir\b/gi, 'İstanbul Başakşehir');
-};
+import { localizeTeamName } from '../utils/localize';
 
 const getMatchTimestamp = (match: EspnFixtureMatch): number => {
     const value = new Date(match?.date).getTime();

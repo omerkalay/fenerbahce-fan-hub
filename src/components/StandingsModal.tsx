@@ -15,17 +15,19 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, onClos
             onClick={onClose}
         >
             <div
-                className="bg-[#0f172a] border-2 border-yellow-400/30 rounded-2xl p-6 max-w-4xl w-full max-h-[85vh] overflow-hidden animate-slideUp shadow-[0_0_40px_rgba(234,179,8,0.2)]"
+                className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20 animate-slideUp"
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-                {/* Header */}
-                <div className="flex justify-between items-center mb-4 pb-4 border-b border-yellow-400/20">
-                    <h2 className="text-xl font-bold text-yellow-400">
-                        {league === 'superlig' ? 'Süper Lig Puan Durumu' : 'UEFA Avrupa Ligi Puan Durumu'}
-                    </h2>
+                <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                    <div>
+                        <p className="text-sm font-bold text-white">
+                            {league === 'superlig' ? 'Süper Lig Puan Durumu' : 'UEFA Avrupa Ligi Puan Durumu'}
+                        </p>
+                    </div>
                     <button
                         onClick={onClose}
-                        className="text-yellow-400 hover:text-white hover:rotate-90 transition-all duration-300"
+                        className="p-1 text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
+                        aria-label="Kapat"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -33,8 +35,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, onClos
                     </button>
                 </div>
 
-                {/* Custom Standings Component */}
-                <div className="w-full">
+                <div className="w-full overflow-y-auto max-h-[calc(88vh-60px)]">
                     <CustomStandings league={league} />
                 </div>
             </div>
