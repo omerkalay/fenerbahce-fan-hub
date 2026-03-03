@@ -400,6 +400,13 @@ interface EspnRosterAthlete {
     };
 }
 
+type RosterStatsMap = Map<string, { name: string; goals: number; assists: number; appearances: number }>;
+
+interface RosterFetchResult {
+    players: RosterStatsMap;
+    ok: boolean;
+}
+
 const getAthleteStat = (athlete: EspnRosterAthlete, statName: string): number => {
     const categories = athlete.statistics?.splits?.categories ?? [];
     for (const cat of categories) {
@@ -409,12 +416,14 @@ const getAthleteStat = (athlete: EspnRosterAthlete, statName: string): number =>
     return 0;
 };
 
-const fetchRosterFromLeague = async (leagueSlug: string): Promise<Map<string, { name: string; goals: number; assists: number; appearances: number }>> => {
-    const map = new Map<string, { name: string; goals: number; assists: number; appearances: number }>();
+const fetchRosterFromLeague = async (leagueSlug: string): Promise<RosterFetchResult> => {
+    const map: RosterStatsMap = new Map<string, { name: string; goals: number; assists: number; appearances: number }>();
     try {
         const url = `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/roster`;
         const response = await fetch(url);
-        if (!response.ok) return map;
+        if (!response.ok) {
+            return { players: map, ok: false };
+        }
         const data = await response.json();
         const athletes: EspnRosterAthlete[] = data?.athletes ?? [];
         for (const a of athletes) {
@@ -427,23 +436,29 @@ const fetchRosterFromLeague = async (leagueSlug: string): Promise<Map<string, { 
                 appearances: getAthleteStat(a, 'appearances'),
             });
         }
-    } catch { /* silently fail for individual league */ }
-    return map;
+        return { players: map, ok: true };
+    } catch {
+        return { players: map, ok: false };
+    }
 };
 
 export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
     try {
-        const [leagueMap, europaMap] = await Promise.all([
+        const [league, europa] = await Promise.all([
             fetchRosterFromLeague('tur.1'),
             fetchRosterFromLeague('uefa.europa'),
         ]);
 
-        const allIds = new Set([...leagueMap.keys(), ...europaMap.keys()]);
+        if (!league.ok && !europa.ok) {
+            throw new Error('Both ESPN player stats sources failed.');
+        }
+
+        const allIds = new Set([...league.players.keys(), ...europa.players.keys()]);
         const players: PlayerStat[] = [];
 
         for (const id of allIds) {
-            const lg = leagueMap.get(id);
-            const eu = europaMap.get(id);
+            const lg = league.players.get(id);
+            const eu = europa.players.get(id);
             const name = lg?.name || eu?.name || '';
             const leagueGoals = lg?.goals ?? 0;
             const leagueAssists = lg?.assists ?? 0;
@@ -466,7 +481,8 @@ export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
         return players;
     } catch (error) {
         console.error('Error fetching player stats:', error);
-        return [];
+        if (error instanceof Error) throw error;
+        throw new Error('Player stats fetch failed.');
     }
 };
 
@@ -477,6 +493,9 @@ const POSSESSION_KEYS = ['possessionPct', 'possession'];
 export const fetchFormResults = async (): Promise<FormResult[]> => {
     try {
         const fixtureData = await fetchEspnFenerbahceFixtures();
+        if (fixtureData.error) {
+            throw new Error('ESPN fixture data unavailable.');
+        }
         if (!fixtureData.matches || fixtureData.matches.length === 0) return [];
 
         const completed = fixtureData.matches.filter(m => m.status.completed && m.resultCode);
@@ -516,7 +535,8 @@ export const fetchFormResults = async (): Promise<FormResult[]> => {
         return recent;
     } catch (error) {
         console.error('Error fetching form results:', error);
-        return [];
+        if (error instanceof Error) throw error;
+        throw new Error('Form results fetch failed.');
     }
 };
 
@@ -549,6 +569,7 @@ export const fetchPlayerStatus = async (): Promise<PlayerStatusEntry[]> => {
             });
     } catch (error) {
         console.error('Error fetching player status:', error);
-        return [];
+        if (error instanceof Error) throw error;
+        throw new Error('Player status fetch failed.');
     }
 };

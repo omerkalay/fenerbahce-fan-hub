@@ -6,13 +6,21 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.8.1-blue)
+![Version](https://img.shields.io/badge/version-2.8.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.8.1
+## What's New in v2.8.2
+
+- **Statistics Error-State Reliability** - Statistics service calls now propagate real fetch errors, so section-level error states render correctly instead of silently falling back to empty lists
+- **Possession Chart Data Integrity** - Form possession trend now plots only matches that actually have possession data; removed implicit `%50` fallback that could create misleading visuals
+- **Statistics Code Refactor** - Split monolithic `Statistics.tsx` internals into focused subcomponents (`FormChart`, `PlayerRankingSection`, `SkeletonCard`) to reduce duplication and improve maintainability
+- **Release Version Sync** - Aligned project version metadata for this release (`README`, `package.json`, `package-lock.json`)
+
+<details>
+<summary>Previous: v2.8.1</summary>
 
 - **ESPN Direct Player Stats** - Goal and assist data now fetched directly from ESPN roster endpoints (`tur.1` + `uefa.europa`) instead of Firebase `cache/squad`, eliminating dependency on daily cache refresh
 - **League / Europa Filtering** - Scorers and assisters sections now have Toplam / Süper Lig / Avrupa tab filters with underline-style tab navigation, allowing users to view stats broken down by competition
@@ -21,6 +29,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Possession Data Enrichment** - Form results are enriched with ball possession percentage from cached match summaries, displayed as an interactive trend chart
 - **Refined Injury/Status Design** - Player name and injury detail shown inline, status indicator uses typographic uppercase labels instead of pill badges, return date displayed below
 - **Underline Tab Design** - Competition filter tabs use minimal underline indicator style matching the site's premium dark theme, replacing generic rounded-pill buttons
+
+</details>
 
 <details>
 <summary>Previous: v2.8.0</summary>
@@ -121,10 +131,10 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Beautiful Format**: `Fenerbahce - Opponent | 20:45 - 1 saat kaldi`
 
 ### Statistics
-- **Top Scorers**: Ranked list of up to 10 players by goals scored this season, sourced from `cache/squad` in Firebase Realtime Database
-- **Top Assisters**: Ranked list of up to 10 players by assists, same data source as Top Scorers
-- **Team Form**: Last 6 match results displayed as color-coded W/D/L indicators with opponent names and dates, derived from `cache/matchSummaries`
-- **Injury & Suspension Status**: Reads from `admin/playerStatus` in Firebase Realtime Database. Displays injured, suspended, and doubtful players with color-coded status badges and return estimates
+- **Top Scorers**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with Toplam / Süper Lig / Avrupa filters
+- **Top Assisters**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with per-competition filtering
+- **Team Form**: Interactive SVG trend over the last 6 completed matches (G/B/M trajectory + expandable goal performance and possession trend)
+- **Injury & Suspension Status**: Reads from `admin/playerStatus` in Firebase Realtime Database. Displays injured, suspended, and doubtful players with status label and return estimate
 
 #### `admin/playerStatus` Schema
 
@@ -392,4 +402,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.8.1** | March 2026
+**v2.8.2** | March 2026
