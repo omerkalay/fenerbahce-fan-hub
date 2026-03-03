@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { database } from '../firebase';
 import { ref, get } from 'firebase/database';
+import { localizePlayerName } from '../utils/playerDisplay';
 
 export const BACKEND_URL = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
 
@@ -420,7 +421,7 @@ const fetchRosterFromLeague = async (leagueSlug: string): Promise<Map<string, { 
             const id = String(a.id ?? '');
             if (!id) continue;
             map.set(id, {
-                name: String(a.displayName ?? ''),
+                name: localizePlayerName(String(a.displayName ?? '')),
                 goals: getAthleteStat(a, 'totalGoals'),
                 assists: getAthleteStat(a, 'goalAssists'),
                 appearances: getAthleteStat(a, 'appearances'),
