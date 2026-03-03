@@ -20,7 +20,7 @@ const SkeletonCard: React.FC<{ lines?: number }> = ({ lines = 3 }) => (
 
 const SVG_W = 320;
 const SVG_H = 96;
-const SVG_L = 28;
+const SVG_L = 36;
 const SVG_R = 12;
 const SVG_T = 14;
 const SVG_B = 14;
@@ -79,8 +79,8 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
     const maxGoal = Math.max(...goals.flatMap(g => [g.scored, g.conceded]), 1);
     const BAR_H = 44;
 
-    const padL = `${(SVG_L / SVG_W) * 100}%`;
-    const padR = `${(SVG_R / SVG_W) * 100}%`;
+    const padL = `${((SVG_L - 6) / SVG_W) * 100}%`;
+    const padR = `${((SVG_R - 6) / SVG_W) * 100}%`;
 
     const hasPossession = data.some(m => m.possession != null);
     const possPts = hasPossession
@@ -131,8 +131,8 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
             <div className="flex justify-between mt-1" style={{ paddingLeft: padL, paddingRight: padR }}>
                 {data.map(m => (
                     <div key={m.matchId} className="flex flex-col items-center min-w-0">
-                        <span className="text-[9px] text-slate-400 truncate max-w-[44px] text-center">{m.opponent}</span>
-                        <span className="text-[8px] text-slate-500">{formatShortDate(m.date)}</span>
+                        <span className="text-[11px] text-slate-400 truncate max-w-[52px] text-center">{m.opponent}</span>
+                        <span className="text-[10px] text-slate-500">{formatShortDate(m.date)}</span>
                     </div>
                 ))}
             </div>
@@ -140,41 +140,41 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
             {/* Expand/Collapse Button */}
             <button
                 onClick={() => setExpanded(e => !e)}
-                className="w-full flex items-center justify-center gap-1.5 mt-3 pt-2.5 pb-1 border-t border-white/5 text-[11px] text-slate-400 hover:text-slate-300 transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 mt-3 pt-2.5 pb-1 border-t border-white/5 text-xs text-slate-400 hover:text-slate-300 transition-colors"
             >
                 <span>{expanded ? 'Detaylari Gizle' : 'Detaylari Gor'}</span>
-                <ChevronDown size={13} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
             </button>
 
             {expanded && (
                 <>
                     {/* Goal Performance */}
                     <div className="pt-2">
-                        <p className="text-[11px] font-semibold text-slate-300 mb-2">Gol Performansi</p>
+                        <p className="text-xs font-semibold text-slate-300 mb-2">Gol Performansi</p>
                         <div className="flex justify-between" style={{ paddingLeft: padL, paddingRight: padR }}>
                             {goals.map((g, i) => (
                                 <div key={i} className="flex flex-col items-center">
-                                    <div className="flex gap-[3px] items-end" style={{ height: `${BAR_H}px` }}>
-                                        <div className="w-[7px] rounded-t-sm bg-emerald-400/70"
+                                    <div className="flex gap-1 items-end" style={{ height: `${BAR_H}px` }}>
+                                        <div className="w-[9px] rounded-t-sm bg-emerald-400/70"
                                             style={{ height: g.scored > 0 ? `${Math.max((g.scored / maxGoal) * BAR_H, 4)}px` : '0px' }} />
-                                        <div className="w-[7px] rounded-t-sm bg-rose-400/50"
+                                        <div className="w-[9px] rounded-t-sm bg-rose-400/50"
                                             style={{ height: g.conceded > 0 ? `${Math.max((g.conceded / maxGoal) * BAR_H, 4)}px` : '0px' }} />
                                     </div>
-                                    <div className="flex gap-[3px] mt-0.5">
-                                        <span className="w-[7px] text-[8px] text-slate-500 text-center">{g.scored}</span>
-                                        <span className="w-[7px] text-[8px] text-slate-500 text-center">{g.conceded}</span>
+                                    <div className="flex gap-1 mt-0.5">
+                                        <span className="w-[9px] text-[10px] text-slate-500 text-center">{g.scored}</span>
+                                        <span className="w-[9px] text-[10px] text-slate-500 text-center">{g.conceded}</span>
                                     </div>
                                 </div>
                             ))}
                         </div>
                         <div className="flex items-center gap-4 mt-2 justify-center">
-                            <span className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-sm bg-emerald-400/70" />
-                                <span className="text-[9px] text-slate-500">Atilan</span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-sm bg-emerald-400/70" />
+                                <span className="text-[11px] text-slate-500">Atilan</span>
                             </span>
-                            <span className="flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-sm bg-rose-400/50" />
-                                <span className="text-[9px] text-slate-500">Yenilen</span>
+                            <span className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-sm bg-rose-400/50" />
+                                <span className="text-[11px] text-slate-500">Yenilen</span>
                             </span>
                         </div>
                     </div>
@@ -182,13 +182,13 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
                     {/* Possession Trend */}
                     {hasPossession && (
                         <div className="border-t border-white/5 mt-3 pt-3">
-                            <p className="text-[11px] font-semibold text-slate-300 mb-2">Topla Oynama %</p>
+                            <p className="text-xs font-semibold text-slate-300 mb-2">Topla Oynama %</p>
                             <svg viewBox={`0 0 ${SVG_W} ${POSS_SVG_H}`} className="w-full" preserveAspectRatio="xMidYMid meet">
                                 {POSS_GUIDE_VALS.map(v => {
                                     const gy = possY(v);
                                     return (
                                         <g key={`pg-${v}`}>
-                                            <text x="6" y={gy + 3} fill="rgba(148,163,184,0.5)" fontSize="8" fontFamily="inherit">%{v}</text>
+                                            <text x="6" y={gy + 3} fill="rgba(148,163,184,0.5)" fontSize="10" fontFamily="inherit">%{v}</text>
                                             <line x1={SVG_L - 4} y1={gy} x2={SVG_W - SVG_R + 4} y2={gy}
                                                 stroke="rgba(255,255,255,0.04)" strokeWidth="1" strokeDasharray="3 5" />
                                         </g>
@@ -203,15 +203,15 @@ const FormChart: React.FC<{ matches: FormResult[] }> = ({ matches }) => {
                                     const next = possPts[i + 1];
                                     return (
                                         <line key={`ps-${i}`} x1={p.x} y1={p.y} x2={next.x} y2={next.y}
-                                            stroke={POSS_COLOR} strokeOpacity="0.4" strokeWidth="2" strokeLinecap="round" />
+                                            stroke={POSS_COLOR} strokeOpacity="0.4" strokeWidth="2.5" strokeLinecap="round" />
                                     );
                                 })}
 
                                 {possPts.map((p, i) => (
                                     <g key={`pd-${i}`}>
-                                        <circle cx={p.x} cy={p.y} r="7" fill={POSS_GLOW} />
-                                        <circle cx={p.x} cy={p.y} r="3.5" fill={POSS_COLOR} />
-                                        <text x={p.x} y={p.y - 8} textAnchor="middle" fill="rgba(148,163,184,0.7)" fontSize="7" fontFamily="inherit">
+                                        <circle cx={p.x} cy={p.y} r="8" fill={POSS_GLOW} />
+                                        <circle cx={p.x} cy={p.y} r="4" fill={POSS_COLOR} />
+                                        <text x={p.x} y={p.y - 9} textAnchor="middle" fill="rgba(148,163,184,0.8)" fontSize="9" fontFamily="inherit">
                                             {Math.round(p.val)}
                                         </text>
                                     </g>
@@ -468,7 +468,7 @@ const Statistics: React.FC = () => {
                 <SkeletonCard lines={2} />
             ) : (
                 <section className="glass-panel rounded-2xl p-4">
-                    <h3 className="text-sm font-bold text-white mb-3">Son Form</h3>
+                    <h3 className="text-[15px] font-bold text-white mb-3">Son Form</h3>
                     {formError ? (
                         <p className="text-xs text-rose-300">{formError}</p>
                     ) : form.length === 0 ? (
@@ -484,7 +484,7 @@ const Statistics: React.FC = () => {
                 <SkeletonCard lines={3} />
             ) : (
                 <section className="glass-panel rounded-2xl p-4">
-                    <h3 className="text-sm font-bold text-white mb-3">Sakatlık ve Ceza Durumu</h3>
+                    <h3 className="text-[15px] font-bold text-white mb-3">Sakatlık ve Ceza Durumu</h3>
                     {statusError ? (
                         <p className="text-xs text-rose-300">{statusError}</p>
                     ) : activeStatusEntries.length === 0 ? (
@@ -498,18 +498,18 @@ const Statistics: React.FC = () => {
                                         <div key={`${entry.name}-${index}`} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-baseline gap-2">
-                                                    <span className="text-[13px] text-white font-semibold truncate">{entry.name}</span>
+                                                    <span className="text-sm text-white font-semibold truncate">{entry.name}</span>
                                                     {entry.detail && (
-                                                        <span className="text-[11px] text-slate-400">{entry.detail}</span>
+                                                        <span className="text-xs text-slate-400">{entry.detail}</span>
                                                     )}
                                                 </div>
                                                 {entry.returnDate && (
-                                                    <span className="text-[10px] text-slate-500 block mt-0.5">
+                                                    <span className="text-[11px] text-slate-500 block mt-0.5">
                                                         Tahmini donus: {entry.returnDate}
                                                     </span>
                                                 )}
                                             </div>
-                                            <span className={`text-[10px] uppercase tracking-wider font-semibold shrink-0 ${badge.text} opacity-70 -ml-1`}>
+                                            <span className={`text-[11px] uppercase tracking-wider font-semibold shrink-0 ${badge.text} opacity-70 -ml-1`}>
                                                 {badge.label}
                                             </span>
                                         </div>
@@ -517,7 +517,7 @@ const Statistics: React.FC = () => {
                                 })}
                             </div>
                             {latestUpdatedAt > 0 && (
-                                <p className="text-[10px] text-slate-500 mt-3 text-right">
+                                <p className="text-[11px] text-slate-500 mt-3 text-right">
                                     Son guncelleme: {formatRelativeTime(latestUpdatedAt)}
                                 </p>
                             )}
