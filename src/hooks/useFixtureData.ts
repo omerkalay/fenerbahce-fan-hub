@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api';
+import { useCooldown } from './useCooldown';
 import type { EspnFixtureMatch, EspnFixtureData, MatchSummaryData } from '../types';
 
 import { localizeTeamName } from '../utils/localize';
@@ -73,7 +74,7 @@ export function useFixtureData() {
         }
     }, [loading, fixtureData]);
 
-    const handleRefresh = async () => {
+    const refreshAction = async () => {
         setError(null);
         setIsRefreshing(true);
         const data = await fetchEspnFenerbahceFixtures();
@@ -83,6 +84,8 @@ export function useFixtureData() {
         setFixtureData(data);
         setIsRefreshing(false);
     };
+
+    const { execute: handleRefresh, isCoolingDown: isRefreshCoolingDown } = useCooldown(refreshAction, 5_000);
 
     // ─── Derived / filtered data ─────────────────────────
 
@@ -202,6 +205,7 @@ export function useFixtureData() {
         error,
         isRefreshing,
         handleRefresh,
+        isRefreshCoolingDown,
 
         // Filters
         statusFilter,

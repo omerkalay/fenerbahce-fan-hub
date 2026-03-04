@@ -174,6 +174,7 @@ function FixtureSchedule() {
         error,
         isRefreshing,
         handleRefresh,
+        isRefreshCoolingDown,
         statusFilter,
         setStatusFilter,
         showFilters,
@@ -241,7 +242,7 @@ function FixtureSchedule() {
 
                         <button
                             onClick={handleRefresh}
-                            disabled={loading || isRefreshing}
+                            disabled={loading || isRefreshing || isRefreshCoolingDown}
                             className="h-[38px] px-[11px] rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1.5"
                             title="Fikstürü yenile"
                         >

@@ -6,19 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.8.3-blue)
+![Version](https://img.shields.io/badge/version-2.8.4-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.8.3
+## What's New in v2.8.4
+
+- **Error Boundaries** - Each main tab (Pano, Fikstür, İstatistikler, Kadro Kur) is now wrapped in an `ErrorBoundary` so a crash in one section no longer takes down the entire app; users see a friendly fallback with a "Tekrar Dene" recovery button
+- **Refresh Rate Limiting** - Fixture refresh button now has a 5-second cooldown after each use, preventing accidental backend spam from rapid clicks
+- **Reusable `useCooldown` Hook** - New `src/hooks/useCooldown.ts` utility that wraps any async action with a configurable cooldown period; ready to apply to other interactive surfaces
+
+<details>
+<summary>Previous: v2.8.3</summary>
 
 - **Standings Redesign** - Puan durumu modal now uses `glass-card` styling matching the fixture match statistics modal, with `border-white/10` separators, subtle Fenerbahçe row glow, and compact mobile-friendly layout (no horizontal scrolling)
 - **League Position Zones** - Standings table displays colored zone indicators: Champions League, CL qualifying, Europa League qualifying, Conference League qualifying, and relegation for Süper Lig; Round of 16, seeded/unseeded playoff, and elimination zones for Europa League
 - **Centralized Turkish Localization** - Created `src/utils/localize.ts` with 30+ team name corrections (Kasımpaşa, Göztepe, Ankaragücü, Başakşehir, Eyüpspor, etc.) and 15+ competition name translations (Turkish Cup → Türkiye Kupası, Group A → Grup A, Matchday 1 → 1. Hafta, etc.). Eliminated 3 duplicate `localizeTeamName` functions across components
 - **Turkish Character Fixes** - Fixed 17 user-visible strings with missing Turkish diacritics (ç, ş, ğ, ı, ö, ü) across Statistics and FormChart components: Gol Krallığı, Detayları Gör, Gol Performansı, Son güncelleme, etc.
 - **Dashboard Day Label** - Next match date now includes weekday name (e.g., "4 Mart Çarşamba")
+
+</details>
 
 <details>
 <summary>Previous: v2.8.2</summary>
@@ -251,8 +260,10 @@ fenerbahce-fan-hub/
 │   │   ├── CustomStandings.tsx    # Standings table
 │   │   ├── LiveMatchScore.tsx     # Live match tracker
 │   │   ├── MatchEventIcon.tsx     # Match event icon renderer
+│   │   ├── ErrorBoundary.tsx       # Reusable error boundary with recovery UI
 │   │   └── TeamLogo.tsx           # Team logo with fallback
 │   ├── hooks/
+│   │   ├── useCooldown.ts         # Reusable async action cooldown hook
 │   │   └── useFixtureData.ts      # Fixture data fetching & filtering hook
 │   ├── services/
 │   │   └── api.ts                 # Firebase API integration + ESPN fixture aggregation
@@ -414,4 +425,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.8.3** | March 2026
+**v2.8.4** | March 2026

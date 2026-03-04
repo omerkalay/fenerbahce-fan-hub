@@ -4,6 +4,7 @@ import FormationBuilder from './components/FormationBuilder';
 import NotificationSettings from './components/NotificationSettings';
 import FixtureSchedule from './components/FixtureSchedule';
 import Statistics from './components/Statistics';
+import ErrorBoundary from './components/ErrorBoundary';
 import { BarChart2 } from 'lucide-react';
 import { fetchNextMatch, fetchNext3Matches, BACKEND_URL } from './services/api';
 import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from './types';
@@ -330,22 +331,36 @@ function App() {
         {/* Main Content */}
         <main className="flex-1 px-4 overflow-y-auto no-scrollbar">
           {activeTab === 'dashboard' && (
-            <Dashboard
-              matchData={currentMatch}
-              next3Matches={next3Matches}
-              loading={loading && !matchData}
-              onRetry={loadMatchData}
-              errorMessage={errorMessage}
-              lastUpdated={lastUpdated}
-              isRefreshing={isRefreshing}
-              liveMatchState={liveMatchState}
-              liveMatchData={liveMatchData}
-              onCountdownEnd={onCountdownEnd}
-            />
+            <ErrorBoundary fallbackTitle="Pano">
+              <Dashboard
+                matchData={currentMatch}
+                next3Matches={next3Matches}
+                loading={loading && !matchData}
+                onRetry={loadMatchData}
+                errorMessage={errorMessage}
+                lastUpdated={lastUpdated}
+                isRefreshing={isRefreshing}
+                liveMatchState={liveMatchState}
+                liveMatchData={liveMatchData}
+                onCountdownEnd={onCountdownEnd}
+              />
+            </ErrorBoundary>
           )}
-          {activeTab === 'fixtures' && <FixtureSchedule />}
-          {activeTab === 'statistics' && <Statistics />}
-          {activeTab === 'builder' && <FormationBuilder />}
+          {activeTab === 'fixtures' && (
+            <ErrorBoundary fallbackTitle="Fikstür">
+              <FixtureSchedule />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'statistics' && (
+            <ErrorBoundary fallbackTitle="İstatistikler">
+              <Statistics />
+            </ErrorBoundary>
+          )}
+          {activeTab === 'builder' && (
+            <ErrorBoundary fallbackTitle="Kadro Kur">
+              <FormationBuilder />
+            </ErrorBoundary>
+          )}
         </main>
 
         {/* Bottom Navigation */}
