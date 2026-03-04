@@ -21,7 +21,7 @@ export function useFixtureData() {
     const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
 
-    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('upcoming');
     const [showFilters, setShowFilters] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [venueFilter, setVenueFilter] = useState<string>('all');
@@ -66,6 +66,12 @@ export function useFixtureData() {
             isMounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        if (!loading && fixtureData && statusFilter === 'upcoming' && upcomingMatches.length === 0) {
+            setStatusFilter('played');
+        }
+    }, [loading, fixtureData]);
 
     const handleRefresh = async () => {
         setError(null);

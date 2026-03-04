@@ -28,9 +28,9 @@ interface FixtureMatchCardProps {
 // ─── Filter constants ────────────────────────────────────
 
 const STATUS_FILTERS: FilterItem[] = [
-    { id: 'all', label: 'Tümü' },
+    { id: 'upcoming', label: 'Kalan' },
     { id: 'played', label: 'Biten' },
-    { id: 'upcoming', label: 'Kalan' }
+    { id: 'all', label: 'Tümü' }
 ];
 
 const VENUE_FILTERS: FilterItem[] = [
