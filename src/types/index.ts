@@ -130,6 +130,7 @@ export interface EspnMatchStatus {
 export interface EspnFixtureMatch {
   id: string;
   date: string;
+  timeValid: boolean;
   competitionName: string;
   competitionKey: string | null;
   competitionGroup: string | null;

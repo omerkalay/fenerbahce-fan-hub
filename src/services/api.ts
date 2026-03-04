@@ -223,6 +223,7 @@ interface EspnEventRaw {
   competitions?: Array<{
     id?: string;
     date?: string;
+    timeValid?: boolean;
     competitors?: EspnCompetitorRaw[];
     status?: { type?: Record<string, unknown> };
     type?: { text?: string };
@@ -274,6 +275,7 @@ const normalizeEspnMatch = (event: EspnEventRaw, sourceCompetition: EspnFixtureC
     return {
         id: String(event.id ?? competition.id ?? `${event.date}-${homeTeam.id}-${awayTeam.id}`),
         date: (event.date ?? competition.date) as string,
+        timeValid: competition?.timeValid !== false,
         competitionName: localizeCompetitionName((event?.season?.displayName ?? event?.seasonType?.name ?? 'Süper Lig') as string),
         competitionKey: sourceCompetition?.slug ?? null,
         competitionGroup: sourceCompetition?.group ?? null,

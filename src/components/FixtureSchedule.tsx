@@ -116,7 +116,7 @@ const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSumma
                 }`}
         >
             <p className={`text-[12px] mb-3 ${featured ? 'text-slate-300' : 'text-slate-400'}`}>
-                {dateInfo.full} • {dateInfo.time}
+                {dateInfo.full} • {match.timeValid ? dateInfo.time : <span className="text-slate-500 italic">Saat belirlenmedi</span>}
             </p>
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
