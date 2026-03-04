@@ -62,13 +62,7 @@ const NotificationSettings = () => {
                 const { getToken } = await import('firebase/messaging');
                 if (!messaging) return;
 
-                const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
-                const fcmScope = `${import.meta.env.BASE_URL}firebase-cloud-messaging-push-scope`;
-
-                let registration = await navigator.serviceWorker.getRegistration(fcmScope);
-                if (!registration) {
-                    registration = await navigator.serviceWorker.register(swUrl, { scope: fcmScope });
-                }
+                const registration = await navigator.serviceWorker.ready;
 
                 const currentToken = await getToken(messaging, {
                     vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
@@ -145,31 +139,16 @@ const NotificationSettings = () => {
                         const { messaging } = await import('../firebase');
                         const { getToken } = await import('firebase/messaging');
 
-                        const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`;
-                        const fcmScope = `${import.meta.env.BASE_URL}firebase-cloud-messaging-push-scope`;
+                        if (!messaging) throw new Error('Firebase Messaging başlatılamadı');
 
-                        try {
-                            let registration = await navigator.serviceWorker.getRegistration(fcmScope);
-                            if (!registration) {
-                                registration = await navigator.serviceWorker.register(swUrl, {
-                                    scope: fcmScope
-                                });
-                            }
+                        const registration = await navigator.serviceWorker.ready;
 
-                            // Service worker'ın aktif olmasını bekle
-                            await navigator.serviceWorker.ready;
-
-                            token = await getToken(messaging, {
-                                vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
-                                serviceWorkerRegistration: registration
-                            });
-                            if (token) {
-                                localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
-                            }
-                        } catch (swError: unknown) {
-                            console.error('FCM Service Worker registration failed:', swError);
-                            alert(`❌ Service Worker hatası: ${(swError as Error).message}`);
-                            return;
+                        token = await getToken(messaging, {
+                            vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
+                            serviceWorkerRegistration: registration
+                        });
+                        if (token) {
+                            localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
                         }
                     } else {
                         alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');

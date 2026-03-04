@@ -49,6 +49,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        importScripts: [`${appBase}firebase-messaging-sw.js`],
+        globIgnores: ['**/firebase-messaging-sw.js', '**/firebase-messaging-sw-template.js'],
         runtimeCaching: [
           {
             urlPattern: new RegExp(`${backendUrl}/api/(next-match|next-3-matches|squad)`),

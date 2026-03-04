@@ -15,6 +15,7 @@ backend/.env
 
 # Generated files
 public/firebase-messaging-sw.js
+*.tsbuildinfo
 
 # Firebase CLI cache
 .firebase/

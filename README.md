@@ -6,17 +6,26 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.8.4-blue)
+![Version](https://img.shields.io/badge/version-2.8.5-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
 
-## What's New in v2.8.4
+## What's New in v2.8.5
+
+- **Service Worker Scope Fix** - Merged Workbox PWA and Firebase Messaging service workers into a single scope via `importScripts`, fixing push notification delivery failures on iOS devices
+- **Backend Modularization** - Split monolithic `functions/index.js` (1,323 lines) into modular structure: `config.js`, `services/` (ESPN, SofaScore), `handlers/` (API endpoints), `schedulers/` (cron jobs) with a clean re-export hub
+- **TypeScript Config Cleanup** - Fixed `tsconfig.node.json` errors (`allowImportingTsExtensions` + `composite` conflict), removed unnecessary project reference
+
+<details>
+<summary>Previous: v2.8.4</summary>
 
 - **Error Boundaries** - Each main tab (Pano, Fikstür, İstatistikler, Kadro Kur) is now wrapped in an `ErrorBoundary` so a crash in one section no longer takes down the entire app; users see a friendly fallback with a "Tekrar Dene" recovery button
 - **Refresh Rate Limiting** - Fixture refresh button now has a 5-second cooldown after each use, preventing accidental backend spam from rapid clicks
 - **Reusable `useCooldown` Hook** - New `src/hooks/useCooldown.ts` utility that wraps any async action with a configurable cooldown period; ready to apply to other interactive surfaces
+
+</details>
 
 <details>
 <summary>Previous: v2.8.3</summary>
@@ -240,7 +249,17 @@ Note: The fixture tab fetches ESPN fixture schedules directly from the frontend 
 ```
 fenerbahce-fan-hub/
 ├── functions/
-│   ├── index.js           # Firebase Cloud Functions (ALL backend logic)
+│   ├── index.js           # Cloud Functions re-export hub
+│   ├── config.js          # Firebase init, secrets, constants, helpers
+│   ├── services/
+│   │   ├── espn.js        # ESPN data fetching & event parsing
+│   │   └── sofascore.js   # SofaScore API calls (matches, squad, images)
+│   ├── handlers/
+│   │   └── api.js         # HTTP endpoint routing & handler functions
+│   ├── schedulers/
+│   │   ├── dailyRefresh.js    # Daily data refresh (03:00 UTC)
+│   │   ├── liveMatch.js       # Live match updater (every 1 min)
+│   │   └── notifications.js   # Match notification checker (every 1 min)
 │   └── package.json       # Functions dependencies
 ├── src/
 │   ├── components/
@@ -425,4 +444,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.8.4** | March 2026
+**v2.8.5** | March 2026
