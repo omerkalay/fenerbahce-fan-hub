@@ -47,7 +47,10 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
             return [];
         };
 
-        for (const [playerId, playerData] of Object.entries(allNotifications)) {
+        for (const [userId, playerData] of Object.entries(allNotifications)) {
+            // Support both new (uid-keyed with fcmToken field) and legacy (token-keyed) entries
+            const token = playerData.fcmToken || userId;
+
             if (playerData.dailyCheck && isDailyCheckTime) {
                 const todayStr = formatDateKey(now);
                 const nextMatch = nextMatches[0];
@@ -66,9 +69,9 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                         });
 
                         pendingNotifications.push({
-                            playerId,
+                            playerId: userId,
                             message: {
-                                token: playerId,
+                                token,
                                 notification: {
                                     title: '📅 Bugün Maç Var!',
                                     body: `💛💙 Fenerbahçe - ${opponent} | ${timeString}`
@@ -78,7 +81,7 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                                 }
                             },
                             successUpdates: {
-                                [`notifications/${playerId}/lastDailyNotification`]: todayStr
+                                [`notifications/${userId}/lastDailyNotification`]: todayStr
                             }
                         });
                     }
@@ -111,12 +114,12 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                             timeZone: ISTANBUL_TIMEZONE
                         });
 
-                        const sentPath = `notifications/${playerId}/sentNotifications/${matchId}`;
+                        const sentPath = `notifications/${userId}/sentNotifications/${matchId}`;
                         pendingNotifications.push({
-                            playerId,
+                            playerId: userId,
                             matchId,
                             message: {
-                                token: playerId,
+                                token,
                                 notification: {
                                     title: `💛💙 Fenerbahçe - ${opponent}`,
                                     body: `${timeString} · ${config.timeText}`

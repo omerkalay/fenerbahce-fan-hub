@@ -2,15 +2,7 @@ import { useState, useEffect } from 'react';
 import { database } from '../firebase';
 import { ref, onValue, runTransaction, get, set } from "firebase/database";
 import { BarChart3 } from 'lucide-react';
-
-const getUserId = (): string => {
-    let userId = localStorage.getItem('fenerbahce_user_id');
-    if (!userId) {
-        userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem('fenerbahce_user_id', userId);
-    }
-    return userId;
-};
+import { useAuth } from '../contexts/AuthContext';
 
 interface PollProps {
     opponentName?: string;
@@ -26,8 +18,10 @@ interface Votes {
 }
 
 const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
+    const { user, loading: authLoading, isAnonymous, signInWithGoogle } = useAuth();
     const [votes, setVotes] = useState<Votes>({ home: 0, away: 0, draw: 0 });
     const [hasVoted, setHasVoted] = useState(false);
+    const [showSignIn, setShowSignIn] = useState(false);
     const [userVote, setUserVote] = useState<VoteOption | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -37,15 +31,13 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
         away: opponentName
     };
 
-    const userId = getUserId();
-
     useEffect(() => {
         if (!matchId) {
             setLoading(false);
-            setError("Match ID eksik");
             return;
         }
 
+        // Everyone can read votes (even anonymous)
         const votesRef = ref(database, `match_polls/${matchId}/votes`);
         const unsubscribeVotes = onValue(votesRef, (snapshot) => {
             const data = snapshot.val();
@@ -60,33 +52,42 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
             }
             setLoading(false);
         }, () => {
-            setError("Anket verileri yüklenemedi.");
+            setError("Anket verileri yuklenemedi.");
             setLoading(false);
         });
 
-        const userVoteRef = ref(database, `match_polls/${matchId}/users/${userId}`);
-        get(userVoteRef).then((snapshot) => {
-            if (snapshot.exists()) {
-                setHasVoted(true);
-                setUserVote(snapshot.val() as VoteOption);
-            } else {
-                setHasVoted(false);
-                setUserVote(null);
-            }
-        }).catch((error) => {
-            console.error("Error checking user vote:", error);
-        });
+        // Only check user vote if signed in with Google
+        if (user && !isAnonymous) {
+            const userVoteRef = ref(database, `match_polls/${matchId}/users/${user.uid}`);
+            get(userVoteRef).then((snapshot) => {
+                if (snapshot.exists()) {
+                    setHasVoted(true);
+                    setUserVote(snapshot.val() as VoteOption);
+                } else {
+                    setHasVoted(false);
+                    setUserVote(null);
+                }
+            }).catch((error) => {
+                console.error("Error checking user vote:", error);
+            });
+        }
 
         return () => {
             unsubscribeVotes();
         };
-    }, [matchId, userId]);
+    }, [matchId, user, isAnonymous]);
 
     const handleVote = async (option: VoteOption) => {
         if (hasVoted || !matchId) return;
 
+        // Require Google sign-in to vote
+        if (!user || isAnonymous) {
+            setShowSignIn(true);
+            return;
+        }
+
         try {
-            const userVoteRef = ref(database, `match_polls/${matchId}/users/${userId}`);
+            const userVoteRef = ref(database, `match_polls/${matchId}/users/${user.uid}`);
             const userSnapshot = await get(userVoteRef);
 
             if (userSnapshot.exists()) {
@@ -119,11 +120,49 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
 
     const [isExpanded, setIsExpanded] = useState(false);
 
-    if (loading) return null;
+    if (loading || authLoading) return null;
     if (error) return null;
     if (!matchId) return null;
 
     return (
+        <>
+        {showSignIn && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn" onClick={() => setShowSignIn(false)}>
+                <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-sm w-full animate-slideUp shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex justify-between items-start mb-4">
+                        <h2 className="text-xl font-bold text-white">Oy Kullan</h2>
+                        <button onClick={() => setShowSignIn(false)} className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="text-center py-4">
+                        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-400/10 flex items-center justify-center">
+                            <BarChart3 className="w-8 h-8 text-yellow-400" />
+                        </div>
+                        <h3 className="text-lg font-bold text-white mb-2">Oy vermek için giriş yap</h3>
+                        <p className="text-sm text-slate-400 mb-6">
+                            Google hesabınla giriş yap ve maç tahminini paylaş.
+                        </p>
+                        <button
+                            onClick={async () => {
+                                try { await signInWithGoogle(); } catch (err) { console.error('Google sign-in failed:', err); } finally { setShowSignIn(false); }
+                            }}
+                            className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-white text-gray-800 font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg"
+                        >
+                            <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                            Google ile Giriş Yap
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
         <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-xl overflow-hidden transition-all duration-500">
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -136,7 +175,8 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
                     <div className="text-left">
                         <h3 className="text-base font-bold text-white">Maçı Kim Kazanır?</h3>
                         <p className="text-xs text-slate-400">
-                            {hasVoted ? 'Oyunuzu kullandınız' : 'Tahminini yap'} • {totalVotes} oy
+                            {hasVoted ? 'Oyunuz kullanıldı' : isAnonymous ? 'Oy vermek için giriş yap' : 'Tahminini yap'}
+                            <span className="text-slate-500 ml-2">· Toplam: {totalVotes} oy</span>
                         </p>
                     </div>
                 </div>
@@ -178,7 +218,9 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
                     />
                 </div>
             </div>
+
         </div>
+        </>
     );
 };
 
@@ -210,7 +252,7 @@ const PollOption = ({ label, percentage, onClick, disabled, isWinner, isUserChoi
             <div className="absolute inset-0 flex items-center justify-between px-4">
                 <span className={`font-medium transition-colors ${isUserChoice ? 'text-green-400' : isWinner ? 'text-yellow-400' : 'text-white'
                     }`}>
-                    {label} {isUserChoice && '✓'}
+                    {label} {isUserChoice && '\u2713'}
                 </span>
 
                 <div className="flex items-center gap-2">

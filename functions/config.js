@@ -4,6 +4,7 @@ const admin = require("firebase-admin");
 // Define secrets (stored in Google Secret Manager)
 const rapidApiKey = defineSecret("RAPIDAPI_KEY");
 const rapidApiHost = defineSecret("RAPIDAPI_HOST");
+const adminRefreshKey = defineSecret("ADMIN_REFRESH_KEY");
 
 // Initialize Firebase Admin
 try {
@@ -71,6 +72,7 @@ module.exports = {
     db,
     rapidApiKey,
     rapidApiHost,
+    adminRefreshKey,
     FENERBAHCE_ID,
     SOFASCORE_IMAGE_BASE,
     IMAGE_USER_AGENT,

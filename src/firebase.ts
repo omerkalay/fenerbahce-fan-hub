@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 import { getMessaging, Messaging } from "firebase/messaging";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -19,13 +20,17 @@ const app = initializeApp(firebaseConfig);
 // Initialize Realtime Database and get a reference to the service
 const database = getDatabase(app);
 
+// Initialize Firebase Auth
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+
 // Initialize Firebase Messaging
 let messaging: Messaging | null = null;
 try {
     messaging = getMessaging(app);
-    console.log('✅ Firebase Messaging initialized');
+    console.log('Firebase Messaging initialized');
 } catch (error) {
-    console.error('❌ Firebase Messaging initialization failed:', error);
+    console.error('Firebase Messaging initialization failed:', error);
 }
 
-export { database, messaging };
+export { database, messaging, auth, googleProvider };

@@ -1,5 +1,5 @@
 const { onRequest } = require("firebase-functions/v2/https");
-const { admin, db, rapidApiKey, rapidApiHost, corsOptions, sleep } = require('../config');
+const { admin, db, rapidApiKey, rapidApiHost, adminRefreshKey, corsOptions, sleep } = require('../config');
 const { fetchEspnSummaryForMatch } = require('../services/espn');
 const { fetchNextMatches, fetchSquad, fetchImage } = require('../services/sofascore');
 
@@ -128,28 +128,30 @@ async function handleTeamImage(req, res, teamId) {
 }
 
 async function handleReminder(req, res) {
-    const { playerId, oldPlayerId, options } = req.body;
+    const { uid, fcmToken, oldFcmToken, options } = req.body;
 
-    if (!playerId || !options) {
-        return res.status(400).json({ error: 'Missing playerId or options' });
+    if (!uid || !fcmToken || !options) {
+        return res.status(400).json({ error: 'Missing uid, fcmToken or options' });
     }
 
     try {
-        await admin.messaging().subscribeToTopic(playerId, 'all_fans');
+        await admin.messaging().subscribeToTopic(fcmToken, 'all_fans');
     } catch (subError) {
         console.error('Topic subscription failed:', subError);
     }
 
     try {
-        if (oldPlayerId && oldPlayerId !== playerId) {
-            await db.ref(`notifications/${oldPlayerId}`).remove();
-            console.log(`🧹 Removed old token: ${oldPlayerId.slice(0, 15)}...`);
+        // Clean up old token-based entries (migration from pre-auth structure)
+        if (oldFcmToken && oldFcmToken !== fcmToken) {
+            // Remove any legacy token-keyed entry
+            await db.ref(`notifications/${oldFcmToken}`).remove();
         }
 
-        const playerRef = db.ref(`notifications/${playerId}`);
-        const snapshot = await playerRef.once('value');
+        const userRef = db.ref(`notifications/${uid}`);
+        const snapshot = await userRef.once('value');
         const currentData = snapshot.val() || {};
 
+        currentData.fcmToken = fcmToken;
         currentData.dailyCheck = options.dailyCheck || false;
         currentData.defaultOptions = {
             threeHours: options.threeHours || false,
@@ -163,7 +165,7 @@ async function handleReminder(req, res) {
             delete currentData.matches;
         }
 
-        await playerRef.set(currentData);
+        await userRef.set(currentData);
 
         const activeCount = Object.values(currentData.defaultOptions)
             .filter(v => v === true).length;
@@ -197,6 +199,10 @@ async function handleHealth(req, res) {
 }
 
 async function handleRefresh(req, res) {
+    const adminKey = req.headers['x-admin-key'] || req.query.key;
+    if (!adminKey || adminKey !== adminRefreshKey.value()) {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
     console.log('🔄 Manual refresh triggered');
 
     try {
@@ -255,7 +261,7 @@ async function handleRefresh(req, res) {
 // Main API - Express-style routing
 const api = onRequest({
     ...corsOptions,
-    secrets: [rapidApiKey, rapidApiHost]
+    secrets: [rapidApiKey, rapidApiHost, adminRefreshKey]
 }, async (req, res) => {
     const path = req.path.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes
     const segments = path.split('/');

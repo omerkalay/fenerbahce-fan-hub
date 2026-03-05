@@ -6,70 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.8.5-blue)
+![Version](https://img.shields.io/badge/version-2.9.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
-![Firebase](https://img.shields.io/badge/Firebase-Cloud_Functions-orange)
+![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.8.5
+## What's New in v2.9.0
 
-- **Service Worker Scope Fix** - Merged Workbox PWA and Firebase Messaging service workers into a single scope via `importScripts`, fixing push notification delivery failures on iOS devices
-- **Backend Modularization** - Split monolithic `functions/index.js` (1,323 lines) into modular structure: `config.js`, `services/` (ESPN, SofaScore), `handlers/` (API endpoints), `schedulers/` (cron jobs) with a clean re-export hub
-- **TypeScript Config Cleanup** - Fixed `tsconfig.node.json` errors (`allowImportingTsExtensions` + `composite` conflict), removed unnecessary project reference
-
-<details>
-<summary>Previous: v2.8.4</summary>
-
-- **Error Boundaries** - Each main tab (Pano, Fikstür, İstatistikler, Kadro Kur) is now wrapped in an `ErrorBoundary` so a crash in one section no longer takes down the entire app; users see a friendly fallback with a "Tekrar Dene" recovery button
-- **Refresh Rate Limiting** - Fixture refresh button now has a 5-second cooldown after each use, preventing accidental backend spam from rapid clicks
-- **Reusable `useCooldown` Hook** - New `src/hooks/useCooldown.ts` utility that wraps any async action with a configurable cooldown period; ready to apply to other interactive surfaces
-
-</details>
+- **Firebase Authentication** - Added Google sign-in with automatic anonymous fallback. Users can browse freely; Google sign-in is required only for voting in polls and configuring push notifications
+- **User Avatar** - Profile icon in the header with yellow ring indicator when signed in, dropdown menu with account info and sign-out option
+- **Auth-Gated Polls** - Poll results are visible to everyone, but voting requires Google sign-in. Vote tracking migrated from `localStorage` to Firebase Auth UID
+- **Auth-Gated Notifications** - Notification preferences now require Google sign-in. Storage migrated from FCM token-keyed (`notifications/{token}`) to UID-keyed (`notifications/{uid}`) with backward compatibility
+- **Admin Refresh Protection** - `/api/refresh` endpoint now requires `ADMIN_REFRESH_KEY` via header or query param, protecting RapidAPI quota from unauthorized calls
+- **Sign-In Modals** - Turkish-localized sign-in prompts appear contextually when anonymous users attempt to vote, configure notifications, or tap the profile icon
+- **Firebase RTDB Security Rules** - Auth-based rules: polls validate own-UID write-once voting, notifications restricted to own UID, cache nodes public-read
 
 <details>
-<summary>Previous: v2.8.3</summary>
+<summary>Previous: v2.8.x (v2.8.0 – v2.8.5)</summary>
 
-- **Standings Redesign** - Puan durumu modal now uses `glass-card` styling matching the fixture match statistics modal, with `border-white/10` separators, subtle Fenerbahçe row glow, and compact mobile-friendly layout (no horizontal scrolling)
-- **League Position Zones** - Standings table displays colored zone indicators: Champions League, CL qualifying, Europa League qualifying, Conference League qualifying, and relegation for Süper Lig; Round of 16, seeded/unseeded playoff, and elimination zones for Europa League
-- **Centralized Turkish Localization** - Created `src/utils/localize.ts` with 30+ team name corrections (Kasımpaşa, Göztepe, Ankaragücü, Başakşehir, Eyüpspor, etc.) and 15+ competition name translations (Turkish Cup → Türkiye Kupası, Group A → Grup A, Matchday 1 → 1. Hafta, etc.). Eliminated 3 duplicate `localizeTeamName` functions across components
-- **Turkish Character Fixes** - Fixed 17 user-visible strings with missing Turkish diacritics (ç, ş, ğ, ı, ö, ü) across Statistics and FormChart components: Gol Krallığı, Detayları Gör, Gol Performansı, Son güncelleme, etc.
-- **Dashboard Day Label** - Next match date now includes weekday name (e.g., "4 Mart Çarşamba")
-
-</details>
-
-<details>
-<summary>Previous: v2.8.2</summary>
-
-- **Statistics Error-State Reliability** - Statistics service calls now propagate real fetch errors, so section-level error states render correctly instead of silently falling back to empty lists
-- **Possession Chart Data Integrity** - Form possession trend now plots only matches that actually have possession data; removed implicit `%50` fallback that could create misleading visuals
-- **Statistics Code Refactor** - Split monolithic `Statistics.tsx` internals into focused subcomponents (`FormChart`, `PlayerRankingSection`, `SkeletonCard`) to reduce duplication and improve maintainability
-- **Release Version Sync** - Aligned project version metadata for this release (`README`, `package.json`, `package-lock.json`)
-
-</details>
-
-<details>
-<summary>Previous: v2.8.1</summary>
-
-- **ESPN Direct Player Stats** - Goal and assist data now fetched directly from ESPN roster endpoints (`tur.1` + `uefa.europa`) instead of Firebase `cache/squad`, eliminating dependency on daily cache refresh
-- **League / Europa Filtering** - Scorers and assisters sections now have Toplam / Süper Lig / Avrupa tab filters with underline-style tab navigation, allowing users to view stats broken down by competition
-- **Expand/Collapse Lists** - Top scorers and assisters show top 5 by default with a "Daha Fazla" toggle to reveal up to 10 players
-- **Interactive Form Chart** - Replaced static W/D/L colored boxes with an SVG line chart showing form trajectory (G/B/M), with expandable details including per-match goal performance bars and possession trend line
-- **Possession Data Enrichment** - Form results are enriched with ball possession percentage from cached match summaries, displayed as an interactive trend chart
-- **Refined Injury/Status Design** - Player name and injury detail shown inline, status indicator uses typographic uppercase labels instead of pill badges, return date displayed below
-- **Underline Tab Design** - Competition filter tabs use minimal underline indicator style matching the site's premium dark theme, replacing generic rounded-pill buttons
-
-</details>
-
-<details>
-<summary>Previous: v2.8.0</summary>
-
-- **Statistics Tab** - New fourth bottom navigation tab ("İstatistikler") positioned between Fixture and Formation Builder, providing team statistics at a glance
-- **Top Scorers & Assisters** - Ranked player lists with graceful empty state when season stats are not yet populated
-- **Team Form** - Last 6 match results displayed as color-coded W/D/L indicators with opponent names and dates
-- **Injury & Suspension Status** - Reads from `admin/playerStatus` (manually managed via Firebase Console), showing injured, suspended, and doubtful players with color-coded badges and return estimates
-- **Independent Section States** - Each of the four statistics sections manages its own loading skeleton, error, and empty state independently; a failure in one section does not affect the others
-- **Mobile-First Layout** - All cards full-width, form indicators flex-wrap safe, player names truncated, status badges legible at small sizes
+- **Statistics Tab** (v2.8.0) - New "İstatistikler" bottom nav tab with top scorers, assisters (ESPN direct, league/Europa filters, expand to 10), interactive SVG form chart with possession trend, and injury/suspension status from `admin/playerStatus`
+- **Standings Redesign** (v2.8.3) - Glassmorphic standings modal with colored league position zones (CL, EL, relegation), compact mobile layout
+- **Turkish Localization** (v2.8.3) - Centralized `localize.ts` with 30+ team name corrections and 15+ competition translations, fixed 17 strings with missing diacritics
+- **Error Boundaries** (v2.8.4) - Each tab wrapped in `ErrorBoundary` with "Tekrar Dene" recovery. Refresh rate limiting with reusable `useCooldown` hook
+- **Backend Modularization** (v2.8.5) - Split monolithic `functions/index.js` into `config.js`, `services/`, `handlers/`, `schedulers/`. Merged SW scopes for reliable iOS push notifications
 
 </details>
 
@@ -132,8 +92,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Live Match State Flow**: Countdown → Checking → Live/Post (stable post-match fallback while preserving final data)
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
 - **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
-- **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database)
-- **Push Notifications**: Reliable match reminders via Firebase Cloud Functions
+- **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database). Requires Google sign-in to vote
+- **Push Notifications**: Reliable match reminders via Firebase Cloud Functions. Requires Google sign-in to configure
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Automatic Data Cleanup**: Old polls and notification records cleaned up daily
 - **Premium UI**: Glassmorphic design with smooth animations
@@ -199,6 +159,7 @@ This node is managed manually via the Firebase Console. Each entry:
 
 - **Frontend**: React 19.2 + Vite 5.4 + TypeScript 5.9
 - **Styling**: Tailwind CSS v4
+- **Auth**: Firebase Authentication (Google sign-in + Anonymous)
 - **Backend**: Firebase Cloud Functions (Serverless, JS)
 - **Database**: Firebase Realtime Database (Polls, Cache & User Preferences)
 - **APIs**: 
@@ -217,7 +178,8 @@ This node is managed manually via the Firebase Console. Each entry:
 │                 │     │  /api/standings      (from cache)    │
 │  React + Vite   │     │  /api/squad          (from cache)    │
 │                 │     │  /api/reminder       (save prefs)    │
-└─────────────────┘     │  /api/live-match     (from DB cache) │
+└─────────────────┘     │  /api/refresh        (admin-key)     │
+                        │  /api/live-match     (from DB cache) │
                         │  /api/match-summary  (cache-first)    │
                         │  /api/player-image   (proxy)         │
                         │  /api/team-image     (proxy)         │
@@ -284,6 +246,8 @@ fenerbahce-fan-hub/
 │   ├── hooks/
 │   │   ├── useCooldown.ts         # Reusable async action cooldown hook
 │   │   └── useFixtureData.ts      # Fixture data fetching & filtering hook
+│   ├── contexts/
+│   │   └── AuthContext.tsx        # Firebase Auth context (Google + Anonymous)
 │   ├── services/
 │   │   └── api.ts                 # Firebase API integration + ESPN fixture aggregation
 │   ├── data/
@@ -294,7 +258,7 @@ fenerbahce-fan-hub/
 │   ├── utils/
 │   │   ├── localize.ts            # Turkish localization for ESPN team/competition names
 │   │   └── matchClock.ts          # Match clock formatting utility
-│   ├── firebase.ts                # Firebase client initialization
+│   ├── firebase.ts                # Firebase client initialization (Auth, RTDB, Messaging)
 │   ├── App.tsx                    # Main app & routing
 │   └── main.tsx                   # React entry point
 ├── tsconfig.json                  # TypeScript configuration (strict mode)
@@ -357,6 +321,7 @@ npm install
 ```bash
 firebase functions:secrets:set RAPIDAPI_KEY
 firebase functions:secrets:set RAPIDAPI_HOST
+firebase functions:secrets:set ADMIN_REFRESH_KEY
 ```
 
 3. **Deploy Functions**
@@ -367,7 +332,9 @@ firebase deploy --only functions
 ```
 
 4. **Initialize Cache**
-   Visit: `https://us-central1-YOUR-PROJECT.cloudfunctions.net/api/refresh`
+   ```bash
+   curl -H "x-admin-key: YOUR_ADMIN_REFRESH_KEY" https://us-central1-YOUR-PROJECT.cloudfunctions.net/api/refresh
+   ```
 
 ## How It Works
 
@@ -381,7 +348,7 @@ firebase deploy --only functions
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
-2. **Database**: Preferences saved to `notifications/{userId}/defaultOptions` in Firebase
+2. **Database**: Preferences saved to `notifications/{uid}` in Firebase (UID-keyed, requires Google sign-in)
 3. **Cloud Function**: Scheduled function checks every minute
    - Reads match data from **cache** (not external API!)
    - Applies `defaultOptions` to all upcoming matches
@@ -444,4 +411,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.8.5** | March 2026
+**v2.9.0** | March 2026

@@ -42,3 +42,9 @@ dist-ssr
 
 # Claude Code
 .claude/
+
+# Firebase security rules (applied manually via Console)
+database.rules.json
+
+# Project roadmap (local reference)
+ROADMAP.md
