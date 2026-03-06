@@ -8,7 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { BarChart2 } from 'lucide-react';
 import { fetchNextMatch, fetchNext3Matches, BACKEND_URL } from './services/api';
 import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from './types';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider, useAuth, getSignInErrorMessage } from './contexts/AuthContext';
 
 type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
 
@@ -49,12 +49,16 @@ function UserAvatar() {
   const { user, signInWithGoogle, signOut } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   if (!user) {
     return (
       <>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setAuthError(null);
+            setShowModal(true);
+          }}
           className="w-9 h-9 rounded-full flex items-center justify-center bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 transition-all duration-300"
           title="Giriş yap"
         >
@@ -63,11 +67,17 @@ function UserAvatar() {
           </svg>
         </button>
         {showModal && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn" onClick={() => setShowModal(false)}>
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn" onClick={() => {
+            setShowModal(false);
+            setAuthError(null);
+          }}>
             <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-sm w-full animate-slideUp shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex justify-between items-start mb-4">
                 <h2 className="text-xl font-bold text-white">Hesap</h2>
-                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300">
+                <button onClick={() => {
+                  setShowModal(false);
+                  setAuthError(null);
+                }} className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -87,12 +97,19 @@ function UserAvatar() {
                   try {
                     const outcome = await signInWithGoogle();
                     if (outcome !== 'cancelled') {
+                      setAuthError(null);
                       setShowModal(false);
                     }
                   } catch (err) {
+                    setAuthError(getSignInErrorMessage(err));
                     console.error('Google sign-in failed:', err);
                   }
                 }} />
+                {authError && (
+                  <p className="mt-4 text-xs leading-5 text-amber-300">
+                    {authError}
+                  </p>
+                )}
               </div>
             </div>
           </div>

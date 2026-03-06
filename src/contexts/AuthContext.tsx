@@ -10,6 +10,10 @@ import {
 } from 'firebase/auth';
 
 type SignInOutcome = 'success' | 'redirect' | 'cancelled';
+type SignInErrorCode =
+    | 'auth/pwa-cross-origin-redirect-unsupported'
+    | 'auth/popup-blocked-required'
+    | 'auth/sign-in-failed';
 
 interface AuthContextType {
     user: User | null;
@@ -29,6 +33,20 @@ export const useAuth = () => useContext(AuthContext);
 
 const REDIRECT_PENDING_KEY = 'fb_auth_redirect_pending';
 const REDIRECT_PENDING_TTL_MS = 5 * 60 * 1000;
+const PWA_CROSS_ORIGIN_ERROR_MESSAGE = 'PWA icinde Google girisi bu kurulumla tamamlanamiyor. Simdilik uygulamayi normal tarayicida acip giris yap.';
+const POPUP_BLOCKED_ERROR_MESSAGE = 'Google girisi icin acilir pencere engellendi. Popup izni verip tekrar dene.';
+const DEFAULT_SIGN_IN_ERROR_MESSAGE = 'Google girisi baslatilamadi. Lutfen tekrar dene.';
+
+const createSignInError = (code: SignInErrorCode, message: string) => (
+    Object.assign(new Error(message), { code })
+);
+
+export const getSignInErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && error.message) {
+        return error.message;
+    }
+    return DEFAULT_SIGN_IN_ERROR_MESSAGE;
+};
 
 const isStandaloneDisplayMode = (): boolean => {
     if (typeof window === 'undefined') return false;
@@ -91,6 +109,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 clearRedirectPending();
             }
         } catch (err) {
+            const error = err as { code?: string; message?: string };
+            if (error.code === 'auth/missing-initial-state' ||
+                error.message?.includes('missing initial state')) {
+                clearRedirectPending();
+            }
             console.error('Google redirect result error:', err);
         }
     }, [clearRedirectPending]);
@@ -152,6 +175,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const startedAt = Date.now();
         const standaloneMode = isStandaloneDisplayMode();
+        const crossOriginAuthDomain = hasCrossOriginAuthDomain();
 
         try {
             if (shouldStartWithRedirect()) {
@@ -168,7 +192,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
             if (error.code === 'auth/popup-closed-by-user' ||
                 error.code === 'auth/cancelled-popup-request') {
-                if (standaloneMode && popupClosedQuickly) {
+                if (standaloneMode && crossOriginAuthDomain && popupClosedQuickly) {
+                    throw createSignInError(
+                        'auth/pwa-cross-origin-redirect-unsupported',
+                        PWA_CROSS_ORIGIN_ERROR_MESSAGE
+                    );
+                }
+
+                if (standaloneMode && popupClosedQuickly && !crossOriginAuthDomain) {
                     markRedirectPending();
                     await signInWithRedirect(auth, googleProvider);
                     return 'redirect';
@@ -177,15 +208,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 return 'cancelled';
             }
 
-            if (error.code === 'auth/popup-blocked' ||
-                error.code === 'auth/operation-not-supported-in-this-environment') {
+            if (error.code === 'auth/popup-blocked') {
+                throw createSignInError(
+                    'auth/popup-blocked-required',
+                    POPUP_BLOCKED_ERROR_MESSAGE
+                );
+            }
+
+            if (error.code === 'auth/operation-not-supported-in-this-environment') {
+                if (crossOriginAuthDomain) {
+                    throw createSignInError(
+                        'auth/pwa-cross-origin-redirect-unsupported',
+                        PWA_CROSS_ORIGIN_ERROR_MESSAGE
+                    );
+                }
+
                 markRedirectPending();
                 await signInWithRedirect(auth, googleProvider);
                 return 'redirect';
             }
 
             console.error('Google sign-in error:', error.code, err);
-            throw err;
+            throw createSignInError(
+                'auth/sign-in-failed',
+                DEFAULT_SIGN_IN_ERROR_MESSAGE
+            );
         }
     }, [markRedirectPending]);
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { database } from '../firebase';
 import { ref, onValue, runTransaction, get, set } from "firebase/database";
 import { BarChart3 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, getSignInErrorMessage } from '../contexts/AuthContext';
 
 interface PollProps {
     opponentName?: string;
@@ -25,6 +25,7 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
     const [userVote, setUserVote] = useState<VoteOption | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [authError, setAuthError] = useState<string | null>(null);
 
     const match = {
         home: "Fenerbahçe",
@@ -85,6 +86,7 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
 
         // Require Google sign-in to vote
         if (!user) {
+            setAuthError(null);
             setShowSignIn(true);
             return;
         }
@@ -130,11 +132,17 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
     return (
         <>
         {showSignIn && (
-            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn" onClick={() => setShowSignIn(false)}>
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn" onClick={() => {
+                setShowSignIn(false);
+                setAuthError(null);
+            }}>
                 <div className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-sm w-full animate-slideUp shadow-2xl" onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-between items-start mb-4">
                         <h2 className="text-xl font-bold text-white">Oy Kullan</h2>
-                        <button onClick={() => setShowSignIn(false)} className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300">
+                        <button onClick={() => {
+                            setShowSignIn(false);
+                            setAuthError(null);
+                        }} className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                             </svg>
@@ -153,9 +161,11 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
                                 try {
                                     const outcome = await signInWithGoogle();
                                     if (outcome !== 'cancelled') {
+                                        setAuthError(null);
                                         setShowSignIn(false);
                                     }
                                 } catch (err) {
+                                    setAuthError(getSignInErrorMessage(err));
                                     console.error('Google sign-in failed:', err);
                                 }
                             }}
@@ -169,6 +179,11 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
                             </svg>
                             Google ile Giriş Yap
                         </button>
+                        {authError && (
+                            <p className="mt-4 text-xs leading-5 text-amber-300">
+                                {authError}
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>

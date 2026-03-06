@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import { NotificationOptions } from '../types';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, getSignInErrorMessage } from '../contexts/AuthContext';
 
 const FCM_TOKEN_STORAGE_KEY = 'fb_fcm_token';
 
@@ -42,6 +42,7 @@ const NotificationSettings = () => {
         const saved = localStorage.getItem('fb_has_notifications');
         return saved === 'true';
     });
+    const [authError, setAuthError] = useState<string | null>(null);
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
@@ -178,11 +179,13 @@ const NotificationSettings = () => {
     };
 
     const handleOpenModal = () => {
+        setAuthError(null);
         setDraftOptions({ ...selectedOptions });
         setShowModal(true);
     };
 
     const handleCloseModal = () => {
+        setAuthError(null);
         setDraftOptions(null);
         setShowModal(false);
     };
@@ -371,7 +374,13 @@ const NotificationSettings = () => {
                                 </p>
                                 <button
                                     onClick={async () => {
-                                        try { await signInWithGoogle(); } catch (err) { console.error('Google sign-in failed:', err); }
+                                        try {
+                                            await signInWithGoogle();
+                                            setAuthError(null);
+                                        } catch (err) {
+                                            setAuthError(getSignInErrorMessage(err));
+                                            console.error('Google sign-in failed:', err);
+                                        }
                                     }}
                                     className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-white text-gray-800 font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg"
                                 >
@@ -383,6 +392,11 @@ const NotificationSettings = () => {
                                     </svg>
                                     Google ile Giriş Yap
                                 </button>
+                                {authError && (
+                                    <p className="mt-4 text-xs leading-5 text-amber-300">
+                                        {authError}
+                                    </p>
+                                )}
                                 <p className="text-xs text-slate-500 mt-4">
                                     Giriş yaparak bildirim tercihlerini kaydedebilirsin.
                                 </p>
