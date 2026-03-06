@@ -5,11 +5,14 @@ import MatchCountdown from './MatchCountdown';
 import NextMatchesPanel from './NextMatchesPanel';
 import StandingsModal from './StandingsModal';
 import LiveMatchModal from './LiveMatchModal';
+import StartingXIModal from './StartingXIModal';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import { database } from '../firebase';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName, localizeCompetitionName } from '../utils/localize';
-import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent } from '../types';
+import { onValue, ref } from 'firebase/database';
+import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData, StartingXIPlayer } from '../types';
 
 const isHalftimeDisplay = (statusDetail = '', displayClock = ''): boolean => {
     const status = String(statusDetail || '').trim().toLowerCase();
@@ -33,6 +36,60 @@ const formatGoalSummaryText = (event: MatchEvent): string => {
     if (event.isOwnGoal) parts.push('(K.K)');
 
     return parts.join(' ');
+};
+
+const STARTING_XI_GROUPS: StartingXIPlayer['group'][] = ['GK', 'DEF', 'MID', 'FWD'];
+
+const normalizeStartingXIPlayer = (value: unknown): StartingXIPlayer | null => {
+    if (!value || typeof value !== 'object') return null;
+
+    const entry = value as Record<string, unknown>;
+    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+    const number = typeof entry.number === 'number' ? entry.number : Number(entry.number);
+    const group = typeof entry.group === 'string' ? entry.group.trim().toUpperCase() : '';
+
+    if (!name || !Number.isFinite(number) || !STARTING_XI_GROUPS.includes(group as StartingXIPlayer['group'])) {
+        return null;
+    }
+
+    return {
+        name,
+        number,
+        group: group as StartingXIPlayer['group']
+    };
+};
+
+const normalizeStartingXIArray = (value: unknown): StartingXIPlayer[] => {
+    const entries = Array.isArray(value)
+        ? value
+        : value && typeof value === 'object'
+            ? Object.values(value as Record<string, unknown>)
+            : [];
+
+    return entries
+        .map(normalizeStartingXIPlayer)
+        .filter((player): player is StartingXIPlayer => player !== null);
+};
+
+const normalizeStartingXIData = (value: unknown): StartingXIData | null => {
+    if (!value || typeof value !== 'object') return null;
+
+    const entry = value as Record<string, unknown>;
+    const starters = normalizeStartingXIArray(entry.starters);
+
+    if (starters.length === 0) {
+        return null;
+    }
+
+    const publishedAt = typeof entry.publishedAt === 'number'
+        ? entry.publishedAt
+        : Number(entry.publishedAt);
+
+    return {
+        publishedAt: Number.isFinite(publishedAt) ? publishedAt : Date.now(),
+        starters,
+        bench: normalizeStartingXIArray(entry.bench)
+    };
 };
 
 interface DashboardProps {
@@ -63,10 +120,31 @@ const Dashboard: React.FC<DashboardProps> = ({
     const [showLiveMatchModal, setShowLiveMatchModal] = useState<boolean>(false);
     const [showStandingsModal, setShowStandingsModal] = useState<boolean>(false);
     const [standingsLeague, setStandingsLeague] = useState<string>('');
+    const [showStartingXIModal, setShowStartingXIModal] = useState<boolean>(false);
+    const [startingXI, setStartingXI] = useState<StartingXIData | null>(null);
+
+    useEffect(() => {
+        const startingXIRef = ref(database, 'admin/startingXI');
+
+        const unsubscribe = onValue(
+            startingXIRef,
+            (snapshot) => {
+                setStartingXI(normalizeStartingXIData(snapshot.val()));
+            },
+            (error) => {
+                console.error('Starting XI could not be loaded from RTDB:', error);
+                setStartingXI(null);
+            }
+        );
+
+        return () => {
+            unsubscribe();
+        };
+    }, []);
 
     // Modal açıkken arka plan scroll'unu engelle
     useEffect(() => {
-        if (showLiveMatchModal || showStandingsModal) {
+        if (showLiveMatchModal || showStandingsModal || showStartingXIModal) {
             document.body.style.overflow = 'hidden';
         } else {
             document.body.style.overflow = 'unset';
@@ -74,7 +152,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         return () => {
             document.body.style.overflow = 'unset';
         };
-    }, [showLiveMatchModal, showStandingsModal]);
+    }, [showLiveMatchModal, showStandingsModal, showStartingXIModal]);
 
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
     if (!matchData) {
@@ -376,6 +454,26 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
+            {/* Starting XI Banner */}
+            {startingXI && (
+                <button
+                    onClick={() => setShowStartingXIModal(true)}
+                    className="glass-panel rounded-2xl mb-6 w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+                >
+                    <div className="flex items-center gap-2.5">
+                        <span className="text-base font-bold text-white">İlk 11 Açıklandı!</span>
+                        <span className="text-xs bg-green-500/20 text-green-300 px-2.5 py-0.5 rounded-full font-bold uppercase">Yeni</span>
+                    </div>
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-4 h-4 text-slate-400"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                </button>
+            )}
+
             {/* Next 3 Matches */}
             <NextMatchesPanel next3Matches={next3Matches} />
 
@@ -412,7 +510,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-
+            {/* Starting XI Modal */}
+            {startingXI && (
+                <StartingXIModal
+                    visible={showStartingXIModal}
+                    data={startingXI}
+                    onClose={() => setShowStartingXIModal(false)}
+                />
+            )}
 
             {/* Live Match Modal */}
             <LiveMatchModal

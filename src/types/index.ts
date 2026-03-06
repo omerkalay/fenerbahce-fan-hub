@@ -275,3 +275,17 @@ export interface StatisticsData {
   playerStatus: PlayerStatusEntry[];
   lastUpdated: number | null;
 }
+
+// ─── Starting XI ─────────────────────────────────────────
+
+export interface StartingXIPlayer {
+  name: string;
+  number: number;
+  group: 'GK' | 'DEF' | 'MID' | 'FWD';
+}
+
+export interface StartingXIData {
+  publishedAt: number;
+  starters: StartingXIPlayer[];
+  bench?: StartingXIPlayer[];
+}

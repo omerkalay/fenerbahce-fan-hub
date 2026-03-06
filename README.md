@@ -6,13 +6,21 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.1-blue)
+![Version](https://img.shields.io/badge/version-2.9.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.1
+## What's New in v2.9.2
+
+- **Starting XI Matchday Module** - Added a dedicated `StartingXIModal` with squad-photo matching from `/api/squad`, showing starters first and bench players in a compact two-column layout
+- **Realtime Starting XI Publishing** - Dashboard now listens to `admin/startingXI` in Firebase Realtime Database and only shows the "İlk 11 Açıklandı!" banner when a valid lineup is actually published
+- **Notification Click Routing Fix** - Background push notifications now carry `/fenerbahce-fan-hub/` as their target and the service worker focuses or opens the app instead of landing on the root domain
+- **README Starting XI Operations Pass** - Documented the `admin/startingXI` schema and the manual operator flow for publishing lineups before kickoff
+
+<details>
+<summary>Previous: v2.9.1</summary>
 
 - **Anonymous Auth Removal** - Removed automatic anonymous Firebase sessions. Signed-out users can browse freely; Google sign-in is now used only when a protected action is attempted
 - **PWA Sign-In Hardening** - Added Google redirect result handling and iOS standalone fallback logic to improve authentication flow inside the installed PWA
@@ -21,6 +29,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Notification Migration Cleanup** - UID-keyed notification records can absorb legacy token-keyed data during save, reducing leftover migration state
 - **Scheduler Dedupe by FCM Token** - Notification dispatch now aggregates duplicate UID/token combinations before sending, preventing repeated pushes when stale records exist
 
+</details>
 <details>
 <summary>Previous: v2.9.0</summary>
 
@@ -103,6 +112,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Next Match Card**: Live countdown timer with team logos and match details
 - **Live Match State Flow**: Countdown → Checking → Live/Post (stable post-match fallback while preserving final data)
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
+- **Starting XI Banner & Modal**: When `admin/startingXI` is published, users get an instant matchday lineup entry point with shirt-number photo matching and bench coverage
 - **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
 - **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database). Requires Google sign-in to vote
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions. Requires Google sign-in to configure
@@ -159,6 +169,36 @@ This node is managed manually via the Firebase Console. Each entry:
 | `returnDate` | `string` | Estimated return date (free text) |
 | `updatedAt` | `number` | Unix timestamp in milliseconds. Used to show "Last updated: X hours ago" |
 
+### Starting XI Publishing
+- **Manual RTDB Control**: Reads from `admin/startingXI`; the banner stays hidden until a valid lineup exists
+- **Photo Matching**: Shirt numbers are matched against `/api/squad` so published players can reuse the cached SofaScore images
+- **Safe Failure Mode**: Invalid player entries are ignored, and if no valid starters remain the lineup is hidden instead of rendering broken UI
+
+#### `admin/startingXI` Schema
+
+This node is managed manually via the Firebase Console on matchday. Recommended payload:
+
+```json
+{
+  "publishedAt": 1741282200000,
+  "starters": [
+    { "name": "Dominik Livakovic", "number": 40, "group": "GK" },
+    { "name": "Mert Muldur", "number": 16, "group": "DEF" }
+  ],
+  "bench": [
+    { "name": "Irfan Can Egribayat", "number": 1, "group": "GK" }
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `publishedAt` | `number` | Unix timestamp in milliseconds. Used for release timing / audit context |
+| `starters` | `StartingXIPlayer[]` | Required. If this array has no valid entries, the banner stays hidden |
+| `bench` | `StartingXIPlayer[]` | Optional bench list rendered below the starters |
+| `group` | `"GK" \| "DEF" \| "MID" \| "FWD"` | Position family used for validation and grouping |
+| `number` | `number` | Shirt number used for squad photo matching |
+
 ### Formation Builder
 - **6 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2, 4-1-2-1-2 Diamond
 - **Realistic Pitch**: SVG-based football field with accurate FIFA-standard markings
@@ -171,7 +211,7 @@ This node is managed manually via the Firebase Console. Each entry:
 
 - **Frontend**: React 19.2 + Vite 5.4 + TypeScript 5.9
 - **Styling**: Tailwind CSS v4
-- **Auth**: Firebase Authentication (Google sign-in + Anonymous)
+- **Auth**: Firebase Authentication (Google sign-in only for protected actions)
 - **Backend**: Firebase Cloud Functions (Serverless, JS)
 - **Database**: Firebase Realtime Database (Polls, Cache & User Preferences)
 - **APIs**: 
@@ -211,6 +251,7 @@ This node is managed manually via the Firebase Console. Each entry:
                 │   matchSummaries/
                 │ admin/       │
                 │   playerStatus   ← Manual (Firebase Console)
+                │   startingXI     ← Manual matchday publish
                 │ match_polls/ │
                 │ notifications│
                 └──────────────┘
@@ -239,6 +280,7 @@ fenerbahce-fan-hub/
 │   ├── components/
 │   │   ├── Dashboard.tsx          # Main dashboard with matches & poll
 │   │   ├── MatchCountdown.tsx     # Countdown timer sub-component
+│   │   ├── StartingXIModal.tsx    # Matchday starting XI modal
 │   │   ├── NextMatchesPanel.tsx   # Upcoming 3 matches panel
 │   │   ├── LiveMatchModal.tsx     # Live match detail modal
 │   │   ├── StandingsModal.tsx     # Standings modal wrapper
@@ -259,7 +301,7 @@ fenerbahce-fan-hub/
 │   │   ├── useCooldown.ts         # Reusable async action cooldown hook
 │   │   └── useFixtureData.ts      # Fixture data fetching & filtering hook
 │   ├── contexts/
-│   │   └── AuthContext.tsx        # Firebase Auth context (Google + Anonymous)
+│   │   └── AuthContext.tsx        # Firebase Auth context (Google sign-in flows)
 │   ├── services/
 │   │   └── api.ts                 # Firebase API integration + ESPN fixture aggregation
 │   ├── data/
@@ -375,6 +417,14 @@ firebase deploy --only functions
 - **Cleanup**: Live cache deleted 5min after match ends
 - **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` fallback
 
+### How to Use Starting XI
+1. Refresh the cache if kickoff time or opponent data changed (`/api/refresh` with `ADMIN_REFRESH_KEY`)
+2. Open Firebase Realtime Database and write the lineup to `admin/startingXI`
+3. Verify the dashboard shows the "İlk 11 Açıklandı!" banner and that the modal renders the expected starters/bench
+4. Ask users to sign in with Google once if they want poll voting or push reminders
+5. During the match, use the dashboard/live modal for the real-time view; after the match, use the fixture summary modal for the stored recap
+6. When the lineup is no longer relevant, overwrite `admin/startingXI` for the next match or delete/set it to `null` to hide the banner again
+
 ### Fixture System
 - **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints (free, client-side fetch)
 - **Coverage**: Süper Lig (`tur.1`) + UEFA Europa League (`uefa.europa`)
@@ -423,4 +473,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.1** | March 2026
+**v2.9.2** | March 2026
