@@ -43,6 +43,143 @@ async function requireAuthenticatedUid(req, res) {
     }
 }
 
+const POLL_OPTIONS = new Set(['home', 'away', 'draw']);
+const RATE_LIMIT_CONFIGS = {
+    default: { windowMs: 60 * 1000, max: 120 },
+    expensive: { windowMs: 60 * 1000, max: 20 },
+    asset: { windowMs: 60 * 1000, max: 90 },
+    write: { windowMs: 15 * 60 * 1000, max: 25 },
+    health: { windowMs: 60 * 1000, max: 10 }
+};
+const rateLimitBuckets = new Map();
+let nextRateLimitSweepAt = 0;
+
+const normalizeVoteCounts = (votes = {}) => ({
+    home: Number(votes.home) || 0,
+    away: Number(votes.away) || 0,
+    draw: Number(votes.draw) || 0
+});
+
+const getClientAddress = (req) => {
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const forwarded = Array.isArray(forwardedFor)
+        ? forwardedFor[0]
+        : String(forwardedFor || '').split(',')[0].trim();
+
+    return forwarded || req.ip || req.socket?.remoteAddress || 'unknown';
+};
+
+const shouldBypassRateLimit = (req, clientAddress) => {
+    const host = String(req.headers.host || '').toLowerCase();
+    return host.includes('localhost') ||
+        host.includes('127.0.0.1') ||
+        ['::1', '127.0.0.1', '::ffff:127.0.0.1'].includes(clientAddress);
+};
+
+const sweepRateLimitBuckets = (now) => {
+    if (now < nextRateLimitSweepAt) {
+        return;
+    }
+
+    for (const [key, bucket] of rateLimitBuckets.entries()) {
+        if (bucket.resetAt <= now) {
+            rateLimitBuckets.delete(key);
+        }
+    }
+
+    nextRateLimitSweepAt = now + 60 * 1000;
+};
+
+const enforceRateLimit = (req, res, profile = 'default') => {
+    if (req.method === 'OPTIONS') {
+        return true;
+    }
+
+    const config = RATE_LIMIT_CONFIGS[profile] || RATE_LIMIT_CONFIGS.default;
+    const now = Date.now();
+    const clientAddress = getClientAddress(req);
+
+    if (shouldBypassRateLimit(req, clientAddress)) {
+        return true;
+    }
+
+    sweepRateLimitBuckets(now);
+
+    const bucketKey = `${profile}:${clientAddress}`;
+    let bucket = rateLimitBuckets.get(bucketKey);
+    if (!bucket || bucket.resetAt <= now) {
+        bucket = {
+            count: 0,
+            resetAt: now + config.windowMs
+        };
+    }
+
+    bucket.count += 1;
+    rateLimitBuckets.set(bucketKey, bucket);
+
+    const remaining = Math.max(config.max - bucket.count, 0);
+    res.set('X-RateLimit-Limit', String(config.max));
+    res.set('X-RateLimit-Remaining', String(remaining));
+    res.set('X-RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+
+    if (bucket.count > config.max) {
+        res.set('Retry-After', String(Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))));
+        res.status(429).json({ error: 'Too many requests. Please try again later.' });
+        return false;
+    }
+
+    return true;
+};
+
+const resolveRateLimitProfile = (endpoint, method) => {
+    if (endpoint === 'match-summary' || endpoint === 'matchSummary') {
+        return 'expensive';
+    }
+
+    if (
+        endpoint === 'player-image' ||
+        endpoint === 'playerImage' ||
+        endpoint === 'team-image' ||
+        endpoint === 'teamImage'
+    ) {
+        return 'asset';
+    }
+
+    if (endpoint === 'health') {
+        return 'health';
+    }
+
+    if (
+        method === 'POST' && (
+            endpoint === 'reminder' ||
+            endpoint === 'poll-vote' ||
+            endpoint === 'pollVote'
+        )
+    ) {
+        return 'write';
+    }
+
+    return 'default';
+};
+
+const getRequestOrigin = (req) => {
+    const forwardedProto = req.headers['x-forwarded-proto'];
+    const protocol = Array.isArray(forwardedProto)
+        ? forwardedProto[0]
+        : String(forwardedProto || req.protocol || 'https').split(',')[0].trim();
+    const forwardedHost = req.headers['x-forwarded-host'];
+    const host = Array.isArray(forwardedHost)
+        ? forwardedHost[0]
+        : String(forwardedHost || req.headers.host || '').split(',')[0].trim();
+
+    return host ? `${protocol}://${host}`.replace(/\/+$/g, '') : '';
+};
+
+const buildApiBaseUrl = (req) => {
+    const origin = getRequestOrigin(req);
+    return origin ? `${origin}/api` : 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
+};
+
 // Handler functions
 async function handleNextMatch(req, res) {
     const snapshot = await db.ref('cache/nextMatch').once('value');
@@ -64,7 +201,7 @@ async function handleSquad(req, res) {
     const squad = snapshot.val() || [];
 
     // Add photo URLs
-    const baseUrl = `https://us-central1-fb-hub-ed9de.cloudfunctions.net/api`;
+    const baseUrl = buildApiBaseUrl(req);
     const enrichedSquad = squad.map(player => ({
         ...player,
         photo: `${baseUrl}/player-image/${player.id}`
@@ -167,6 +304,76 @@ async function handleTeamImage(req, res, teamId) {
     }
 }
 
+
+async function handlePollVote(req, res) {
+    const authenticatedUid = await requireAuthenticatedUid(req, res);
+    if (!authenticatedUid) {
+        return;
+    }
+
+    const { matchId, option } = req.body || {};
+    const normalizedMatchId = String(matchId || '').trim();
+    const normalizedOption = String(option || '').trim();
+
+    if (!normalizedMatchId) {
+        return res.status(400).json({ error: 'Match ID required' });
+    }
+
+    if (normalizedMatchId.includes('/')) {
+        return res.status(400).json({ error: 'Invalid match ID' });
+    }
+
+    if (!POLL_OPTIONS.has(normalizedOption)) {
+        return res.status(400).json({ error: 'Invalid vote option' });
+    }
+
+    const pollRef = db.ref(`match_polls/${normalizedMatchId}`);
+
+    try {
+        let existingVote = null;
+        const transactionResult = await pollRef.transaction((currentData) => {
+            const current = currentData && typeof currentData === 'object' ? currentData : {};
+            const currentUsers = current.users && typeof current.users === 'object' ? current.users : {};
+            const previousVote = typeof currentUsers[authenticatedUid] === 'string'
+                ? currentUsers[authenticatedUid]
+                : null;
+
+            if (previousVote) {
+                existingVote = previousVote;
+                return current;
+            }
+
+            const nextVotes = normalizeVoteCounts(current.votes);
+            nextVotes[normalizedOption] = (nextVotes[normalizedOption] || 0) + 1;
+
+            return {
+                ...current,
+                votes: nextVotes,
+                users: {
+                    ...currentUsers,
+                    [authenticatedUid]: normalizedOption
+                },
+                updatedAt: Date.now()
+            };
+        });
+
+        const pollData = transactionResult.snapshot.val() || {};
+        const votes = normalizeVoteCounts(pollData.votes);
+        const userVote = existingVote || pollData.users?.[authenticatedUid] || normalizedOption;
+        const totalVotes = votes.home + votes.away + votes.draw;
+
+        return res.json({
+            success: true,
+            alreadyVoted: Boolean(existingVote),
+            userVote,
+            votes,
+            totalVotes
+        });
+    } catch (error) {
+        console.error('Poll vote error:', error);
+        return res.status(500).json({ error: 'Oy kaydedilemedi.' });
+    }
+}
 async function handleReminder(req, res) {
     const authenticatedUid = await requireAuthenticatedUid(req, res);
     if (!authenticatedUid) {
@@ -367,8 +574,13 @@ const api = onRequest({
     const segments = path.split('/');
     const endpoint = segments[0];
     const param = segments[1];
+    const rateLimitProfile = resolveRateLimitProfile(endpoint, req.method);
 
     console.log(`📥 ${req.method} /${path}`);
+
+    if (!enforceRateLimit(req, res, rateLimitProfile)) {
+        return;
+    }
 
     try {
         switch (endpoint) {
@@ -411,6 +623,13 @@ const api = onRequest({
                 }
                 return res.status(405).json({ error: 'Method not allowed' });
 
+            case 'poll-vote':
+            case 'pollVote':
+                if (req.method === 'POST') {
+                    return await handlePollVote(req, res);
+                }
+                return res.status(405).json({ error: 'Method not allowed' });
+
             case 'health':
                 return await handleHealth(req, res);
 
@@ -431,6 +650,7 @@ const api = onRequest({
                         '/player-image/:id',
                         '/team-image/:id',
                         '/reminder (GET, POST)',
+                        '/poll-vote (POST)',
                         '/health',
                         '/refresh'
                     ]
@@ -443,3 +663,6 @@ const api = onRequest({
 });
 
 module.exports = { api };
+
+
+

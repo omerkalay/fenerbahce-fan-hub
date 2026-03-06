@@ -17,7 +17,59 @@ import { ref, get } from 'firebase/database';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeCompetitionName, localizeTeamName } from '../utils/localize';
 
-export const BACKEND_URL = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
+const DEFAULT_BACKEND_ORIGIN = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net';
+
+const normalizeBaseUrl = (value = ''): string => value.replace(/\/+$/g, '');
+
+export const BACKEND_ORIGIN = normalizeBaseUrl(
+    import.meta.env.VITE_BACKEND_ORIGIN || DEFAULT_BACKEND_ORIGIN
+);
+export const BACKEND_URL = `${BACKEND_ORIGIN}/api`;
+
+export type PollVoteOption = 'home' | 'away' | 'draw';
+
+export interface PollVoteResponse {
+    success: boolean;
+    alreadyVoted: boolean;
+    userVote: PollVoteOption;
+    votes: Record<PollVoteOption, number>;
+    totalVotes: number;
+}
+
+export const submitPollVote = async (
+    matchId: string | number,
+    option: PollVoteOption,
+    idToken: string
+): Promise<PollVoteResponse> => {
+    const response = await fetch(`${BACKEND_URL}/poll-vote`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({
+            matchId: String(matchId),
+            option
+        })
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload) {
+        throw new Error(payload?.error || 'Oy kaydedilemedi.');
+    }
+
+    return {
+        success: Boolean(payload.success),
+        alreadyVoted: Boolean(payload.alreadyVoted),
+        userVote: payload.userVote as PollVoteOption,
+        votes: {
+            home: Number(payload.votes?.home) || 0,
+            away: Number(payload.votes?.away) || 0,
+            draw: Number(payload.votes?.draw) || 0
+        },
+        totalVotes: Number(payload.totalVotes) || 0
+    };
+};
 
 const ensureAbsolutePhoto = (player: Partial<Player> = {}): string => {
     const fallbackPath = `/player-image/${player.id ?? ''}`;
@@ -576,3 +628,4 @@ export const fetchPlayerStatus = async (): Promise<PlayerStatusEntry[]> => {
         throw new Error('Player status fetch failed.');
     }
 };
+

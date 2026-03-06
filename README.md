@@ -6,18 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.2-blue)
+![Version](https://img.shields.io/badge/version-2.9.3-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.2
+## What's New in v2.9.3
+
+- **Atomic Poll Voting** - Match poll writes now go through `POST /api/poll-vote`, where the backend updates vote totals and `users/{uid}` in a single Realtime Database transaction
+- **Reusable Google Sign-In Prompt** - Account, poll, and notification flows now share one extracted Google sign-in modal/button instead of carrying duplicated UI in three separate components
+- **Configurable Backend Origin** - Frontend API calls and PWA runtime caching now read the same `VITE_BACKEND_ORIGIN` build variable, keeping GitHub Pages builds aligned when the Functions origin changes
+- **Baseline HTTP Rate Limiting** - Cloud Functions endpoints now have a lightweight in-memory throttle to blunt obvious abuse while a stronger shared limiter or App Check layer is still pending
+
+<details>
+<summary>Previous: v2.9.2</summary>
 
 - **Starting XI Matchday Module** - Added a dedicated `StartingXIModal` with squad-photo matching from `/api/squad`, showing starters first and bench players in a compact two-column layout
 - **Realtime Starting XI Publishing** - Dashboard now listens to `admin/startingXI` in Firebase Realtime Database and only shows the "İlk 11 Açıklandı!" banner when a valid lineup is actually published
 - **Notification Click Routing Fix** - Background push notifications now carry `/fenerbahce-fan-hub/` as their target and the service worker focuses or opens the app instead of landing on the root domain
 - **README Starting XI Operations Pass** - Documented the `admin/startingXI` schema and the manual operator flow for publishing lineups before kickoff
+
+</details>
 
 <details>
 <summary>Previous: v2.9.1</summary>
@@ -114,7 +124,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
 - **Starting XI Banner & Modal**: When `admin/startingXI` is published, users get an instant matchday lineup entry point with shirt-number photo matching and bench coverage
 - **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
-- **Match Poll**: Interactive "Who will win?" poll with real-time results (Firebase Realtime Database). Requires Google sign-in to vote
+- **Match Poll**: Interactive "Who will win?" poll with real-time results. Votes are validated server-side via `POST /api/poll-vote` and stored atomically in Firebase Realtime Database
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions. Requires Google sign-in to configure
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Automatic Data Cleanup**: Old polls and notification records cleaned up daily
@@ -230,9 +240,10 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 │                 │     │  /api/standings      (from cache)    │
 │  React + Vite   │     │  /api/squad          (from cache)    │
 │                 │     │  /api/reminder       (save prefs)    │
-└─────────────────┘     │  /api/refresh        (admin-key)     │
+└─────────────────┘     │  /api/poll-vote      (vote write)    │
+                        │  /api/refresh        (admin-key)     │
                         │  /api/live-match     (from DB cache) │
-                        │  /api/match-summary  (cache-first)    │
+                        │  /api/match-summary  (cache-first)   │
                         │  /api/player-image   (proxy)         │
                         │  /api/team-image     (proxy)         │
                         └──────────────────────────────────────┘
@@ -321,7 +332,7 @@ fenerbahce-fan-hub/
 └── firebase.json                  # Firebase configuration
 ```
 
-> **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, change `BACKEND_URL` in `src/services/api.ts` back to `https://fenerbahce-backend.onrender.com`.
+> **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, build the frontend with `VITE_BACKEND_ORIGIN=https://fenerbahce-backend.onrender.com` and keep the PWA cache config aligned with that same origin.
 
 ## Installation & Setup
 
@@ -353,6 +364,7 @@ npm install
    VITE_FIREBASE_PROJECT_ID=...
    # ... other firebase config
    VITE_FIREBASE_VAPID_KEY=...
+   VITE_BACKEND_ORIGIN=https://us-central1-YOUR-PROJECT.cloudfunctions.net
    ```
 
 4. **Run development server**
@@ -473,4 +485,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.2** | March 2026
+**v2.9.3** | March 2026
