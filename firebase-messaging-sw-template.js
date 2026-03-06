@@ -1,5 +1,5 @@
-importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.6.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/12.6.0/firebase-messaging-compat.js');
 
 const DEFAULT_NOTIFICATION_URL = '/fenerbahce-fan-hub/';
 
