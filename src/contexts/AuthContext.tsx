@@ -33,9 +33,9 @@ export const useAuth = () => useContext(AuthContext);
 
 const REDIRECT_PENDING_KEY = 'fb_auth_redirect_pending';
 const REDIRECT_PENDING_TTL_MS = 5 * 60 * 1000;
-const PWA_CROSS_ORIGIN_ERROR_MESSAGE = 'PWA icinde Google girisi bu kurulumla tamamlanamiyor. Simdilik uygulamayi normal tarayicida acip giris yap.';
-const POPUP_BLOCKED_ERROR_MESSAGE = 'Google girisi icin acilir pencere engellendi. Popup izni verip tekrar dene.';
-const DEFAULT_SIGN_IN_ERROR_MESSAGE = 'Google girisi baslatilamadi. Lutfen tekrar dene.';
+const PWA_CROSS_ORIGIN_ERROR_MESSAGE = 'PWA içinde Google girişi bu kurulumla tamamlanamıyor. Şimdilik uygulamayı normal tarayıcıda açıp giriş yap.';
+const POPUP_BLOCKED_ERROR_MESSAGE = 'Google girişi için açılır pencere engellendi. Popup izni verip tekrar dene.';
+const DEFAULT_SIGN_IN_ERROR_MESSAGE = 'Google girişi başlatılamadı. Lütfen tekrar dene.';
 
 const createSignInError = (code: SignInErrorCode, message: string) => (
     Object.assign(new Error(message), { code })
