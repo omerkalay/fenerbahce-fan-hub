@@ -150,7 +150,14 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
                         </p>
                         <button
                             onClick={async () => {
-                                try { await signInWithGoogle(); } catch (err) { console.error('Google sign-in failed:', err); } finally { setShowSignIn(false); }
+                                try {
+                                    const outcome = await signInWithGoogle();
+                                    if (outcome !== 'cancelled') {
+                                        setShowSignIn(false);
+                                    }
+                                } catch (err) {
+                                    console.error('Google sign-in failed:', err);
+                                }
                             }}
                             className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-white text-gray-800 font-semibold hover:bg-gray-100 transition-all duration-200 shadow-lg"
                         >

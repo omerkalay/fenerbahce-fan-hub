@@ -23,6 +23,9 @@ const database = getDatabase(app);
 // Initialize Firebase Auth
 const auth = getAuth(app);
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+    prompt: 'select_account'
+});
 
 // Initialize Firebase Messaging
 let messaging: Messaging | null = null;

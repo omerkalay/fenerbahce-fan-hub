@@ -84,7 +84,14 @@ function UserAvatar() {
                   Oy kullan, bildirim al ve ayarlarını tüm cihazlarda senkronize tut.
                 </p>
                 <GoogleSignInButton onClick={async () => {
-                  try { await signInWithGoogle(); setShowModal(false); } catch (err) { console.error('Google sign-in failed:', err); }
+                  try {
+                    const outcome = await signInWithGoogle();
+                    if (outcome !== 'cancelled') {
+                      setShowModal(false);
+                    }
+                  } catch (err) {
+                    console.error('Google sign-in failed:', err);
+                  }
                 }} />
               </div>
             </div>

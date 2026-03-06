@@ -9,32 +9,37 @@ import {
     type User
 } from 'firebase/auth';
 
+type SignInOutcome = 'success' | 'redirect' | 'cancelled';
+
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    signInWithGoogle: () => Promise<void>;
+    signInWithGoogle: () => Promise<SignInOutcome>;
     signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
-    signInWithGoogle: async () => {},
+    signInWithGoogle: async () => 'cancelled',
     signOut: async () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 const REDIRECT_PENDING_KEY = 'fb_auth_redirect_pending';
+const REDIRECT_PENDING_TTL_MS = 5 * 60 * 1000;
 
-const shouldUseRedirectFlow = (): boolean => {
+const isStandaloneDisplayMode = (): boolean => {
     if (typeof window === 'undefined') return false;
-    const ua = window.navigator.userAgent.toLowerCase();
-    const isIOS = /iphone|ipad|ipod/.test(ua);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+    return window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
         (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+};
 
-    return isIOS && isStandalone;
+const shouldStartWithRedirect = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    return isStandaloneDisplayMode() && !hasCrossOriginAuthDomain();
 };
 
 const hasCrossOriginAuthDomain = (): boolean => {
@@ -49,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const markRedirectPending = useCallback(() => {
         if (typeof window === 'undefined') return;
-        localStorage.setItem(REDIRECT_PENDING_KEY, '1');
+        localStorage.setItem(REDIRECT_PENDING_KEY, String(Date.now()));
     }, []);
 
     const clearRedirectPending = useCallback(() => {
@@ -59,14 +64,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const hasRedirectPending = useCallback(() => {
         if (typeof window === 'undefined') return false;
-        return localStorage.getItem(REDIRECT_PENDING_KEY) === '1';
+        const pendingValue = localStorage.getItem(REDIRECT_PENDING_KEY);
+        if (!pendingValue) return false;
+
+        const pendingTimestamp = Number(pendingValue);
+        if (!Number.isFinite(pendingTimestamp)) {
+            return true;
+        }
+
+        if ((Date.now() - pendingTimestamp) > REDIRECT_PENDING_TTL_MS) {
+            localStorage.removeItem(REDIRECT_PENDING_KEY);
+            return false;
+        }
+
+        return true;
     }, []);
 
     const processRedirectResult = useCallback(async () => {
-        if (!hasRedirectPending() && !auth.currentUser) {
-            return;
-        }
-
         try {
             const result = await getRedirectResult(auth);
             if (result?.user) {
@@ -79,9 +93,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } catch (err) {
             console.error('Google redirect result error:', err);
         }
-    }, [clearRedirectPending, hasRedirectPending]);
+    }, [clearRedirectPending]);
 
     useEffect(() => {
+        hasRedirectPending();
         void processRedirectResult();
         const retryTimer = window.setTimeout(() => {
             void processRedirectResult();
@@ -115,9 +130,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         window.addEventListener('pageshow', handleAppResume);
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        if (shouldUseRedirectFlow() && hasCrossOriginAuthDomain()) {
+        if (isStandaloneDisplayMode() && hasCrossOriginAuthDomain()) {
             console.warn(
-                'iOS PWA auth is using a cross-origin authDomain. Redirect sign-in may not return reliably until authDomain is moved behind the app domain.'
+                'Installed PWA auth is using a cross-origin authDomain. Popup sign-in will be tried first because redirect may not return reliably until authDomain is moved behind the app domain.'
             );
         }
 
@@ -128,33 +143,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             unsubscribe();
         };
-    }, [clearRedirectPending, processRedirectResult]);
+    }, [clearRedirectPending, hasRedirectPending, processRedirectResult]);
 
-    const signInWithGoogle = useCallback(async () => {
+    const signInWithGoogle = useCallback(async (): Promise<SignInOutcome> => {
+        if (auth.currentUser) {
+            return 'success';
+        }
+
+        const startedAt = Date.now();
+        const standaloneMode = isStandaloneDisplayMode();
+
         try {
-            if (shouldUseRedirectFlow()) {
+            if (shouldStartWithRedirect()) {
                 markRedirectPending();
                 await signInWithRedirect(auth, googleProvider);
-                return;
+                return 'redirect';
             }
 
             await signInWithPopup(auth, googleProvider);
+            return 'success';
         } catch (err: unknown) {
             const error = err as { code?: string };
+            const popupClosedQuickly = (Date.now() - startedAt) < 1500;
 
             if (error.code === 'auth/popup-closed-by-user' ||
                 error.code === 'auth/cancelled-popup-request') {
-                return;
+                if (standaloneMode && popupClosedQuickly) {
+                    markRedirectPending();
+                    await signInWithRedirect(auth, googleProvider);
+                    return 'redirect';
+                }
+
+                return 'cancelled';
             }
 
             if (error.code === 'auth/popup-blocked' ||
                 error.code === 'auth/operation-not-supported-in-this-environment') {
                 markRedirectPending();
                 await signInWithRedirect(auth, googleProvider);
-                return;
+                return 'redirect';
             }
 
-            console.error('Google sign-in error:', error.code);
+            console.error('Google sign-in error:', error.code, err);
+            throw err;
         }
     }, [markRedirectPending]);
 
