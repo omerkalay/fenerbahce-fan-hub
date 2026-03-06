@@ -46,13 +46,11 @@ const GoogleSignInButton = ({ onClick }: { onClick: () => void }) => (
 );
 
 function UserAvatar() {
-  const { user, isAnonymous, signInWithGoogle, signOut } = useAuth();
+  const { user, signInWithGoogle, signOut } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
-  if (!user) return null;
-
-  if (isAnonymous) {
+  if (!user) {
     return (
       <>
         <button

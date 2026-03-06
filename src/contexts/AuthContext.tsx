@@ -2,8 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback, type React
 import { auth, googleProvider } from '../firebase';
 import {
     onAuthStateChanged,
-    signInAnonymously,
+    getRedirectResult,
     signInWithPopup,
+    signInWithRedirect,
     signOut as firebaseSignOut,
     type User
 } from 'firebase/auth';
@@ -11,7 +12,6 @@ import {
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    isAnonymous: boolean;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
 }
@@ -19,45 +19,62 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
-    isAnonymous: true,
     signInWithGoogle: async () => {},
     signOut: async () => {}
 });
 
 export const useAuth = () => useContext(AuthContext);
 
+const shouldUseRedirectFlow = (): boolean => {
+    if (typeof window === 'undefined') return false;
+    const ua = window.navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+        (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+
+    return isIOS && isStandalone;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                setUser(firebaseUser);
-                setLoading(false);
-            } else {
-                try {
-                    await signInAnonymously(auth);
-                } catch (err) {
-                    console.error('Anonymous sign-in failed:', err);
-                    setLoading(false);
-                }
-            }
+        getRedirectResult(auth).catch((err) => {
+            console.error('Google redirect result error:', err);
         });
+
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+            setUser(firebaseUser ?? null);
+            setLoading(false);
+        });
+
         return unsubscribe;
     }, []);
 
     const signInWithGoogle = useCallback(async () => {
         try {
+            if (shouldUseRedirectFlow()) {
+                await signInWithRedirect(auth, googleProvider);
+                return;
+            }
+
             await signInWithPopup(auth, googleProvider);
         } catch (err: unknown) {
             const error = err as { code?: string };
+
             if (error.code === 'auth/popup-closed-by-user' ||
                 error.code === 'auth/cancelled-popup-request') {
-                // User closed popup, do nothing
-            } else {
-                console.error('Google sign-in error:', error.code);
+                return;
             }
+
+            if (error.code === 'auth/popup-blocked' ||
+                error.code === 'auth/operation-not-supported-in-this-environment') {
+                await signInWithRedirect(auth, googleProvider);
+                return;
+            }
+
+            console.error('Google sign-in error:', error.code);
         }
     }, []);
 
@@ -69,7 +86,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         <AuthContext.Provider value={{
             user,
             loading,
-            isAnonymous: user?.isAnonymous ?? true,
             signInWithGoogle,
             signOut
         }}>

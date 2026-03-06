@@ -3,6 +3,46 @@ const { admin, db, rapidApiKey, rapidApiHost, adminRefreshKey, corsOptions, slee
 const { fetchEspnSummaryForMatch } = require('../services/espn');
 const { fetchNextMatches, fetchSquad, fetchImage } = require('../services/sofascore');
 
+const buildReminderOptions = (data = {}) => ({
+    threeHours: !!data.defaultOptions?.threeHours,
+    oneHour: !!data.defaultOptions?.oneHour,
+    thirtyMinutes: !!data.defaultOptions?.thirtyMinutes,
+    fifteenMinutes: !!data.defaultOptions?.fifteenMinutes,
+    dailyCheck: !!data.dailyCheck,
+    updatedAt: data.defaultOptions?.updatedAt || null
+});
+
+const countActiveReminderOptions = (options = {}) => (
+    Object.entries(options).filter(([key, value]) => key !== 'updatedAt' && value === true).length
+);
+
+const getBearerToken = (req) => {
+    const authHeader = req.headers.authorization;
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+        return null;
+    }
+
+    const token = authHeader.slice(7).trim();
+    return token || null;
+};
+
+async function requireAuthenticatedUid(req, res) {
+    const idToken = getBearerToken(req);
+    if (!idToken) {
+        res.status(401).json({ error: 'Missing bearer token' });
+        return null;
+    }
+
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken);
+        return decoded.uid;
+    } catch (error) {
+        console.error('Auth verification failed:', error);
+        res.status(401).json({ error: 'Invalid auth token' });
+        return null;
+    }
+}
+
 // Handler functions
 async function handleNextMatch(req, res) {
     const snapshot = await db.ref('cache/nextMatch').once('value');
@@ -128,10 +168,19 @@ async function handleTeamImage(req, res, teamId) {
 }
 
 async function handleReminder(req, res) {
-    const { uid, fcmToken, oldFcmToken, options } = req.body;
+    const authenticatedUid = await requireAuthenticatedUid(req, res);
+    if (!authenticatedUid) {
+        return;
+    }
 
-    if (!uid || !fcmToken || !options) {
-        return res.status(400).json({ error: 'Missing uid, fcmToken or options' });
+    const { uid, fcmToken, oldFcmToken, options } = req.body || {};
+
+    if (uid && uid !== authenticatedUid) {
+        return res.status(403).json({ error: 'UID mismatch' });
+    }
+
+    if (!fcmToken || !options) {
+        return res.status(400).json({ error: 'Missing fcmToken or options' });
     }
 
     try {
@@ -141,45 +190,91 @@ async function handleReminder(req, res) {
     }
 
     try {
-        // Clean up old token-based entries (migration from pre-auth structure)
-        if (oldFcmToken && oldFcmToken !== fcmToken) {
-            // Remove any legacy token-keyed entry
-            await db.ref(`notifications/${oldFcmToken}`).remove();
-        }
+        const userRef = db.ref(`notifications/${authenticatedUid}`);
+        const legacyRef = authenticatedUid !== fcmToken
+            ? db.ref(`notifications/${fcmToken}`)
+            : null;
 
-        const userRef = db.ref(`notifications/${uid}`);
-        const snapshot = await userRef.once('value');
-        const currentData = snapshot.val() || {};
+        const [userSnapshot, legacySnapshot] = await Promise.all([
+            userRef.once('value'),
+            legacyRef ? legacyRef.once('value') : Promise.resolve({ val: () => null })
+        ]);
 
-        currentData.fcmToken = fcmToken;
-        currentData.dailyCheck = options.dailyCheck || false;
-        currentData.defaultOptions = {
-            threeHours: options.threeHours || false,
-            oneHour: options.oneHour || false,
-            thirtyMinutes: options.thirtyMinutes || false,
-            fifteenMinutes: options.fifteenMinutes || false,
-            updatedAt: Date.now()
+        const currentData = userSnapshot.val() || {};
+        const legacyData = legacySnapshot.val() || {};
+        const nextData = {
+            ...legacyData,
+            ...currentData,
+            fcmToken,
+            dailyCheck: !!options.dailyCheck,
+            defaultOptions: {
+                ...legacyData.defaultOptions,
+                ...currentData.defaultOptions,
+                threeHours: !!options.threeHours,
+                oneHour: !!options.oneHour,
+                thirtyMinutes: !!options.thirtyMinutes,
+                fifteenMinutes: !!options.fifteenMinutes,
+                updatedAt: Date.now()
+            }
         };
 
-        if (currentData.matches) {
-            delete currentData.matches;
+        if (nextData.matches) {
+            delete nextData.matches;
         }
 
-        await userRef.set(currentData);
+        await userRef.set(nextData);
 
-        const activeCount = Object.values(currentData.defaultOptions)
-            .filter(v => v === true).length;
+        const cleanupPaths = {};
+        if (legacyRef && Object.keys(legacyData).length > 0) {
+            cleanupPaths[`notifications/${fcmToken}`] = null;
+        }
+        if (oldFcmToken && oldFcmToken !== fcmToken && oldFcmToken !== authenticatedUid) {
+            cleanupPaths[`notifications/${oldFcmToken}`] = null;
+        }
+        if (Object.keys(cleanupPaths).length > 0) {
+            await db.ref().update(cleanupPaths);
+        }
+
+        const reminderOptions = buildReminderOptions(nextData);
+        const activeCount = countActiveReminderOptions(reminderOptions);
 
         return res.json({
             success: true,
             message: 'Preferences saved',
-            dailyCheckActive: currentData.dailyCheck,
-            activeNotifications: activeCount
+            dailyCheckActive: reminderOptions.dailyCheck,
+            activeNotifications: activeCount,
+            options: reminderOptions
         });
 
     } catch (error) {
         console.error('Reminder save error:', error);
         return res.status(500).json({ error: 'Failed to save preferences' });
+    }
+}
+
+async function handleReminderPreferences(req, res) {
+    const authenticatedUid = await requireAuthenticatedUid(req, res);
+    if (!authenticatedUid) {
+        return;
+    }
+
+    try {
+        const snapshot = await db.ref(`notifications/${authenticatedUid}`).once('value');
+        const data = snapshot.val();
+        if (!data) {
+            return res.status(404).json({ error: 'Preferences not found' });
+        }
+
+        const options = buildReminderOptions(data);
+        return res.json({
+            uid: authenticatedUid,
+            fcmToken: data.fcmToken || null,
+            activeNotifications: countActiveReminderOptions(options),
+            options
+        });
+    } catch (error) {
+        console.error('Reminder fetch error:', error);
+        return res.status(500).json({ error: 'Failed to fetch preferences' });
     }
 }
 
@@ -306,6 +401,9 @@ const api = onRequest({
                 if (req.method === 'POST') {
                     return await handleReminder(req, res);
                 }
+                if (req.method === 'GET') {
+                    return await handleReminderPreferences(req, res);
+                }
                 return res.status(405).json({ error: 'Method not allowed' });
 
             case 'health':
@@ -327,7 +425,7 @@ const api = onRequest({
                         '/match-summary/:matchId',
                         '/player-image/:id',
                         '/team-image/:id',
-                        '/reminder (POST)',
+                        '/reminder (GET, POST)',
                         '/health',
                         '/refresh'
                     ]

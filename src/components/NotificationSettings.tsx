@@ -18,8 +18,12 @@ const normalizeOptions = (options?: Partial<NotificationOptions>): NotificationO
     ...options
 });
 
+const countEnabledOptions = (options: NotificationOptions): number => (
+    Object.entries(options).filter(([key, value]) => key !== 'updatedAt' && value === true).length
+);
+
 const NotificationSettings = () => {
-    const { user, isAnonymous, signInWithGoogle } = useAuth();
+    const { user, signInWithGoogle } = useAuth();
     const [showModal, setShowModal] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [selectedOptions, setSelectedOptions] = useState<NotificationOptions>(() => {
@@ -50,6 +54,65 @@ const NotificationSettings = () => {
             document.body.style.overflow = 'unset';
         };
     }, [showModal]);
+
+    useEffect(() => {
+        const clearLocalState = () => {
+            setSelectedOptions(createEmptyOptions());
+            setDraftOptions(null);
+            setHasActiveNotifications(false);
+            localStorage.removeItem('fb_has_notifications');
+            localStorage.removeItem('fb_notification_options');
+        };
+
+        const loadServerPreferences = async () => {
+            if (!user) {
+                clearLocalState();
+                return;
+            }
+
+            try {
+                const idToken = await user.getIdToken();
+                const response = await fetch(`${BACKEND_URL}/reminder`, {
+                    headers: {
+                        Authorization: `Bearer ${idToken}`
+                    }
+                });
+
+                if (response.status === 404) {
+                    clearLocalState();
+                    return;
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Backend error: ${response.status}`);
+                }
+
+                const result = await response.json();
+                const serverOptions = normalizeOptions(result.options);
+                const enabledCount = countEnabledOptions(serverOptions);
+
+                setSelectedOptions(serverOptions);
+                setDraftOptions(null);
+                setHasActiveNotifications(enabledCount > 0);
+
+                if (enabledCount > 0) {
+                    localStorage.setItem('fb_has_notifications', 'true');
+                    localStorage.setItem('fb_notification_options', JSON.stringify(serverOptions));
+                } else {
+                    localStorage.removeItem('fb_has_notifications');
+                    localStorage.removeItem('fb_notification_options');
+                }
+
+                if (result.fcmToken) {
+                    localStorage.setItem(FCM_TOKEN_STORAGE_KEY, result.fcmToken);
+                }
+            } catch (err) {
+                console.error('Notification preferences load error:', err);
+            }
+        };
+
+        loadServerPreferences();
+    }, [user]);
 
     // FCM token sync: SW + token gecerliligi kontrol et, degismisse backend'e bildir
     useEffect(() => {
@@ -83,11 +146,14 @@ const NotificationSettings = () => {
 
                 const options = normalizeOptions(JSON.parse(savedOptions));
                 if (!user) return;
+                const idToken = await user.getIdToken();
                 await fetch(`${BACKEND_URL}/reminder`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${idToken}`
+                    },
                     body: JSON.stringify({
-                        uid: user.uid,
                         fcmToken: currentToken,
                         oldFcmToken: storedToken || undefined,
                         options
@@ -167,11 +233,14 @@ const NotificationSettings = () => {
 
             if (token && user) {
                 const oldFcmToken = (previousToken && previousToken !== token) ? previousToken : undefined;
+                const idToken = await user.getIdToken();
                 const response = await fetch(`${BACKEND_URL}/reminder`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${idToken}`
+                    },
                     body: JSON.stringify({
-                        uid: user.uid,
                         fcmToken: token,
                         oldFcmToken,
                         options: optionsToSave
@@ -240,8 +309,7 @@ const NotificationSettings = () => {
 
     const currentDraftOptions = draftOptions ?? selectedOptions;
     const hasDraftChanges = JSON.stringify(currentDraftOptions) !== JSON.stringify(selectedOptions);
-    const draftSelectionCount = Object.entries(currentDraftOptions).filter(([k, v]) => v && k !== 'updatedAt').length;
-    const savedSelectionCount = Object.entries(selectedOptions).filter(([k, v]) => v && k !== 'updatedAt').length;
+    const draftSelectionCount = countEnabledOptions(currentDraftOptions);
 
     return (
         <>
@@ -273,7 +341,7 @@ const NotificationSettings = () => {
                                 <h2 className="text-xl font-bold text-white">
                                     Bildirim Ayarları
                                 </h2>
-                                {!isAnonymous && (
+                                {user && (
                                 <p className="text-sm text-slate-400 mt-2">
                                     Tüm maçlar için geçerli
                                 </p>
@@ -290,7 +358,7 @@ const NotificationSettings = () => {
                         </div>
 
                         {/* Google giris zorunlulugu */}
-                        {isAnonymous ? (
+                        {!user ? (
                             <div className="text-center py-6">
                                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-400/10 flex items-center justify-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

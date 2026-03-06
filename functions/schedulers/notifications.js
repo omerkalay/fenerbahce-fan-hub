@@ -29,7 +29,7 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
         };
 
         const now = Date.now();
-        const pendingNotifications = [];
+        const pendingNotificationsMap = new Map();
 
         const istanbulParts = new Intl.DateTimeFormat('en-US', {
             timeZone: ISTANBUL_TIMEZONE,
@@ -45,6 +45,33 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
             if (Array.isArray(val)) return val;
             if (val && typeof val === 'object') return Object.values(val);
             return [];
+        };
+
+        const queueNotification = (key, payload) => {
+            if (!pendingNotificationsMap.has(key)) {
+                pendingNotificationsMap.set(key, {
+                    token: payload.token,
+                    message: payload.message,
+                    successUpdates: {},
+                    sentTargets: [],
+                    userIds: new Set()
+                });
+            }
+
+            const entry = pendingNotificationsMap.get(key);
+            entry.userIds.add(payload.userId);
+
+            if (payload.successUpdates) {
+                Object.assign(entry.successUpdates, payload.successUpdates);
+            }
+
+            if (payload.sentPath && payload.optionKey) {
+                entry.sentTargets.push({
+                    sentPath: payload.sentPath,
+                    optionKey: payload.optionKey,
+                    baseSentList: payload.baseSentList
+                });
+            }
         };
 
         for (const [userId, playerData] of Object.entries(allNotifications)) {
@@ -68,8 +95,9 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                             timeZone: ISTANBUL_TIMEZONE
                         });
 
-                        pendingNotifications.push({
-                            playerId: userId,
+                        queueNotification(`daily:${token}:${todayStr}`, {
+                            userId,
+                            token,
                             message: {
                                 token,
                                 notification: {
@@ -115,9 +143,9 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                         });
 
                         const sentPath = `notifications/${userId}/sentNotifications/${matchId}`;
-                        pendingNotifications.push({
-                            playerId: userId,
-                            matchId,
+                        queueNotification(`${matchId}:${optionKey}:${token}`, {
+                            userId,
+                            token,
                             message: {
                                 token,
                                 notification: {
@@ -141,6 +169,7 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
             }
         }
 
+        const pendingNotifications = Array.from(pendingNotificationsMap.values());
         if (pendingNotifications.length === 0) {
             return;
         }
@@ -160,22 +189,25 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
         results.forEach((result, index) => {
             const item = pendingNotifications[index];
             if (result.status === 'fulfilled') {
-                if (item.successUpdates) {
-                    Object.assign(updates, item.successUpdates);
-                }
-                if (item.sentPath && item.optionKey) {
-                    if (!sentAccumulator[item.sentPath]) {
-                        sentAccumulator[item.sentPath] = [...item.baseSentList];
+                Object.assign(updates, item.successUpdates);
+
+                for (const target of item.sentTargets) {
+                    if (!sentAccumulator[target.sentPath]) {
+                        sentAccumulator[target.sentPath] = [...target.baseSentList];
                     }
-                    sentAccumulator[item.sentPath].push(item.optionKey);
+                    if (!sentAccumulator[target.sentPath].includes(target.optionKey)) {
+                        sentAccumulator[target.sentPath].push(target.optionKey);
+                    }
                 }
                 return;
             }
 
             const errorCode = result.reason?.code || result.reason?.errorInfo?.code;
             if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
-                invalidTokenDeletes[`notifications/${item.playerId}`] = null;
-                console.log(`🧹 Removing invalid token: ${item.playerId.slice(0, 10)}...`);
+                item.userIds.forEach((userId) => {
+                    invalidTokenDeletes[`notifications/${userId}`] = null;
+                });
+                console.log(`🧹 Removing invalid token: ${item.token.slice(0, 10)}...`);
             }
         });
 

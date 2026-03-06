@@ -18,7 +18,7 @@ interface Votes {
 }
 
 const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
-    const { user, loading: authLoading, isAnonymous, signInWithGoogle } = useAuth();
+    const { user, loading: authLoading, signInWithGoogle } = useAuth();
     const [votes, setVotes] = useState<Votes>({ home: 0, away: 0, draw: 0 });
     const [hasVoted, setHasVoted] = useState(false);
     const [showSignIn, setShowSignIn] = useState(false);
@@ -57,7 +57,7 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
         });
 
         // Only check user vote if signed in with Google
-        if (user && !isAnonymous) {
+        if (user) {
             const userVoteRef = ref(database, `match_polls/${matchId}/users/${user.uid}`);
             get(userVoteRef).then((snapshot) => {
                 if (snapshot.exists()) {
@@ -70,18 +70,21 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
             }).catch((error) => {
                 console.error("Error checking user vote:", error);
             });
+        } else {
+            setHasVoted(false);
+            setUserVote(null);
         }
 
         return () => {
             unsubscribeVotes();
         };
-    }, [matchId, user, isAnonymous]);
+    }, [matchId, user]);
 
     const handleVote = async (option: VoteOption) => {
         if (hasVoted || !matchId) return;
 
         // Require Google sign-in to vote
-        if (!user || isAnonymous) {
+        if (!user) {
             setShowSignIn(true);
             return;
         }
@@ -175,7 +178,7 @@ const Poll = ({ opponentName = "Rakip Takım", matchId }: PollProps) => {
                     <div className="text-left">
                         <h3 className="text-base font-bold text-white">Maçı Kim Kazanır?</h3>
                         <p className="text-xs text-slate-400">
-                            {hasVoted ? 'Oyunuz kullanıldı' : isAnonymous ? 'Oy vermek için giriş yap' : 'Tahminini yap'}
+                            {hasVoted ? 'Oyunuz kullanıldı' : !user ? 'Oy vermek için giriş yap' : 'Tahminini yap'}
                             <span className="text-slate-500 ml-2">· Toplam: {totalVotes} oy</span>
                         </p>
                     </div>

@@ -6,13 +6,23 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.0-blue)
+![Version](https://img.shields.io/badge/version-2.9.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.0
+## What's New in v2.9.1
+
+- **Anonymous Auth Removal** - Removed automatic anonymous Firebase sessions. Signed-out users can browse freely; Google sign-in is now used only when a protected action is attempted
+- **PWA Sign-In Hardening** - Added Google redirect result handling and iOS standalone fallback logic to improve authentication flow inside the installed PWA
+- **Authenticated Notification API** - `/api/reminder` now verifies Firebase ID tokens instead of trusting a client-sent UID, preventing users from writing preferences for another account
+- **Cross-Device Notification Sync** - Notification settings now load from the backend after sign-in, so the UI reflects the server-side source of truth instead of stale local storage
+- **Notification Migration Cleanup** - UID-keyed notification records can absorb legacy token-keyed data during save, reducing leftover migration state
+- **Scheduler Dedupe by FCM Token** - Notification dispatch now aggregates duplicate UID/token combinations before sending, preventing repeated pushes when stale records exist
+
+<details>
+<summary>Previous: v2.9.0</summary>
 
 - **Firebase Authentication** - Added Google sign-in with automatic anonymous fallback. Users can browse freely; Google sign-in is required only for voting in polls and configuring push notifications
 - **User Avatar** - Profile icon in the header with yellow ring indicator when signed in, dropdown menu with account info and sign-out option
@@ -21,6 +31,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Admin Refresh Protection** - `/api/refresh` endpoint now requires `ADMIN_REFRESH_KEY` via header or query param, protecting RapidAPI quota from unauthorized calls
 - **Sign-In Modals** - Turkish-localized sign-in prompts appear contextually when anonymous users attempt to vote, configure notifications, or tap the profile icon
 - **Firebase RTDB Security Rules** - Auth-based rules: polls validate own-UID write-once voting, notifications restricted to own UID, cache nodes public-read
+
+</details>
 
 <details>
 <summary>Previous: v2.8.x (v2.8.0 – v2.8.5)</summary>
@@ -411,4 +423,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.0** | March 2026
+**v2.9.1** | March 2026
