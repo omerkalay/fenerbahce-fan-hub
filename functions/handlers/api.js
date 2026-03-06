@@ -183,6 +183,11 @@ async function handleReminder(req, res) {
         return res.status(400).json({ error: 'Missing fcmToken or options' });
     }
 
+    const hasPathTraversal = (v) => typeof v === 'string' && v.includes('/');
+    if (hasPathTraversal(fcmToken) || hasPathTraversal(oldFcmToken)) {
+        return res.status(400).json({ error: 'Invalid token format' });
+    }
+
     try {
         await admin.messaging().subscribeToTopic(fcmToken, 'all_fans');
     } catch (subError) {
