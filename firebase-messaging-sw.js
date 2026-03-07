@@ -19,13 +19,12 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
-    const notificationTitle = payload.notification?.title || 'Fenerbahçe Fan Hub';
+    const d = payload.data || {};
+    const notificationTitle = d.title || 'Fenerbahçe Fan Hub';
     const notificationOptions = {
-        body: payload.notification?.body || '',
-        icon: payload.notification?.icon,
-        image: payload.notification?.image,
+        body: d.body || '',
         data: {
-            url: DEFAULT_NOTIFICATION_URL,
+            url: d.url || DEFAULT_NOTIFICATION_URL,
         },
     };
 
