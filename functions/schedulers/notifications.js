@@ -100,12 +100,10 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                             token,
                             message: {
                                 token,
-                                notification: {
+                                data: {
                                     title: '📅 Bugün Maç Var!',
-                                    body: `💛💙 Fenerbahçe - ${opponent} | ${timeString}`
-                                },
-                                webpush: {
-                                    fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
+                                    body: `💛💙 Fenerbahçe - ${opponent} | ${timeString}`,
+                                    url: 'https://omerkalay.com/fenerbahce-fan-hub/'
                                 }
                             },
                             successUpdates: {
@@ -148,16 +146,12 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
                             token,
                             message: {
                                 token,
-                                notification: {
-                                    title: `💛💙 Fenerbahçe - ${opponent}`,
-                                    body: `${timeString} · ${config.timeText}`
-                                },
                                 data: {
+                                    title: `💛💙 Fenerbahçe - ${opponent}`,
+                                    body: `${timeString} · ${config.timeText}`,
                                     matchId: matchId,
-                                    type: optionKey
-                                },
-                                webpush: {
-                                    fcmOptions: { link: 'https://omerkalay.com/fenerbahce-fan-hub/' }
+                                    type: optionKey,
+                                    url: 'https://omerkalay.com/fenerbahce-fan-hub/'
                                 }
                             },
                             sentPath,
