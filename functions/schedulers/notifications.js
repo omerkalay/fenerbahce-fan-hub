@@ -5,7 +5,9 @@ const { admin, db, FENERBAHCE_ID, ISTANBUL_TIMEZONE, formatDateKey } = require('
  * Check Match Notifications - Her dakika çalışır
  * ARTIK API CALL YAPMIYOR! Cache'den okuyor.
  */
-const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
+const checkMatchNotifications = onSchedule(
+    { schedule: "every 1 minutes", maxInstances: 1 },
+    async (event) => {
     try {
         const matchesSnapshot = await db.ref('cache/next3Matches').once('value');
         const nextMatches = matchesSnapshot.val();

@@ -34,6 +34,7 @@ const acquireFcmToken = async (): Promise<string | null> => {
 };
 
 const createEmptyOptions = (): NotificationOptions => ({
+  generalNotifications: false,
   threeHours: false,
   oneHour: false,
   thirtyMinutes: false,
@@ -48,6 +49,12 @@ const normalizeOptions = (options?: Partial<NotificationOptions>): NotificationO
 
 const countEnabledOptions = (options: NotificationOptions): number => (
   Object.entries(options).filter(([key, value]) => key !== 'updatedAt' && value === true).length
+);
+
+const MATCH_OPTION_KEYS = ['threeHours', 'oneHour', 'thirtyMinutes', 'fifteenMinutes', 'dailyCheck'] as const;
+
+const countMatchOptions = (options: NotificationOptions): number => (
+  MATCH_OPTION_KEYS.filter(key => options[key]).length
 );
 
 const NotificationSettings = () => {
@@ -159,14 +166,12 @@ const NotificationSettings = () => {
         const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
         if (currentToken === storedToken) return;
 
-        localStorage.setItem(FCM_TOKEN_STORAGE_KEY, currentToken);
-
         const savedOptions = localStorage.getItem('fb_notification_options');
         if (!savedOptions || !user) return;
 
         const options = normalizeOptions(JSON.parse(savedOptions));
         const idToken = await user.getIdToken();
-        await fetch(`${BACKEND_URL}/reminder`, {
+        const response = await fetch(`${BACKEND_URL}/reminder`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -178,6 +183,12 @@ const NotificationSettings = () => {
             options
           })
         });
+
+        if (!response.ok) {
+          throw new Error(`Backend error: ${response.status}`);
+        }
+
+        localStorage.setItem(FCM_TOKEN_STORAGE_KEY, currentToken);
       } catch (err) {
         console.error('FCM token sync error:', err);
       }
@@ -210,7 +221,8 @@ const NotificationSettings = () => {
 
   const currentDraftOptions = draftOptions ?? selectedOptions;
   const hasDraftChanges = JSON.stringify(currentDraftOptions) !== JSON.stringify(selectedOptions);
-  const draftSelectionCount = countEnabledOptions(currentDraftOptions);
+  const draftMatchCount = countMatchOptions(currentDraftOptions);
+  const draftGeneralCount = currentDraftOptions.generalNotifications ? 1 : 0;
 
   const saveNotifications = async () => {
     if (isSaving) return;
@@ -240,10 +252,6 @@ const NotificationSettings = () => {
           if (!token) {
             throw new Error('Firebase Messaging başlatılamadı');
           }
-
-          if (token) {
-            localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
-          }
         } catch (err) {
           console.error('Token alınamadı:', err);
           alert(`❌ Bildirim hatası: ${(err as Error).message}`);
@@ -251,6 +259,7 @@ const NotificationSettings = () => {
         }
       }
 
+      let topicSyncPending = false;
       if (user && (token || isDisablingAll)) {
         const oldFcmToken = previousToken && previousToken !== token ? previousToken : undefined;
         const idToken = await user.getIdToken();
@@ -272,21 +281,27 @@ const NotificationSettings = () => {
 
         const result = await response.json();
         console.log('Backend response:', result);
+        topicSyncPending = !!result.topicSyncPending;
+
+        if (token && token !== previousToken) {
+          localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
+        }
       } else if (!isDisablingAll) {
         alert('❌ Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
         return;
       }
 
+      const syncNote = topicSyncPending ? '\nGenel bildirim senkronu otomatik tekrar denenecek.' : '';
       if (count === 0) {
         setHasActiveNotifications(false);
         localStorage.removeItem('fb_has_notifications');
         localStorage.removeItem('fb_notification_options');
-        alert('✅ Tüm bildirimler temizlendi!');
+        alert('✅ Tüm bildirimler temizlendi!' + syncNote);
       } else {
         setHasActiveNotifications(true);
         localStorage.setItem('fb_has_notifications', 'true');
         localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
-        alert(`✅ ${count} bildirim ayarlandı! Tüm maçlara uygulanacak.`);
+        alert(`✅ ${count} bildirim ayarlandı!` + syncNote);
       }
 
       setSelectedOptions(optionsToSave);
@@ -379,7 +394,7 @@ const NotificationSettings = () => {
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-xl font-bold text-white">Bildirim Ayarları</h2>
-                <p className="text-sm text-slate-400 mt-2">Tüm maçlar için geçerli</p>
+                <p className="text-sm text-slate-400 mt-2">Genel ve maç bildirimlerini ayrı ayrı yönet</p>
               </div>
               <button
                 type="button"
@@ -393,60 +408,88 @@ const NotificationSettings = () => {
               </button>
             </div>
 
-            <div className="glass-panel rounded-xl p-4 mb-6 border border-yellow-400/20">
-              <div className="flex items-center gap-2 text-yellow-400">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-sm font-semibold">Bu ayarlar tüm maçlara uygulanır</span>
-              </div>
-              <p className="text-xs text-slate-400 mt-2">Bir kez ayarla, her maç için otomatik bildirim al!</p>
+            <div className="mb-5">
+              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">Genel Bildirimler</h3>
+              <label
+                className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.generalNotifications ? 'bg-emerald-400/20 border-emerald-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={currentDraftOptions.generalNotifications}
+                  onChange={() => toggleOption('generalNotifications')}
+                  className="mt-1 w-5 h-5 rounded border-2 border-emerald-400 bg-transparent checked:bg-emerald-400 cursor-pointer accent-emerald-400"
+                />
+                <div className="flex-1">
+                  <span className="font-semibold text-white">Önemli Duyurular</span>
+                  <p className="text-xs text-slate-400 mt-1">Kulüple ilgili önemli duyuru ve manuel toplu bildirimleri al</p>
+                </div>
+              </label>
             </div>
 
-            <div className="space-y-3 mb-6">
-              {notificationOptions.map((option) => (
-                <label
-                  key={option.id}
-                  className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id] ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={Boolean(currentDraftOptions[option.id])}
-                    onChange={() => toggleOption(option.id)}
-                    className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-white">{option.label}</span>
-                    </div>
-                    <p className="text-xs text-slate-400">{option.description}</p>
-                  </div>
-                </label>
-              ))}
+            <div className="mb-6">
+              <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider mb-3">Maç Bildirimleri</h3>
 
-              <div className="pt-3 border-t border-white/10">
-                <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.dailyCheck ? 'bg-blue-400/20 border-blue-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}>
-                  <input
-                    type="checkbox"
-                    checked={currentDraftOptions.dailyCheck}
-                    onChange={() => toggleOption('dailyCheck')}
-                    className="mt-1 w-5 h-5 rounded border-2 border-blue-400 bg-transparent checked:bg-blue-400 cursor-pointer accent-blue-400"
-                  />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-semibold text-white">Günlük Maç Kontrolü</span>
-                      <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">ÖZEL</span>
+              <div className="glass-panel rounded-xl p-4 mb-4 border border-yellow-400/20">
+                <div className="flex items-center gap-2 text-yellow-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-sm font-semibold">Bu ayarlar tüm maçlara uygulanır</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Bir kez ayarla, her maç için otomatik bildirim al!</p>
+              </div>
+
+              <div className="space-y-3">
+                {notificationOptions.map((option) => (
+                  <label
+                    key={option.id}
+                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id] ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(currentDraftOptions[option.id])}
+                      onChange={() => toggleOption(option.id)}
+                      className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-white">{option.label}</span>
+                      </div>
+                      <p className="text-xs text-slate-400">{option.description}</p>
                     </div>
-                    <p className="text-xs text-slate-400">Her sabah 09:00'da kontrol et, o gün maç varsa bildir</p>
-                  </div>
-                </label>
+                  </label>
+                ))}
+
+                <div className="pt-3 border-t border-white/10">
+                  <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.dailyCheck ? 'bg-blue-400/20 border-blue-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}>
+                    <input
+                      type="checkbox"
+                      checked={currentDraftOptions.dailyCheck}
+                      onChange={() => toggleOption('dailyCheck')}
+                      className="mt-1 w-5 h-5 rounded border-2 border-blue-400 bg-transparent checked:bg-blue-400 cursor-pointer accent-blue-400"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold text-white">Günlük Maç Kontrolü</span>
+                        <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">ÖZEL</span>
+                      </div>
+                      <p className="text-xs text-slate-400">Her sabah 09:00'da kontrol et, o gün maç varsa bildir</p>
+                    </div>
+                  </label>
+                </div>
               </div>
             </div>
 
-            {Object.entries(currentDraftOptions).some(([key, value]) => key !== 'updatedAt' && value) && (
+            {(draftGeneralCount > 0 || draftMatchCount > 0) && (
               <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4 animate-fadeIn">
                 <p className="text-xs text-yellow-200">
-                  <strong className="text-yellow-400">{draftSelectionCount}</strong> bildirim seçtiniz
+                  <strong className="text-yellow-400">
+                    {draftGeneralCount > 0 && draftMatchCount > 0
+                      ? `${draftGeneralCount} genel + ${draftMatchCount} maç`
+                      : draftGeneralCount > 0
+                        ? `${draftGeneralCount} genel`
+                        : `${draftMatchCount} maç`}
+                  </strong>{' '}bildirim seçtiniz
                 </p>
               </div>
             )}

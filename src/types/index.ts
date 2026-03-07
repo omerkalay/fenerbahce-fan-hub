@@ -204,12 +204,13 @@ export interface MatchSummaryData {
 // ─── Notification Options ────────────────────────────────
 
 export interface NotificationOptions {
+  generalNotifications: boolean;
   threeHours: boolean;
   oneHour: boolean;
   thirtyMinutes: boolean;
   fifteenMinutes: boolean;
   dailyCheck: boolean;
-  updatedAt?: string;
+  updatedAt?: number;
 }
 
 // ─── Formation Builder ───────────────────────────────────

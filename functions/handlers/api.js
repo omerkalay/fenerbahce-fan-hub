@@ -3,7 +3,8 @@ const { admin, db, rapidApiKey, rapidApiHost, adminRefreshKey, corsOptions, slee
 const { fetchEspnSummaryForMatch } = require('../services/espn');
 const { fetchNextMatches, fetchSquad, fetchImage } = require('../services/sofascore');
 
-const buildReminderOptions = (data = {}) => ({
+const buildNotificationOptions = (data = {}) => ({
+    generalNotifications: data.generalNotifications !== false,
     threeHours: !!data.defaultOptions?.threeHours,
     oneHour: !!data.defaultOptions?.oneHour,
     thirtyMinutes: !!data.defaultOptions?.thirtyMinutes,
@@ -12,7 +13,7 @@ const buildReminderOptions = (data = {}) => ({
     updatedAt: data.defaultOptions?.updatedAt || null
 });
 
-const countActiveReminderOptions = (options = {}) => (
+const countActiveOptions = (options = {}) => (
     Object.entries(options).filter(([key, value]) => key !== 'updatedAt' && value === true).length
 );
 
@@ -390,8 +391,8 @@ async function handleReminder(req, res) {
         return res.status(400).json({ error: 'Missing options' });
     }
 
-    const isDisablingAll = !options.dailyCheck && !options.threeHours &&
-        !options.oneHour && !options.thirtyMinutes && !options.fifteenMinutes;
+    const isDisablingAll = !options.generalNotifications && !options.dailyCheck &&
+        !options.threeHours && !options.oneHour && !options.thirtyMinutes && !options.fifteenMinutes;
 
     if (!fcmToken && !isDisablingAll) {
         return res.status(400).json({ error: 'Missing fcmToken' });
@@ -400,14 +401,6 @@ async function handleReminder(req, res) {
     const hasPathTraversal = (v) => typeof v === 'string' && v.includes('/');
     if (hasPathTraversal(fcmToken) || hasPathTraversal(oldFcmToken)) {
         return res.status(400).json({ error: 'Invalid token format' });
-    }
-
-    if (fcmToken) {
-        try {
-            await admin.messaging().subscribeToTopic(fcmToken, 'all_fans');
-        } catch (subError) {
-            console.error('Topic subscription failed:', subError);
-        }
     }
 
     try {
@@ -429,6 +422,7 @@ async function handleReminder(req, res) {
         rootUpdates[`${basePath}/defaultOptions/thirtyMinutes`] = !!options.thirtyMinutes;
         rootUpdates[`${basePath}/defaultOptions/fifteenMinutes`] = !!options.fifteenMinutes;
         rootUpdates[`${basePath}/defaultOptions/updatedAt`] = Date.now();
+        rootUpdates[`${basePath}/generalNotifications`] = !!options.generalNotifications;
 
         if (currentData.matches) {
             rootUpdates[`${basePath}/matches`] = null;
@@ -453,9 +447,79 @@ async function handleReminder(req, res) {
             rootUpdates[`notifications/${oldFcmToken}`] = null;
         }
 
+        // DB-first: include topic sync pending state in the atomic write
+        const topicToken = fcmToken || currentData.fcmToken;
+        const desiredTopicState = !!options.generalNotifications;
+        rootUpdates[`${basePath}/topicSync/allFans/pending`] = true;
+        rootUpdates[`${basePath}/topicSync/allFans/desired`] = desiredTopicState;
+        rootUpdates[`${basePath}/topicSync/allFans/token`] = topicToken || null;
+        rootUpdates[`${basePath}/topicSync/allFans/lastAttemptAt`] = null;
+        rootUpdates[`${basePath}/topicSync/allFans/lastError`] = null;
+
         await db.ref().update(rootUpdates);
 
-        const reminderOptions = {
+        // Attempt topic sync after DB commit
+        let topicSyncPending = true;
+        if (topicToken) {
+            try {
+                const topicResult = desiredTopicState
+                    ? await admin.messaging().subscribeToTopic(topicToken, 'all_fans')
+                    : await admin.messaging().unsubscribeFromTopic(topicToken, 'all_fans');
+                if (topicResult.failureCount > 0) {
+                    const reasons = topicResult.errors?.map(e => e.error?.message || e.error?.code).join(', ') || 'unknown';
+                    await db.ref(`${basePath}/topicSync/allFans`).update({
+                        lastAttemptAt: Date.now(),
+                        lastError: reasons
+                    });
+                } else {
+                    await db.ref(`${basePath}/topicSync/allFans`).update({
+                        pending: false,
+                        lastAttemptAt: Date.now(),
+                        lastSyncedAt: Date.now(),
+                        lastError: null
+                    });
+                    topicSyncPending = false;
+                }
+            } catch (topicErr) {
+                await db.ref(`${basePath}/topicSync/allFans`).update({
+                    lastAttemptAt: Date.now(),
+                    lastError: topicErr.message || 'unknown error'
+                });
+            }
+        } else if (!desiredTopicState) {
+            // No token + unsubscribe desired = effectively synced
+            await db.ref(`${basePath}/topicSync/allFans`).update({
+                pending: false,
+                lastAttemptAt: Date.now(),
+                lastSyncedAt: Date.now(),
+                lastError: null
+            });
+            topicSyncPending = false;
+        }
+
+        // Old token topic cleanup: defer if current subscribe is pending to avoid coverage gap
+        const hasOldToken = oldFcmToken && oldFcmToken !== fcmToken && oldFcmToken !== authenticatedUid;
+        if (hasOldToken) {
+            if (!topicSyncPending || !desiredTopicState) {
+                // Safe: new token confirmed, or unsubscribing anyway
+                try {
+                    const oldResult = await admin.messaging().unsubscribeFromTopic(oldFcmToken, 'all_fans');
+                    if (oldResult.failureCount > 0) {
+                        console.warn('Old token topic unsubscribe partial failure:', oldResult.errors);
+                        await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                    }
+                } catch (oldTopicErr) {
+                    console.error('Old token topic unsubscribe failed:', oldTopicErr);
+                    await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                }
+            } else {
+                // Defer: reconciler will clean up after current sync succeeds
+                await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+            }
+        }
+
+        const savedOptions = {
+            generalNotifications: !!options.generalNotifications,
             threeHours: !!options.threeHours,
             oneHour: !!options.oneHour,
             thirtyMinutes: !!options.thirtyMinutes,
@@ -463,14 +527,15 @@ async function handleReminder(req, res) {
             dailyCheck: !!options.dailyCheck,
             updatedAt: rootUpdates[`${basePath}/defaultOptions/updatedAt`]
         };
-        const activeCount = countActiveReminderOptions(reminderOptions);
+        const activeCount = countActiveOptions(savedOptions);
 
         return res.json({
             success: true,
-            message: 'Preferences saved',
-            dailyCheckActive: reminderOptions.dailyCheck,
+            message: topicSyncPending ? 'Preferences saved, topic sync pending' : 'Preferences saved',
+            topicSyncPending,
+            dailyCheckActive: savedOptions.dailyCheck,
             activeNotifications: activeCount,
-            options: reminderOptions
+            options: savedOptions
         });
 
     } catch (error) {
@@ -492,11 +557,12 @@ async function handleReminderPreferences(req, res) {
             return res.status(404).json({ error: 'Preferences not found' });
         }
 
-        const options = buildReminderOptions(data);
+        const options = buildNotificationOptions(data);
         return res.json({
             uid: authenticatedUid,
             fcmToken: data.fcmToken || null,
-            activeNotifications: countActiveReminderOptions(options),
+            activeNotifications: countActiveOptions(options),
+            topicSyncPending: !!data.topicSync?.allFans?.pending,
             options
         });
     } catch (error) {
