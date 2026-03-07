@@ -1,6 +1,9 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { admin, db } = require('../config');
 
+const isTerminalTokenCode = (code) =>
+    code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered';
+
 /**
  * Reconcile pending topic syncs - 5 dakikada bir
  * topicSync/allFans.pending=true olan kullanicilari bulup retry eder.
@@ -69,12 +72,24 @@ const reconcileTopicSync = onSchedule(
                             try {
                                 const oldResult = await admin.messaging().unsubscribeFromTopic(oldCleanupToken, 'all_fans');
                                 if (oldResult.failureCount > 0) {
-                                    console.warn(`Old token cleanup partial failure for ${userId.slice(0, 8)}:`, oldResult.errors);
+                                    const code = oldResult.errors?.[0]?.error?.code;
+                                    if (isTerminalTokenCode(code)) {
+                                        console.info(`Old token expired, cleanup cleared for ${userId.slice(0, 8)}...`);
+                                        await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+                                    } else {
+                                        console.warn(`Old token cleanup partial failure for ${userId.slice(0, 8)}:`, oldResult.errors);
+                                    }
                                 } else {
                                     await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
                                 }
                             } catch (cleanupErr) {
-                                console.error(`Old token cleanup failed for ${userId.slice(0, 8)}:`, cleanupErr.message);
+                                const code = cleanupErr.code || cleanupErr.errorInfo?.code;
+                                if (isTerminalTokenCode(code)) {
+                                    console.info(`Old token expired, cleanup cleared for ${userId.slice(0, 8)}...`);
+                                    await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+                                } else {
+                                    console.error(`Old token cleanup failed for ${userId.slice(0, 8)}:`, cleanupErr.message);
+                                }
                             }
                         }
                     }
@@ -95,12 +110,24 @@ const reconcileTopicSync = onSchedule(
                     try {
                         const oldResult = await admin.messaging().unsubscribeFromTopic(allFans.oldTokenToCleanup, 'all_fans');
                         if (oldResult.failureCount > 0) {
-                            console.warn(`Old token straggler cleanup partial failure for ${userId.slice(0, 8)}:`, oldResult.errors);
+                            const code = oldResult.errors?.[0]?.error?.code;
+                            if (isTerminalTokenCode(code)) {
+                                console.info(`Old token expired, straggler cleanup cleared for ${userId.slice(0, 8)}...`);
+                                await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+                            } else {
+                                console.warn(`Old token straggler cleanup partial failure for ${userId.slice(0, 8)}:`, oldResult.errors);
+                            }
                         } else {
                             await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
                         }
                     } catch (cleanupErr) {
-                        console.error(`Old token cleanup failed for ${userId.slice(0, 8)}:`, cleanupErr.message);
+                        const code = cleanupErr.code || cleanupErr.errorInfo?.code;
+                        if (isTerminalTokenCode(code)) {
+                            console.info(`Old token expired, straggler cleanup cleared for ${userId.slice(0, 8)}...`);
+                            await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+                        } else {
+                            console.error(`Old token cleanup failed for ${userId.slice(0, 8)}:`, cleanupErr.message);
+                        }
                     }
                 }
             }

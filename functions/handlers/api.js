@@ -505,12 +505,22 @@ async function handleReminder(req, res) {
                 try {
                     const oldResult = await admin.messaging().unsubscribeFromTopic(oldFcmToken, 'all_fans');
                     if (oldResult.failureCount > 0) {
-                        console.warn('Old token topic unsubscribe partial failure:', oldResult.errors);
-                        await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                        const code = oldResult.errors?.[0]?.error?.code;
+                        if (code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered') {
+                            console.info(`Old token expired, cleanup skipped: ${oldFcmToken.slice(0, 10)}...`);
+                        } else {
+                            console.warn('Old token topic unsubscribe partial failure:', oldResult.errors);
+                            await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                        }
                     }
                 } catch (oldTopicErr) {
-                    console.error('Old token topic unsubscribe failed:', oldTopicErr);
-                    await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                    const code = oldTopicErr.code || oldTopicErr.errorInfo?.code;
+                    if (code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered') {
+                        console.info(`Old token expired, cleanup skipped: ${oldFcmToken.slice(0, 10)}...`);
+                    } else {
+                        console.error('Old token topic unsubscribe failed:', oldTopicErr);
+                        await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                    }
                 }
             } else {
                 // Defer: reconciler will clean up after current sync succeeds
