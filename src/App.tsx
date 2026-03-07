@@ -105,10 +105,11 @@ function AppContent() {
 
         unsubscribe = onMessage(messaging, (payload) => {
           console.log('📩 Foreground message:', payload);
-          const { title, body } = payload.notification || {};
+          const title = payload.notification?.title || payload.data?.title;
+          const body = payload.notification?.body || payload.data?.body || '';
           if (title) {
             new Notification(title, {
-              body: body || '',
+              body,
               icon: 'https://media.api-sports.io/football/teams/611.png',
               data: payload.data
             });
