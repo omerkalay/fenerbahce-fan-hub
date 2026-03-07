@@ -19,6 +19,9 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
 
+    // Skip if notification payload exists — browser auto-displays those
+    if (payload.notification) return;
+
     const d = payload.data || {};
     const notificationTitle = d.title || 'Fenerbahçe Fan Hub';
     const notificationOptions = {
