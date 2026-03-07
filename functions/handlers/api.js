@@ -386,8 +386,15 @@ async function handleReminder(req, res) {
         return res.status(403).json({ error: 'UID mismatch' });
     }
 
-    if (!fcmToken || !options) {
-        return res.status(400).json({ error: 'Missing fcmToken or options' });
+    if (!options) {
+        return res.status(400).json({ error: 'Missing options' });
+    }
+
+    const isDisablingAll = !options.dailyCheck && !options.threeHours &&
+        !options.oneHour && !options.thirtyMinutes && !options.fifteenMinutes;
+
+    if (!fcmToken && !isDisablingAll) {
+        return res.status(400).json({ error: 'Missing fcmToken' });
     }
 
     const hasPathTraversal = (v) => typeof v === 'string' && v.includes('/');
@@ -395,59 +402,67 @@ async function handleReminder(req, res) {
         return res.status(400).json({ error: 'Invalid token format' });
     }
 
-    try {
-        await admin.messaging().subscribeToTopic(fcmToken, 'all_fans');
-    } catch (subError) {
-        console.error('Topic subscription failed:', subError);
+    if (fcmToken) {
+        try {
+            await admin.messaging().subscribeToTopic(fcmToken, 'all_fans');
+        } catch (subError) {
+            console.error('Topic subscription failed:', subError);
+        }
     }
 
     try {
-        const userRef = db.ref(`notifications/${authenticatedUid}`);
-        const legacyRef = authenticatedUid !== fcmToken
-            ? db.ref(`notifications/${fcmToken}`)
-            : null;
+        const currentSnapshot = await db.ref(`notifications/${authenticatedUid}`).once('value');
+        const currentData = currentSnapshot.val() || {};
 
-        const [userSnapshot, legacySnapshot] = await Promise.all([
-            userRef.once('value'),
-            legacyRef ? legacyRef.once('value') : Promise.resolve({ val: () => null })
-        ]);
+        const basePath = `notifications/${authenticatedUid}`;
+        const rootUpdates = {};
 
-        const currentData = userSnapshot.val() || {};
-        const legacyData = legacySnapshot.val() || {};
-        const nextData = {
-            ...legacyData,
-            ...currentData,
-            fcmToken,
-            dailyCheck: !!options.dailyCheck,
-            defaultOptions: {
-                ...legacyData.defaultOptions,
-                ...currentData.defaultOptions,
-                threeHours: !!options.threeHours,
-                oneHour: !!options.oneHour,
-                thirtyMinutes: !!options.thirtyMinutes,
-                fifteenMinutes: !!options.fifteenMinutes,
-                updatedAt: Date.now()
+        if (fcmToken) {
+            rootUpdates[`${basePath}/fcmToken`] = fcmToken;
+            rootUpdates[`${basePath}/tokenInvalidAt`] = null;
+            rootUpdates[`${basePath}/tokenInvalidCode`] = null;
+        }
+
+        rootUpdates[`${basePath}/dailyCheck`] = !!options.dailyCheck;
+        rootUpdates[`${basePath}/defaultOptions/threeHours`] = !!options.threeHours;
+        rootUpdates[`${basePath}/defaultOptions/oneHour`] = !!options.oneHour;
+        rootUpdates[`${basePath}/defaultOptions/thirtyMinutes`] = !!options.thirtyMinutes;
+        rootUpdates[`${basePath}/defaultOptions/fifteenMinutes`] = !!options.fifteenMinutes;
+        rootUpdates[`${basePath}/defaultOptions/updatedAt`] = Date.now();
+
+        if (currentData.matches) {
+            rootUpdates[`${basePath}/matches`] = null;
+        }
+
+        // Legacy migration: token-keyed → uid-keyed
+        if (fcmToken && authenticatedUid !== fcmToken) {
+            const legacySnapshot = await db.ref(`notifications/${fcmToken}`).once('value');
+            const legacyData = legacySnapshot.val();
+            if (legacyData && typeof legacyData === 'object') {
+                if (legacyData.sentNotifications && !currentData.sentNotifications) {
+                    rootUpdates[`${basePath}/sentNotifications`] = legacyData.sentNotifications;
+                }
+                if (legacyData.lastDailyNotification && !currentData.lastDailyNotification) {
+                    rootUpdates[`${basePath}/lastDailyNotification`] = legacyData.lastDailyNotification;
+                }
+                rootUpdates[`notifications/${fcmToken}`] = null;
             }
-        };
-
-        if (nextData.matches) {
-            delete nextData.matches;
         }
 
-        await userRef.set(nextData);
-
-        const cleanupPaths = {};
-        if (legacyRef && Object.keys(legacyData).length > 0) {
-            cleanupPaths[`notifications/${fcmToken}`] = null;
-        }
         if (oldFcmToken && oldFcmToken !== fcmToken && oldFcmToken !== authenticatedUid) {
-            cleanupPaths[`notifications/${oldFcmToken}`] = null;
-        }
-        if (Object.keys(cleanupPaths).length > 0) {
-            await db.ref().update(cleanupPaths);
+            rootUpdates[`notifications/${oldFcmToken}`] = null;
         }
 
-        const reminderOptions = buildReminderOptions(nextData);
+        await db.ref().update(rootUpdates);
+
+        const reminderOptions = {
+            threeHours: !!options.threeHours,
+            oneHour: !!options.oneHour,
+            thirtyMinutes: !!options.thirtyMinutes,
+            fifteenMinutes: !!options.fifteenMinutes,
+            dailyCheck: !!options.dailyCheck,
+            updatedAt: rootUpdates[`${basePath}/defaultOptions/updatedAt`]
+        };
         const activeCount = countActiveReminderOptions(reminderOptions);
 
         return res.json({

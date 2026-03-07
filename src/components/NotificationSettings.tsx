@@ -134,6 +134,8 @@ const NotificationSettings = () => {
 
         if (result.fcmToken) {
           localStorage.setItem(FCM_TOKEN_STORAGE_KEY, result.fcmToken);
+        } else {
+          localStorage.removeItem(FCM_TOKEN_STORAGE_KEY);
         }
       } catch (err) {
         console.error('Notification preferences load error:', err);
@@ -249,7 +251,7 @@ const NotificationSettings = () => {
         }
       }
 
-      if (token && user) {
+      if (user && (token || isDisablingAll)) {
         const oldFcmToken = previousToken && previousToken !== token ? previousToken : undefined;
         const idToken = await user.getIdToken();
         const response = await fetch(`${BACKEND_URL}/reminder`, {
@@ -259,8 +261,7 @@ const NotificationSettings = () => {
             Authorization: `Bearer ${idToken}`
           },
           body: JSON.stringify({
-            fcmToken: token,
-            oldFcmToken,
+            ...(token ? { fcmToken: token, oldFcmToken } : {}),
             options: optionsToSave
           })
         });
@@ -274,8 +275,6 @@ const NotificationSettings = () => {
       } else if (!isDisablingAll) {
         alert('❌ Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
         return;
-      } else {
-        console.warn('No stored token found while disabling notifications; local state cleared only.');
       }
 
       if (count === 0) {

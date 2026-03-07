@@ -6,18 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.3-blue)
+![Version](https://img.shields.io/badge/version-2.9.4-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.3
+## What's New in v2.9.4
+
+- **Atomic Preference Writes** - Notification preference saves now use partial multi-path `update()` instead of `set()`, preventing the scheduler from losing `sentNotifications` or `lastDailyNotification` state during concurrent writes
+- **Graceful Invalid Token Handling** - Invalid FCM tokens now clear only the token field and record the failure reason; user notification preferences are preserved so they reactivate when the user returns
+- **Tokenless Disable Fix** - Disabling all reminders now persists correctly to the backend even when the client has no local FCM token
+- **Stale Local Token Cleanup** - Client now removes the cached FCM token from localStorage when the backend reports no active token, preventing stale tokens from being inadvertently re-registered
+
+<details>
+<summary>Previous: v2.9.3</summary>
 
 - **Atomic Poll Voting** - Match poll writes now go through `POST /api/poll-vote`, where the backend updates vote totals and `users/{uid}` in a single Realtime Database transaction
 - **Reusable Google Sign-In Prompt** - Account, poll, and notification flows now share one extracted Google sign-in modal/button instead of carrying duplicated UI in three separate components
 - **Configurable Backend Origin** - Frontend API calls and PWA runtime caching now read the same `VITE_BACKEND_ORIGIN` build variable, keeping GitHub Pages builds aligned when the Functions origin changes
 - **Baseline HTTP Rate Limiting** - Cloud Functions endpoints now have a lightweight in-memory throttle to blunt obvious abuse while a stronger shared limiter or App Check layer is still pending
+
+</details>
 
 <details>
 <summary>Previous: v2.9.2</summary>

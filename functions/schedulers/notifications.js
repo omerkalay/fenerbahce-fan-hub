@@ -75,8 +75,11 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
         };
 
         for (const [userId, playerData] of Object.entries(allNotifications)) {
-            // Support both new (uid-keyed with fcmToken field) and legacy (token-keyed) entries
-            const token = playerData.fcmToken || userId;
+            const token = playerData.fcmToken;
+            if (!token) {
+                console.log(`Skipping ${userId.slice(0, 8)}... (no valid fcmToken)`);
+                continue;
+            }
 
             if (playerData.dailyCheck && isDailyCheckTime) {
                 const todayStr = formatDateKey(now);
@@ -199,9 +202,11 @@ const checkMatchNotifications = onSchedule("every 1 minutes", async (event) => {
             const errorCode = result.reason?.code || result.reason?.errorInfo?.code;
             if (errorCode === 'messaging/registration-token-not-registered' || errorCode === 'messaging/invalid-registration-token') {
                 item.userIds.forEach((userId) => {
-                    invalidTokenDeletes[`notifications/${userId}`] = null;
+                    invalidTokenDeletes[`notifications/${userId}/fcmToken`] = null;
+                    invalidTokenDeletes[`notifications/${userId}/tokenInvalidAt`] = Date.now();
+                    invalidTokenDeletes[`notifications/${userId}/tokenInvalidCode`] = errorCode;
                 });
-                console.log(`🧹 Removing invalid token: ${item.token.slice(0, 10)}...`);
+                console.log(`🧹 Marking invalid token: ${item.token.slice(0, 10)}...`);
             }
         });
 
