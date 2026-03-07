@@ -5,6 +5,33 @@ import { useAuth, getSignInErrorMessage } from '../contexts/AuthContext';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
 const FCM_TOKEN_STORAGE_KEY = 'fb_fcm_token';
+const VAPID_KEY = 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4';
+
+/** Try getToken; on AbortError clear stale push subscription and retry once. */
+const acquireFcmToken = async (): Promise<string | null> => {
+  const { messaging } = await import('../firebase');
+  const { getToken } = await import('firebase/messaging');
+  if (!messaging) return null;
+
+  const registration = await navigator.serviceWorker.ready;
+
+  const attempt = () =>
+    getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
+
+  try {
+    return await attempt();
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      console.warn('Push subscription stale, clearing and retrying…');
+      try {
+        const sub = await registration.pushManager.getSubscription();
+        if (sub) await sub.unsubscribe();
+      } catch { /* ignore unsubscribe failure */ }
+      return await attempt();
+    }
+    throw err;
+  }
+};
 
 const createEmptyOptions = (): NotificationOptions => ({
   threeHours: false,
@@ -124,16 +151,7 @@ const NotificationSettings = () => {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
         if (!('serviceWorker' in navigator)) return;
 
-        const { messaging } = await import('../firebase');
-        const { getToken } = await import('firebase/messaging');
-        if (!messaging) return;
-
-        const registration = await navigator.serviceWorker.ready;
-        const currentToken = await getToken(messaging, {
-          vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
-          serviceWorkerRegistration: registration
-        });
-
+        const currentToken = await acquireFcmToken();
         if (!currentToken) return;
 
         const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
@@ -216,17 +234,10 @@ const NotificationSettings = () => {
             return;
           }
 
-          const { messaging } = await import('../firebase');
-          const { getToken } = await import('firebase/messaging');
-          if (!messaging) {
+          token = await acquireFcmToken();
+          if (!token) {
             throw new Error('Firebase Messaging başlatılamadı');
           }
-
-          const registration = await navigator.serviceWorker.ready;
-          token = await getToken(messaging, {
-            vapidKey: 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4',
-            serviceWorkerRegistration: registration
-          });
 
           if (token) {
             localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
