@@ -9,7 +9,7 @@ const { admin, db } = require('../config');
  * tek seferlik data-only push gönderir.
  */
 const onStartingXIPushRequested = onValueWritten(
-    { ref: "admin/startingXI/push/requested", instance: "fb-hub-ed9de-default-rtdb" },
+    { ref: "admin/startingXI/push/requested", instance: "fb-hub-ed9de-default-rtdb", region: "europe-west1" },
     async (event) => {
         const before = event.data.before.val();
         const after = event.data.after.val();
