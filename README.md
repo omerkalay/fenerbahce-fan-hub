@@ -6,18 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.4-blue)
+![Version](https://img.shields.io/badge/version-2.9.5-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.4
+## What's New in v2.9.5
+
+- **General Notifications Channel** - Users can now opt in to a general `all_fans` FCM topic for non-match announcements (e.g. Starting XI, club news) alongside per-match reminders
+- **DB-First all_fans Topic Sync Recovery** - Topic subscribe/unsubscribe is written as a pending intent to RTDB first; a 5-minute reconciler retries until FCM confirms, surviving cold starts and transient failures
+- **Safer Token Rotation and Cleanup** - When a user's FCM token refreshes, the old token is deferred for unsubscribe until the new token's subscribe succeeds, preventing a window where the user receives no topic messages
+- **One-Shot Starting XI Push Trigger** - New RTDB trigger (`admin/startingXI/push/requested`) sends a single data-only push to `all_fans` when set to `true`, with payload validation (11 valid starters), publishedAt-based dedupe, and automatic error reporting
+
+<details>
+<summary>Previous: v2.9.4</summary>
 
 - **Atomic Preference Writes** - Notification preference saves now use partial multi-path `update()` instead of `set()`, preventing the scheduler from losing `sentNotifications` or `lastDailyNotification` state during concurrent writes
 - **Graceful Invalid Token Handling** - Invalid FCM tokens now clear only the token field and record the failure reason; user notification preferences are preserved so they reactivate when the user returns
 - **Tokenless Disable Fix** - Disabling all reminders now persists correctly to the backend even when the client has no local FCM token
 - **Stale Local Token Cleanup** - Client now removes the cached FCM token from localStorage when the backend reports no active token, preventing stale tokens from being inadvertently re-registered
+
+</details>
 
 <details>
 <summary>Previous: v2.9.3</summary>
@@ -207,7 +217,13 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
   ],
   "bench": [
     { "name": "Irfan Can Egribayat", "number": 1, "group": "GK" }
-  ]
+  ],
+  "push": {
+    "requested": false,
+    "sentAt": 1741282500000,
+    "sentForPublishedAt": 1741282200000,
+    "lastError": null
+  }
 }
 ```
 
@@ -218,6 +234,10 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 | `bench` | `StartingXIPlayer[]` | Optional bench list rendered below the starters |
 | `group` | `"GK" \| "DEF" \| "MID" \| "FWD"` | Position family used for validation and grouping |
 | `number` | `number` | Shirt number used for squad photo matching |
+| `push.requested` | `boolean` | Set to `true` to trigger a one-shot push to `all_fans`. Automatically reset to `false` after processing |
+| `push.sentAt` | `number` | Timestamp of the last successful push send |
+| `push.sentForPublishedAt` | `number` | The `publishedAt` value for which the last push was sent. Used for dedupe |
+| `push.lastError` | `string \| null` | Error message from the last failed attempt. `null` on success |
 
 ### Formation Builder
 - **6 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2, 4-1-2-1-2 Diamond
@@ -295,7 +315,10 @@ fenerbahce-fan-hub/
 │   ├── schedulers/
 │   │   ├── dailyRefresh.js    # Daily data refresh (03:00 UTC)
 │   │   ├── liveMatch.js       # Live match updater (every 1 min)
-│   │   └── notifications.js   # Match notification checker (every 1 min)
+│   │   ├── notifications.js   # Match notification checker (every 1 min)
+│   │   └── topicSync.js       # all_fans topic reconciler (every 5 min)
+│   ├── triggers/
+│   │   └── startingXI.js      # One-shot Starting XI push (RTDB trigger)
 │   └── package.json       # Functions dependencies
 ├── src/
 │   ├── components/
@@ -414,13 +437,15 @@ firebase deploy --only functions
 
 ## How It Works
 
-### Scheduled Functions
+### Scheduled Functions & Triggers
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
 | `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match & squad data from SofaScore, standings from ESPN. Caches in Firebase. Cleans up old polls & notification records. |
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
 | `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches (Süper Lig + Europa League) during match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
+| `reconcileTopicSync` | Every 5 minutes | Retries pending `all_fans` topic subscribe/unsubscribe intents until FCM confirms. |
+| `onStartingXIPushRequested` | RTDB trigger | Fires when `admin/startingXI/push/requested` transitions to `true`. Validates payload, dedupes by `publishedAt`, sends one-shot push to `all_fans`. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
@@ -443,7 +468,7 @@ firebase deploy --only functions
 1. Refresh the cache if kickoff time or opponent data changed (`/api/refresh` with `ADMIN_REFRESH_KEY`)
 2. Open Firebase Realtime Database and write the lineup to `admin/startingXI`
 3. Verify the dashboard shows the "İlk 11 Açıklandı!" banner and that the modal renders the expected starters/bench
-4. Ask users to sign in with Google once if they want poll voting or push reminders
+4. To send a push notification, set `admin/startingXI/push/requested` to `true`. The trigger validates the payload (11 valid starters, valid `publishedAt`), sends a one-shot data-only push to `all_fans`, and resets `requested` to `false`. Check `push/lastError` if the push did not go through
 5. During the match, use the dashboard/live modal for the real-time view; after the match, use the fixture summary modal for the stored recap
 6. When the lineup is no longer relevant, overwrite `admin/startingXI` for the next match or delete/set it to `null` to hide the banner again
 
@@ -495,4 +520,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.3** | March 2026
+**v2.9.5** | March 2026

@@ -14,9 +14,11 @@ const { dailyDataRefresh } = require('./schedulers/dailyRefresh');
 const { updateLiveMatch } = require('./schedulers/liveMatch');
 const { checkMatchNotifications } = require('./schedulers/notifications');
 const { reconcileTopicSync } = require('./schedulers/topicSync');
+const { onStartingXIPushRequested } = require('./triggers/startingXI');
 
 exports.api = api;
 exports.dailyDataRefresh = dailyDataRefresh;
 exports.updateLiveMatch = updateLiveMatch;
 exports.checkMatchNotifications = checkMatchNotifications;
 exports.reconcileTopicSync = reconcileTopicSync;
+exports.onStartingXIPushRequested = onStartingXIPushRequested;
