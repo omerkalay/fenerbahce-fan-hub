@@ -229,6 +229,10 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLin
 
     if (!activeLineup) return null;
 
+    // Defensive guard: formation must be a string, never an object
+    const safeFormation: string | null =
+        typeof activeLineup.formation === 'string' ? activeLineup.formation : null;
+
     return (
         <div className="glass-panel rounded-xl p-4">
             <h4 className="text-sm font-bold text-white mb-3">Kadro</h4>
@@ -251,14 +255,14 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLin
             </div>
 
             {/* Formation label */}
-            {activeLineup.formation && (
+            {safeFormation && (
                 <p className="text-xs text-yellow-300 font-semibold mb-3 text-center">
-                    {activeLineup.formation}
+                    {safeFormation}
                 </p>
             )}
 
             {/* Mini Pitch */}
-            <MiniPitch lineup={activeLineup} />
+            <MiniPitch lineup={{ ...activeLineup, formation: safeFormation }} />
 
             {/* Bench */}
             {activeLineup.bench.length > 0 && (

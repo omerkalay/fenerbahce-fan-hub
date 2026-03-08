@@ -178,6 +178,17 @@ const classifyPosition = (positionStr = '') => {
     return 'MID'; // safe fallback
 };
 
+const normalizeFormation = (raw) => {
+    if (!raw) return null;
+    if (typeof raw === 'string') return raw.trim() || null;
+    // ESPN sometimes returns formation as an object with a text/formation field
+    if (typeof raw === 'object') {
+        const candidate = raw.formation || raw.formationName || raw.text || raw.displayName || raw.name || '';
+        return typeof candidate === 'string' && candidate.trim() ? candidate.trim() : null;
+    }
+    return null;
+};
+
 const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents) => {
     const roster = Array.isArray(rosterEntry?.roster) ? rosterEntry.roster : [];
     if (roster.length === 0) return null;
@@ -208,7 +219,7 @@ const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents
 
     if (starters.length === 0) return null;
 
-    return { teamId, teamName, formation, starters, bench, substitutions: teamSubs };
+    return { teamId, teamName, formation: normalizeFormation(formation), starters, bench, substitutions: teamSubs };
 };
 
 // Fallback: build roster-like entries from boxscore.players arrays
