@@ -103,6 +103,7 @@ const buildSummaryPayloadFromLiveData = (liveData, now, source = 'live-post') =>
         },
         stats: pickOrderedSummaryStats(homeStatMap, awayStatMap),
         events,
+        lineups: liveData.lineups || null,
         source,
         updatedAt: now
     };
@@ -145,6 +146,135 @@ const parseSummaryKeyEvent = (item) => {
         isYellowCard,
         isRedCard
     });
+};
+
+const parseSubstitutionEvents = (keyEvents = []) =>
+    keyEvents
+        .filter((item) => {
+            const rawType = String(item?.type?.type || '').toLowerCase();
+            const rawText = String(item?.type?.text || item?.text || item?.shortText || '');
+            return rawType === 'substitution' || /substitution/i.test(rawText);
+        })
+        .map((item) => {
+            const participants = Array.isArray(item?.participants) ? item.participants : [];
+            const playerIn = participants[0]?.athlete?.displayName || '';
+            const playerOut = participants[1]?.athlete?.displayName || '';
+            const teamId = String(item?.team?.id || participants[0]?.team?.id || '');
+            return {
+                minute: item?.clock?.displayValue || '',
+                playerIn,
+                playerOut,
+                team: teamId
+            };
+        })
+        .filter((sub) => sub.playerIn || sub.playerOut);
+
+const classifyPosition = (positionStr = '') => {
+    const p = positionStr.toLowerCase();
+    if (p.includes('goalkeeper') || p.includes('kaleci') || p === 'gk') return 'GK';
+    if (p.includes('defender') || p.includes('back') || p === 'def' || p === 'd') return 'DEF';
+    if (p.includes('midfielder') || p.includes('midfield') || p === 'mid' || p === 'm') return 'MID';
+    if (p.includes('forward') || p.includes('striker') || p.includes('wing') || p === 'fwd' || p === 'f') return 'FWD';
+    return 'MID'; // safe fallback
+};
+
+const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents) => {
+    const roster = Array.isArray(rosterEntry?.roster) ? rosterEntry.roster : [];
+    if (roster.length === 0) return null;
+
+    const teamName = rosterEntry?.team?.displayName || '';
+
+    const starters = roster
+        .filter((entry) => entry?.starter)
+        .map((entry, idx) => ({
+            name: entry?.athlete?.displayName || '',
+            jersey: String(entry?.athlete?.jersey || ''),
+            position: entry?.position?.displayName || entry?.position?.name || '',
+            positionGroup: classifyPosition(entry?.position?.displayName || entry?.position?.name || ''),
+            order: idx
+        }))
+        .filter((p) => p.name);
+
+    const bench = roster
+        .filter((entry) => !entry?.starter)
+        .map((entry) => ({
+            name: entry?.athlete?.displayName || '',
+            jersey: String(entry?.athlete?.jersey || ''),
+            position: entry?.position?.displayName || entry?.position?.name || ''
+        }))
+        .filter((p) => p.name);
+
+    const teamSubs = substitutionEvents.filter((sub) => sub.team === teamId);
+
+    if (starters.length === 0) return null;
+
+    return { teamId, teamName, formation, starters, bench, substitutions: teamSubs };
+};
+
+// Fallback: build roster-like entries from boxscore.players arrays
+const buildRosterFromBoxscorePlayers = (summaryJson, homeTeamId, awayTeamId) => {
+    const bsPlayers = Array.isArray(summaryJson?.boxscore?.players) ? summaryJson.boxscore.players : [];
+    if (bsPlayers.length === 0) return [];
+
+    return bsPlayers.map((teamBlock) => {
+        const teamId = String(teamBlock?.team?.id || '');
+        const teamName = teamBlock?.team?.displayName || '';
+        const statistics = Array.isArray(teamBlock?.statistics) ? teamBlock.statistics : [];
+        // Flatten all athlete entries across stat categories
+        const athleteSet = new Map();
+        for (const statGroup of statistics) {
+            const athletes = Array.isArray(statGroup?.athletes) ? statGroup.athletes : [];
+            for (const entry of athletes) {
+                const id = entry?.athlete?.id;
+                if (id && !athleteSet.has(id)) {
+                    athleteSet.set(id, {
+                        athlete: entry.athlete,
+                        starter: Boolean(entry.starter),
+                        position: entry.position || entry.athlete?.position || null
+                    });
+                }
+            }
+        }
+        return {
+            team: { id: teamId, displayName: teamName },
+            roster: Array.from(athleteSet.values())
+        };
+    });
+};
+
+const extractLineupsFromSummary = (summaryJson, homeTeamId, awayTeamId, keyEvents = []) => {
+    const formArray = Array.isArray(summaryJson?.boxscore?.form) ? summaryJson.boxscore.form : [];
+    const substitutionEvents = parseSubstitutionEvents(keyEvents);
+
+    // ── Source 1: summaryJson.rosters (primary, most complete) ──
+    let rosters = Array.isArray(summaryJson?.rosters) ? summaryJson.rosters : [];
+
+    // ── Source 2: boxscore.players fallback ──
+    if (rosters.length === 0) {
+        rosters = buildRosterFromBoxscorePlayers(summaryJson, homeTeamId, awayTeamId);
+    }
+
+    if (rosters.length === 0) return null;
+
+    const findRoster = (targetId, fallbackIdx) =>
+        rosters.find((r) => String(r?.team?.id || '') === String(targetId)) || rosters[fallbackIdx] || null;
+
+    const homeRoster = findRoster(homeTeamId, 0);
+    const awayRoster = findRoster(awayTeamId, 1);
+
+    const homeFormIdx = homeRoster === rosters[0] ? 0 : 1;
+    const awayFormIdx = awayRoster === rosters[1] ? 1 : 0;
+
+    const home = homeRoster
+        ? parseTeamRosterEntry(homeRoster, String(homeTeamId), formArray[homeFormIdx] || null, substitutionEvents)
+        : null;
+    const away = awayRoster
+        ? parseTeamRosterEntry(awayRoster, String(awayTeamId), formArray[awayFormIdx] || null, substitutionEvents)
+        : null;
+
+    if (!home && !away) return null;
+
+    return { home, away };
 };
 
 const extractTeamStatMap = (summaryJson, teamId, fallbackStats = []) => {
@@ -208,6 +338,13 @@ const buildSummaryPayloadFromEspnSummary = (summaryJson, league, now, source = '
     if (!homeStatMap.has('redCards')) homeStatMap.set('redCards', String(homeRedCards));
     if (!awayStatMap.has('redCards')) awayStatMap.set('redCards', String(awayRedCards));
 
+    const lineups = extractLineupsFromSummary(
+        summaryJson,
+        homeTeamId,
+        awayTeamId,
+        summaryJson?.keyEvents || []
+    );
+
     return {
         matchId: String(competition?.id || summaryJson?.header?.id || ''),
         league: league || null,
@@ -228,6 +365,7 @@ const buildSummaryPayloadFromEspnSummary = (summaryJson, league, now, source = '
         },
         stats: pickOrderedSummaryStats(homeStatMap, awayStatMap),
         events: normalizeSummaryEvents(events),
+        lineups: lineups || null,
         source,
         updatedAt: now
     };
@@ -257,6 +395,7 @@ module.exports = {
     pickOrderedSummaryStats,
     buildSummaryPayloadFromLiveData,
     buildSummaryPayloadFromEspnSummary,
+    extractLineupsFromSummary,
     parseSummaryKeyEvent,
     fetchEspnSummaryForMatch
 };

@@ -1,4 +1,4 @@
-# Fenerbahce Fan Hub
+# Fenerbahçe Fan Hub
 
 Modern, interactive fan application for Fenerbahçe SK supporters with match tracking, **live polls**, squad management, formation builder, **push notifications**, and full PWA (Progressive Web App) support.
 
@@ -6,18 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.5-blue)
+![Version](https://img.shields.io/badge/version-2.9.6-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.5
+## What's New in v2.9.6
+
+- **ESPN Actual Lineups in Post-Match Details** - Completed matches now show the real lineup, formation, bench, and substitutions extracted from ESPN summary data. Visible in both the live match detail modal and the fixture summary modal
+- **Dual-Team Toggle with Formation, Bench, and Substitutions** - A shared `MatchLineups` component renders a toggle (defaulting to Fenerbahçe) with a mini pitch visualization, position-aware player placement, bench list, and substitution timeline
+- **Dashboard Post-Match Lineup Teaser** - When lineup data is available, the post-match hero card shows a minimal "Kadro ve formasyon detaylarda mevcut" hint without inflating the card; full details open in the existing detail flow
+- **Summary Payload Lineup Parsing** - For this app, lineup data is parsed from the ESPN summary response using `rosters` first and `boxscore.players` as a fallback. If neither yields valid starters, `lineups` is `null` and the UI section is silently hidden
+
+<details>
+<summary>Previous: v2.9.5</summary>
 
 - **General Notifications Channel** - Users can now opt in to a general `all_fans` FCM topic for non-match announcements (e.g. Starting XI, club news) alongside per-match reminders
 - **DB-First all_fans Topic Sync Recovery** - Topic subscribe/unsubscribe is written as a pending intent to RTDB first; a 5-minute reconciler retries until FCM confirms, surviving cold starts and transient failures
 - **Safer Token Rotation and Cleanup** - When a user's FCM token refreshes, the old token is deferred for unsubscribe until the new token's subscribe succeeds, preventing a window where the user receives no topic messages
 - **One-Shot Starting XI Push Trigger** - New RTDB trigger (`admin/startingXI/push/requested`) sends a single data-only push to `all_fans` when set to `true`, with payload validation (11 valid starters), publishedAt-based dedupe, and automatic error reporting
+
+</details>
 
 <details>
 <summary>Previous: v2.9.4</summary>
@@ -142,6 +152,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Next Match Card**: Live countdown timer with team logos and match details
 - **Live Match State Flow**: Countdown → Checking → Live/Post (stable post-match fallback while preserving final data)
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
+- **Post-Match Actual Lineups**: After a match ends, the detail modal shows ESPN-sourced formation, starting XI on a mini pitch, bench list, and substitution timeline. If lineup data is unavailable the section is silently hidden
 - **Starting XI Banner & Modal**: When `admin/startingXI` is published, users get an instant matchday lineup entry point with shirt-number photo matching and bench coverage
 - **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
 - **Match Poll**: Interactive "Who will win?" poll with real-time results. Votes are validated server-side via `POST /api/poll-vote` and stored atomically in Firebase Realtime Database
@@ -158,7 +169,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Team Search**: Search fixtures by opponent name
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
 - **Manual Refresh**: Re-fetch ESPN fixture data on demand
-- **Fixture Match Summary Modal**: For completed matches, opens cached summary data (scoreline, ordered stats, key events)
+- **Fixture Match Summary Modal**: For completed matches, opens cached summary data (scoreline, ordered stats, key events, and actual lineups with formation/bench/substitutions when available)
 
 ### Push Notification System
 - **5 Notification Types**:
@@ -169,7 +180,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
   - **Daily Match Check**: Automatically notifies at 09:00 TR if there is a match that day
 - **Always-On Delivery**: Powered by **Firebase Cloud Functions** (Serverless)
 - **Cross-Platform**: Works on mobile & desktop (PWA support)
-- **Beautiful Format**: `Fenerbahce - Opponent | 20:45 - 1 saat kaldi`
+- **Beautiful Format**: `Fenerbahçe - Opponent | 20:45 - 1 saat kaldi`
 
 ### Statistics
 - **Top Scorers**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with Toplam / Süper Lig / Avrupa filters
@@ -330,6 +341,7 @@ fenerbahce-fan-hub/
 │   │   ├── StandingsModal.tsx     # Standings modal wrapper
 │   │   ├── FixtureSchedule.tsx    # Fixture tab with ESPN-backed filters
 │   │   ├── MatchSummaryModal.tsx  # Match statistics modal
+│   │   ├── MatchLineups.tsx      # Post-match lineup viewer (shared)
 │   │   ├── Statistics.tsx          # Statistics tab (scorers, assists, form, injuries)
 │   │   ├── FormationBuilder.tsx   # Interactive pitch & formations
 │   │   ├── PlayerSelectionModal.tsx # Player picker modal
@@ -514,10 +526,10 @@ MIT License - Free to use and modify
 - **APIs**: SofaScore (RapidAPI), ESPN (Free)
 - **Design Inspiration**: Modern sports apps
 - **Icons**: Lucide React
-- **Team**: Fenerbahce SK
+- **Team**: Fenerbahçe SK
 
 ---
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.5** | March 2026
+**v2.9.6** | March 2026

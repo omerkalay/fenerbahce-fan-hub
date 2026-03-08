@@ -96,6 +96,7 @@ export interface MatchStat {
 }
 
 export interface LiveMatchData {
+  matchId?: string;
   matchState: 'pre' | 'in' | 'post' | 'no-match';
   displayClock?: string;
   statusDetail?: string;
@@ -103,6 +104,7 @@ export interface LiveMatchData {
   awayTeam?: LiveMatchTeam;
   events?: MatchEvent[];
   stats?: MatchStat[];
+  lineups?: MatchLineups | null;
 }
 
 export type LiveMatchState = 'countdown' | 'checking' | 'pre' | 'in' | 'post' | 'idle';
@@ -193,12 +195,41 @@ export interface MatchSummaryTeam {
   score?: string;
 }
 
+export interface LineupPlayer {
+  name: string;
+  jersey: string;
+  position: string;
+  positionGroup?: 'GK' | 'DEF' | 'MID' | 'FWD';
+  order?: number;
+}
+
+export interface LineupSubstitution {
+  minute: string;
+  playerIn: string;
+  playerOut: string;
+}
+
+export interface TeamLineup {
+  teamId: string;
+  teamName: string;
+  formation: string | null;
+  starters: LineupPlayer[];
+  bench: LineupPlayer[];
+  substitutions: LineupSubstitution[];
+}
+
+export interface MatchLineups {
+  home: TeamLineup | null;
+  away: TeamLineup | null;
+}
+
 export interface MatchSummaryData {
   homeTeam?: MatchSummaryTeam;
   awayTeam?: MatchSummaryTeam;
   statusDetail?: string;
   events?: MatchEvent[];
   stats?: MatchStat[];
+  lineups?: MatchLineups | null;
 }
 
 // ─── Notification Options ────────────────────────────────

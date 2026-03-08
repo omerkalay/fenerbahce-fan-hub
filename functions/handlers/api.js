@@ -249,6 +249,22 @@ async function handleMatchSummary(req, res, matchId) {
         const snapshot = await db.ref(`cache/matchSummaries/${normalizedMatchId}`).once('value');
         const cachedSummary = snapshot.val();
         if (cachedSummary) {
+            // Lazy enrichment: backfill lineups for pre-2.9.6 cached summaries
+            if (!cachedSummary.lineups) {
+                try {
+                    const enriched = await fetchEspnSummaryForMatch(normalizedMatchId);
+                    if (enriched?.lineups) {
+                        cachedSummary.lineups = enriched.lineups;
+                        cachedSummary.updatedAt = Date.now();
+                        await db.ref(`cache/matchSummaries/${normalizedMatchId}`).update({
+                            lineups: enriched.lineups,
+                            updatedAt: cachedSummary.updatedAt
+                        });
+                    }
+                } catch (enrichErr) {
+                    console.warn(`Lineup enrichment skipped for ${normalizedMatchId}:`, enrichErr.message);
+                }
+            }
             return res.json(cachedSummary);
         }
 

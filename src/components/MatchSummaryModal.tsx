@@ -1,4 +1,5 @@
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import MatchLineups from './MatchLineups';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName } from '../utils/localize';
@@ -249,6 +250,15 @@ function MatchSummaryModal({
                                         })}
                                     </div>
                                 </div>
+                            )}
+
+                            {activeSummaryData.lineups && (
+                                <MatchLineups
+                                    lineups={activeSummaryData.lineups}
+                                    homeTeamName={activeSummaryData.homeTeam?.name}
+                                    awayTeamName={activeSummaryData.awayTeam?.name}
+                                    matchId={activeSummaryMatch?.id}
+                                />
                             )}
                         </>
                     )}

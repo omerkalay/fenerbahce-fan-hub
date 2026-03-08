@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import MatchLineups from './MatchLineups';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import type { LiveMatchData, MatchStat } from '../types';
@@ -341,6 +342,16 @@ const LiveMatchScore = () => {
                         })}
                     </div>
                 </div>
+            )}
+
+            {/* Lineups (post-match only) */}
+            {liveData.matchState === 'post' && liveData.lineups && (
+                <MatchLineups
+                    lineups={liveData.lineups}
+                    homeTeamName={liveData.homeTeam?.name}
+                    awayTeamName={liveData.awayTeam?.name}
+                    matchId={liveData.matchId}
+                />
             )}
         </div>
     );

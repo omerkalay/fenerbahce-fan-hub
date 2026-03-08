@@ -1,6 +1,6 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db } = require('../config');
-const { normalizeEventFlags, parseSummaryKeyEvent, buildSummaryPayloadFromLiveData } = require('../services/espn');
+const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, buildSummaryPayloadFromLiveData } = require('../services/espn');
 
 /**
  * Update Live Match - Her dakika çalışır
@@ -144,6 +144,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
         };
 
         let summaryKeyEvents = [];
+        let summaryLineups = null;
         try {
             const summaryResponse = await fetch(summaryUrl);
             if (summaryResponse.ok) {
@@ -158,6 +159,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
                             event.assist
                         ])
                 );
+                summaryLineups = extractLineupsFromSummary(summaryJson, homeTeamId, awayTeamId, summaryKeyEvents);
             }
         } catch (summaryError) {
             console.warn(`⚠️ ESPN summary keyEvents unavailable for ${fenerbahceMatch.id}:`, summaryError.message);
@@ -259,6 +261,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
             },
             events,
             stats,
+            lineups: summaryLineups || null,
             lastUpdated: now
         };
 
