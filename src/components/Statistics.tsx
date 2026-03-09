@@ -236,6 +236,11 @@ const Statistics: React.FC = () => {
                                     );
                                 })}
                             </div>
+                            {latestUpdatedAt > 0 && (
+                                <p className="text-[13px] text-slate-500 mt-3 text-right">
+                                    Son güncelleme: {formatRelativeTime(latestUpdatedAt)}
+                                </p>
+                            )}
                         </section>
                     )}
                 </>

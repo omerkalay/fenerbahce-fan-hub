@@ -4,6 +4,7 @@ import { PITCH_SVG, MATCH_PRESET_LAYOUTS } from '../data/formations';
 import { fetchSquad } from '../services/api';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName } from '../utils/localize';
+import { buildSquadPhotoMaps, findPlayerPhoto, normalizeLookupKey } from '../utils/squadPhotoLookup';
 import type { MatchLineups as MatchLineupsType, TeamLineup, LineupPlayer } from '../types';
 
 const FENERBAHCE_NAMES = ['fenerbahce', 'fenerbahce sk'];
@@ -113,35 +114,9 @@ const FORMATION_PLACE_SLOT_MAPS: Record<string, Record<number, SlotKey>> = {
     '4-1-2-1-2 Diamond': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CDM', 5: 'CB2', 6: 'CB1', 7: 'CM2', 8: 'CM1', 9: 'ST2', 10: 'CAM', 11: 'ST1' }
 };
 
-const stripDiacritics = (value: string): string =>
-    value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-const normalizeLookupKey = (value: string): string =>
-    stripDiacritics(localizePlayerName(String(value || '')).trim().toLocaleLowerCase('tr-TR'))
-        .replace(/[^\p{L}\p{N} ]/gu, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-const normalizeRawLookupKey = (value: string): string =>
-    stripDiacritics(String(value || '').trim().toLocaleLowerCase('tr-TR'))
-        .replace(/[^\p{L}\p{N} ]/gu, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-const getLookupTokens = (value: string): string[] =>
-    normalizeLookupKey(value)
-        .split(' ')
-        .map((part) => part.trim())
-        .filter((part) => part.length >= 3);
-
-const getRawLookupTokens = (value: string): string[] =>
-    normalizeRawLookupKey(value)
-        .split(' ')
-        .map((part) => part.trim())
-        .filter((part) => part.length >= 3);
-
 const normalizeTeamKey = (value: string): string =>
-    stripDiacritics(localizeTeamName(String(value || '')).trim().toLocaleLowerCase('tr-TR'));
+    localizeTeamName(String(value || '')).trim().toLocaleLowerCase('tr-TR')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 const isFenerbahce = (name: string): boolean => {
     const normalized = normalizeTeamKey(name);
@@ -185,42 +160,6 @@ const getDistributedX = (count: number, index: number): number => {
     if (preset?.[index] != null) return preset[index];
     if (count <= 1) return 50;
     return 10 + (index / (count - 1)) * 80;
-};
-
-const getPhotoUrl = (
-    player: LineupPlayer,
-    isFenerbahceTeam: boolean,
-    photoByJersey: Record<string, string>,
-    photoByName: Record<string, string>,
-    photoByAlias: Record<string, string>
-): string | null => {
-    if (!isFenerbahceTeam) return null;
-
-    if (player.jersey && photoByJersey[player.jersey]) {
-        return photoByJersey[player.jersey];
-    }
-
-    const exactKey = normalizeLookupKey(player.name);
-    if (exactKey && photoByName[exactKey]) {
-        return photoByName[exactKey];
-    }
-
-    const rawExactKey = normalizeRawLookupKey(player.name);
-    if (rawExactKey && photoByName[rawExactKey]) {
-        return photoByName[rawExactKey];
-    }
-
-    const tokens = getLookupTokens(player.name).sort((a, b) => b.length - a.length);
-    for (const token of tokens) {
-        if (photoByAlias[token]) return photoByAlias[token];
-    }
-
-    const rawTokens = getRawLookupTokens(player.name).sort((a, b) => b.length - a.length);
-    for (const token of rawTokens) {
-        if (photoByAlias[token]) return photoByAlias[token];
-    }
-
-    return null;
 };
 
 const getFormationParts = (formation: string | null): number[] =>
@@ -838,7 +777,7 @@ function MiniPitch({
                 {rows.map((row, rowIndex) => (
                     row.slots.map((slot, slotIndex) => {
                         const { player, x } = slot;
-                        const photoUrl = getPhotoUrl(player, isFenerbahceTeam, photoByJersey, photoByName, photoByAlias);
+                        const photoUrl = isFenerbahceTeam ? findPlayerPhoto(player.name, player.jersey, { byJersey: photoByJersey, byName: photoByName, byAlias: photoByAlias }) : null;
                         const subOutMinute = subOutByPlayer.get(normalizeLookupKey(player.name));
                         const displayName = localizePlayerName(player.name);
                         const shortName = displayName.split(' ').pop() || displayName;
@@ -914,46 +853,10 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLin
         fetchSquad()
             .then((squad) => {
                 if (!mounted) return;
-
-                const nextJerseyMap = squad.reduce<Record<string, string>>((acc, player) => {
-                    if (player.number != null && player.photo) {
-                        acc[String(player.number)] = player.photo;
-                    }
-                    return acc;
-                }, {});
-
-                const nextNameMap = squad.reduce<Record<string, string>>((acc, player) => {
-                    if (player.name && player.photo) {
-                        acc[normalizeLookupKey(player.name)] = player.photo;
-                    }
-                    return acc;
-                }, {});
-
-                const aliasCounts = squad.reduce<Record<string, number>>((acc, player) => {
-                    if (!player.name || !player.photo) return acc;
-                    const seen = new Set<string>();
-                    getLookupTokens(player.name).forEach((token) => {
-                        if (seen.has(token)) return;
-                        seen.add(token);
-                        acc[token] = (acc[token] || 0) + 1;
-                    });
-                    return acc;
-                }, {});
-
-                const nextAliasMap = squad.reduce<Record<string, string>>((acc, player) => {
-                    if (!player.name || !player.photo) return acc;
-                    const seen = new Set<string>();
-                    getLookupTokens(player.name).forEach((token) => {
-                        if (seen.has(token) || aliasCounts[token] !== 1) return;
-                        seen.add(token);
-                        acc[token] = player.photo!;
-                    });
-                    return acc;
-                }, {});
-
-                setPhotoByJersey(nextJerseyMap);
-                setPhotoByName(nextNameMap);
-                setPhotoByAlias(nextAliasMap);
+                const maps = buildSquadPhotoMaps(squad);
+                setPhotoByJersey(maps.byJersey);
+                setPhotoByName(maps.byName);
+                setPhotoByAlias(maps.byAlias);
             })
             .catch((error) => {
                 console.error('Lineup squad photo load error:', error);

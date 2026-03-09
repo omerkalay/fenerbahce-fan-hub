@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import type { StartingXIData, Player } from '../types';
+import type { StartingXIData } from '../types';
 import { fetchSquad } from '../services/api';
+import { buildSquadPhotoMaps, findPlayerPhoto, type SquadPhotoMaps } from '../utils/squadPhotoLookup';
 
 interface StartingXIModalProps {
     visible: boolean;
@@ -9,20 +10,16 @@ interface StartingXIModalProps {
 }
 
 const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClose }) => {
-    const [squad, setSquad] = useState<Player[]>([]);
+    const [photoMaps, setPhotoMaps] = useState<SquadPhotoMaps | null>(null);
 
     useEffect(() => {
-        if (!visible || squad.length > 0) return;
+        if (!visible || photoMaps) return;
         fetchSquad().then((s) => {
-            setSquad(s);
+            setPhotoMaps(buildSquadPhotoMaps(s));
         });
-    }, [visible, squad.length]);
+    }, [visible, photoMaps]);
 
     if (!visible) return null;
-
-    const photoByNumber = new Map(
-        squad.filter(p => p.number != null).map(p => [Number(p.number), p.photo])
-    );
 
     return (
         <div
@@ -48,12 +45,14 @@ const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClos
 
                 <div className="w-full overflow-y-auto max-h-[calc(88vh-60px)] p-4">
                     <div className="space-y-0">
-                        {data.starters.map((player, idx) => (
+                        {data.starters.map((player, idx) => {
+                            const photo = photoMaps ? findPlayerPhoto(player.name, player.number, photoMaps) : null;
+                            return (
                             <div key={`s-${idx}`} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
                                 <div className="w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                                    {photoByNumber.get(player.number) ? (
+                                    {photo ? (
                                         <img
-                                            src={photoByNumber.get(player.number)}
+                                            src={photo}
                                             alt=""
                                             className="w-full h-full object-cover"
                                             loading="lazy"
@@ -67,19 +66,22 @@ const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClos
                                 <span className="text-sm font-bold text-yellow-400/80 w-7 text-right">{player.number}</span>
                                 <span className="text-sm text-white font-medium">{player.name}</span>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {data.bench && data.bench.length > 0 && (
                         <div className="mt-4 pt-3 border-t border-white/10">
                             <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Yedekler</p>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                {data.bench.map((player, idx) => (
+                                {data.bench.map((player, idx) => {
+                                    const photo = photoMaps ? findPlayerPhoto(player.name, player.number, photoMaps) : null;
+                                    return (
                                     <div key={`b-${idx}`} className="flex items-center gap-2 py-1">
                                         <div className="w-6 h-6 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                                            {photoByNumber.get(player.number) ? (
+                                            {photo ? (
                                                 <img
-                                                    src={photoByNumber.get(player.number)}
+                                                    src={photo}
                                                     alt=""
                                                     className="w-full h-full object-cover"
                                                     loading="lazy"
@@ -92,7 +94,8 @@ const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClos
                                         </div>
                                         <span className="text-xs text-slate-400 truncate">{player.name}</span>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
