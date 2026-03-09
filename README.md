@@ -6,18 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.6-blue)
+![Version](https://img.shields.io/badge/version-2.9.7-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.6
+## What's New in v2.9.7
+
+- **Formation Rendering Stabilization** - Single source-of-truth for formation coordinates (`formations.ts`), eliminating duplicate layout data. Preset and numeric formation renderers now use the same canonical coordinate set
+- **Role-Aware Player Assignment** - Numeric formation renderer replaced blind `formationPlace` bucket-fill with a global scoring algorithm that matches players to rows by positional depth (DEF→HOLD→MID→AM→FWD), preventing midfielders from appearing in the forward line and vice versa
+- **Formation Badge Confidence** - Badge only displays when the rendered formation is verified: preset matches or numeric rows with correct counts and no role mismatches. Uncertain renders (detailed/fallback strategies) hide the badge instead of showing potentially wrong information
+- **ESPN Lineup Parsing Hardening** - Removed misuse of `boxscore.form` (recent results, not tactical formation), added `normalizeFormation()` for safe string/object handling, and enriched lineup data with `positionCode`/`formationPlace` fields
+- **Turkish Text Fixes** - Fixed 20+ mojibake strings across `LiveMatchScore`, `MatchSummaryModal`, and `playerDisplay` where UTF-8 Turkish characters (ş, ı, ç, İ, ö, ü) were rendered as garbled Latin-1
+- **Substitution & Bench UI Polish** - Bench sub-in pills now use the same dark badge design language as pitch overlays. Substitution rows are more compact with subtle backgrounds, slate-toned minute badges, and tighter spacing
+
+<details>
+<summary>Previous: v2.9.6</summary>
 
 - **ESPN Actual Lineups in Post-Match Details** - Completed matches now show the real lineup, formation, bench, and substitutions extracted from ESPN summary data. Visible in both the live match detail modal and the fixture summary modal
 - **Dual-Team Toggle with Formation, Bench, and Substitutions** - A shared `MatchLineups` component renders a toggle (defaulting to Fenerbahçe) with a mini pitch visualization, position-aware player placement, bench list, and substitution timeline
 - **Dashboard Post-Match Lineup Teaser** - When lineup data is available, the post-match hero card shows a minimal "Kadro ve formasyon detaylarda mevcut" hint without inflating the card; full details open in the existing detail flow
 - **Summary Payload Lineup Parsing** - For this app, lineup data is parsed from the ESPN summary response using `rosters` first and `boxscore.players` as a fallback. If neither yields valid starters, `lineups` is `null` and the UI section is silently hidden
+
+</details>
 
 <details>
 <summary>Previous: v2.9.5</summary>
@@ -532,4 +544,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.6** | March 2026
+**v2.9.7** | March 2026

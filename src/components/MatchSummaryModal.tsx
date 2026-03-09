@@ -20,7 +20,7 @@ const localizeSummaryStatus = (value: string = ''): string => {
     return value;
 };
 
-const formatIncidentLabel = (event: MatchSummaryData['events'][number]): string => {
+const formatIncidentLabel = (event: NonNullable<MatchSummaryData['events']>[number]): string => {
     const playerName = localizePlayerName(event?.player || event?.type || 'Olay');
     const suffixes: string[] = [];
 
@@ -213,6 +213,15 @@ function MatchSummaryModal({
                                 </div>
                             )}
 
+                            {activeSummaryData.lineups && (
+                                <MatchLineups
+                                    lineups={activeSummaryData.lineups}
+                                    homeTeamName={activeSummaryData.homeTeam?.name}
+                                    awayTeamName={activeSummaryData.awayTeam?.name}
+                                    matchId={activeSummaryMatch?.id}
+                                />
+                            )}
+
                             {Array.isArray(activeSummaryData.events) && activeSummaryData.events.length > 0 && (
                                 <div className="glass-panel rounded-xl p-4">
                                     <h4 className="text-sm font-bold text-white mb-3">Maç Olayları</h4>
@@ -252,14 +261,6 @@ function MatchSummaryModal({
                                 </div>
                             )}
 
-                            {activeSummaryData.lineups && (
-                                <MatchLineups
-                                    lineups={activeSummaryData.lineups}
-                                    homeTeamName={activeSummaryData.homeTeam?.name}
-                                    awayTeamName={activeSummaryData.awayTeam?.name}
-                                    matchId={activeSummaryMatch?.id}
-                                />
-                            )}
                         </>
                     )}
                 </div>
@@ -269,3 +270,5 @@ function MatchSummaryModal({
 }
 
 export default MatchSummaryModal;
+
+

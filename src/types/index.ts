@@ -199,6 +199,8 @@ export interface LineupPlayer {
   name: string;
   jersey: string;
   position: string;
+  positionCode?: string;
+  formationPlace?: number;
   positionGroup?: 'GK' | 'DEF' | 'MID' | 'FWD';
   order?: number;
 }

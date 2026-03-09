@@ -49,7 +49,7 @@ const localizeStatusDetail = (statusDetail: string = ''): string => {
     return status;
 };
 
-const formatIncidentLabel = (event: LiveMatchData['events'][number]): string => {
+const formatIncidentLabel = (event: NonNullable<LiveMatchData['events']>[number]): string => {
     const playerName = localizePlayerName(event?.player || event?.type || 'Olay');
     const suffixes: string[] = [];
 
@@ -274,6 +274,16 @@ const LiveMatchScore = () => {
                 </div>
             )}
 
+            {/* Lineups (post-match only) */}
+            {liveData.matchState === 'post' && liveData.lineups && (
+                <MatchLineups
+                    lineups={liveData.lineups}
+                    homeTeamName={liveData.homeTeam?.name}
+                    awayTeamName={liveData.awayTeam?.name}
+                    matchId={liveData.matchId}
+                />
+            )}
+
             {/* Match Events */}
             {liveData.events && liveData.events.length > 0 && (
                 <div className="glass-panel rounded-2xl p-4">
@@ -344,17 +354,10 @@ const LiveMatchScore = () => {
                 </div>
             )}
 
-            {/* Lineups (post-match only) */}
-            {liveData.matchState === 'post' && liveData.lineups && (
-                <MatchLineups
-                    lineups={liveData.lineups}
-                    homeTeamName={liveData.homeTeam?.name}
-                    awayTeamName={liveData.awayTeam?.name}
-                    matchId={liveData.matchId}
-                />
-            )}
         </div>
     );
 };
 
 export default LiveMatchScore;
+
+

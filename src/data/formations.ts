@@ -91,3 +91,59 @@ export const formations: Formations = {
         ST2: { top: '18%', left: '65%' }
     }
 };
+
+// Additional formations for match lineup rendering (not in FormationBuilder)
+const matchOnlyFormations: Record<string, Record<string, { top: string; left: string }>> = {
+    '4-4-1-1': {
+        GK: { top: '93%', left: '50%' },
+        LB: { top: '79%', left: '12%' },
+        CB1: { top: '79%', left: '35%' },
+        CB2: { top: '79%', left: '65%' },
+        RB: { top: '79%', left: '88%' },
+        LM: { top: '53%', left: '10%' },
+        CM1: { top: '53%', left: '37%' },
+        CM2: { top: '53%', left: '63%' },
+        RM: { top: '53%', left: '90%' },
+        CAM: { top: '35%', left: '50%' },
+        ST: { top: '16%', left: '50%' }
+    },
+    '4-3-1-2': {
+        GK: { top: '93%', left: '50%' },
+        LB: { top: '79%', left: '12%' },
+        CB1: { top: '79%', left: '35%' },
+        CB2: { top: '79%', left: '65%' },
+        RB: { top: '79%', left: '88%' },
+        CM1: { top: '53%', left: '24%' },
+        CM2: { top: '49%', left: '50%' },
+        CM3: { top: '53%', left: '76%' },
+        CAM: { top: '34%', left: '50%' },
+        ST1: { top: '18%', left: '36%' },
+        ST2: { top: '18%', left: '64%' }
+    },
+    '3-4-1-2': {
+        GK: { top: '93%', left: '50%' },
+        CB1: { top: '79%', left: '24%' },
+        CB2: { top: '79%', left: '50%' },
+        CB3: { top: '79%', left: '76%' },
+        LM: { top: '55%', left: '9%' },
+        CM1: { top: '55%', left: '36%' },
+        CM2: { top: '55%', left: '64%' },
+        RM: { top: '55%', left: '91%' },
+        CAM: { top: '36%', left: '50%' },
+        ST1: { top: '18%', left: '34%' },
+        ST2: { top: '18%', left: '66%' }
+    }
+};
+
+// Single source of truth: all formation layouts for match lineup rendering
+export const MATCH_PRESET_LAYOUTS: Record<string, Array<{ key: string; x: number; y: number }>> =
+    Object.fromEntries(
+        Object.entries({ ...formations, ...matchOnlyFormations }).map(([name, positions]) => [
+            name,
+            Object.entries(positions).map(([key, coord]) => ({
+                key,
+                x: parseFloat(coord.left),
+                y: parseFloat(coord.top)
+            }))
+        ])
+    );

@@ -238,6 +238,17 @@ async function handleLiveMatch(req, res) {
     }
 }
 
+function teamLineupHasDetailedSlots(teamLineup) {
+    return Array.isArray(teamLineup?.starters) && teamLineup.starters.some((player) =>
+        Number.isFinite(Number(player?.formationPlace))
+        || (typeof player?.positionCode === 'string' && player.positionCode.trim().length > 0)
+    );
+}
+
+function lineupsNeedRefresh(lineups) {
+    if (!lineups) return true;
+    return !teamLineupHasDetailedSlots(lineups.home) || !teamLineupHasDetailedSlots(lineups.away);
+}
 async function handleMatchSummary(req, res, matchId) {
     if (!matchId) {
         return res.status(400).json({ error: 'Match ID required' });
@@ -249,8 +260,8 @@ async function handleMatchSummary(req, res, matchId) {
         const snapshot = await db.ref(`cache/matchSummaries/${normalizedMatchId}`).once('value');
         const cachedSummary = snapshot.val();
         if (cachedSummary) {
-            // Lazy enrichment: backfill lineups for pre-2.9.6 cached summaries
-            if (!cachedSummary.lineups) {
+            // Lazy enrichment: backfill or refresh stale lineup payloads in cached summaries
+            if (lineupsNeedRefresh(cachedSummary.lineups)) {
                 try {
                     const enriched = await fetchEspnSummaryForMatch(normalizedMatchId);
                     if (enriched?.lineups) {
@@ -444,7 +455,7 @@ async function handleReminder(req, res) {
             rootUpdates[`${basePath}/matches`] = null;
         }
 
-        // Legacy migration: token-keyed → uid-keyed
+        // Legacy migration: token-keyed -> uid-keyed
         if (fcmToken && authenticatedUid !== fcmToken) {
             const legacySnapshot = await db.ref(`notifications/${fcmToken}`).once('value');
             const legacyData = legacySnapshot.val();
@@ -617,7 +628,7 @@ async function handleRefresh(req, res) {
     if (!adminKey || adminKey !== adminRefreshKey.value()) {
         return res.status(403).json({ error: 'Forbidden' });
     }
-    console.log('🔄 Manual refresh triggered');
+    console.log('Manual refresh triggered');
 
     try {
         const existingSummariesSnapshot = await db.ref('cache/matchSummaries').once('value');
@@ -640,7 +651,7 @@ async function handleRefresh(req, res) {
                 cache.next3Matches = events.slice(0, 3);
             }
         } catch (error) {
-            console.error('❌ Match fetch failed:', error.message);
+            console.error('Match fetch failed:', error.message);
         }
 
         await sleep(1000);
@@ -651,7 +662,7 @@ async function handleRefresh(req, res) {
             // handleRefresh doesn't include marketValue in its mapping
             cache.squad = squad.map(({ marketValue, ...rest }) => rest);
         } catch (error) {
-            console.error('❌ Squad fetch failed:', error.message);
+            console.error('Squad fetch failed:', error.message);
         }
 
         await db.ref('cache').set(cache);
@@ -683,7 +694,7 @@ const api = onRequest({
     const param = segments[1];
     const rateLimitProfile = resolveRateLimitProfile(endpoint, req.method);
 
-    console.log(`📥 ${req.method} /${path}`);
+    console.log(`[api] ${req.method} /${path}`);
 
     if (!enforceRateLimit(req, res, rateLimitProfile)) {
         return;
@@ -745,7 +756,7 @@ const api = onRequest({
 
             default:
                 return res.json({
-                    message: 'Fenerbahçe Fan Hub API (Firebase)',
+                    message: 'Fenerbahce Fan Hub API (Firebase)',
                     version: '2.0.0',
                     endpoints: [
                         '/next-match',
@@ -764,7 +775,7 @@ const api = onRequest({
                 });
         }
     } catch (error) {
-        console.error('❌ API Error:', error);
+        console.error('API Error:', error);
         return res.status(500).json({ error: 'Internal server error' });
     }
 });

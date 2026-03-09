@@ -198,10 +198,12 @@ const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents
     const starters = roster
         .filter((entry) => entry?.starter)
         .map((entry, idx) => ({
-            name: entry?.athlete?.displayName || '',
-            jersey: String(entry?.athlete?.jersey || ''),
+            name: String(entry?.athlete?.displayName || '').trim(),
+            jersey: String(entry?.athlete?.jersey || entry?.jersey || '').trim(),
             position: entry?.position?.displayName || entry?.position?.name || '',
-            positionGroup: classifyPosition(entry?.position?.displayName || entry?.position?.name || ''),
+            positionCode: String(entry?.position?.abbreviation || entry?.athlete?.position?.abbreviation || '').trim(),
+            formationPlace: Number.isFinite(Number(entry?.formationPlace)) ? Number(entry.formationPlace) : undefined,
+            positionGroup: classifyPosition(entry?.position?.displayName || entry?.position?.name || entry?.position?.abbreviation || ''),
             order: idx
         }))
         .filter((p) => p.name);
@@ -209,9 +211,10 @@ const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents
     const bench = roster
         .filter((entry) => !entry?.starter)
         .map((entry) => ({
-            name: entry?.athlete?.displayName || '',
-            jersey: String(entry?.athlete?.jersey || ''),
-            position: entry?.position?.displayName || entry?.position?.name || ''
+            name: String(entry?.athlete?.displayName || '').trim(),
+            jersey: String(entry?.athlete?.jersey || entry?.jersey || '').trim(),
+            position: entry?.position?.displayName || entry?.position?.name || '',
+            positionCode: String(entry?.position?.abbreviation || entry?.athlete?.position?.abbreviation || '').trim()
         }))
         .filter((p) => p.name);
 
@@ -219,7 +222,7 @@ const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents
 
     if (starters.length === 0) return null;
 
-    return { teamId, teamName, formation: normalizeFormation(formation), starters, bench, substitutions: teamSubs };
+    return { teamId, teamName, formation: normalizeFormation(rosterEntry?.formation || formation), starters, bench, substitutions: teamSubs };
 };
 
 // Fallback: build roster-like entries from boxscore.players arrays
@@ -254,7 +257,6 @@ const buildRosterFromBoxscorePlayers = (summaryJson, homeTeamId, awayTeamId) => 
 };
 
 const extractLineupsFromSummary = (summaryJson, homeTeamId, awayTeamId, keyEvents = []) => {
-    const formArray = Array.isArray(summaryJson?.boxscore?.form) ? summaryJson.boxscore.form : [];
     const substitutionEvents = parseSubstitutionEvents(keyEvents);
 
     // ── Source 1: summaryJson.rosters (primary, most complete) ──
@@ -273,14 +275,13 @@ const extractLineupsFromSummary = (summaryJson, homeTeamId, awayTeamId, keyEvent
     const homeRoster = findRoster(homeTeamId, 0);
     const awayRoster = findRoster(awayTeamId, 1);
 
-    const homeFormIdx = homeRoster === rosters[0] ? 0 : 1;
-    const awayFormIdx = awayRoster === rosters[1] ? 1 : 0;
-
+    // Formation comes from rosterEntry.formation (normalizeFormation handles it inside parseTeamRosterEntry).
+    // boxscore.form is NOT tactical formation — it contains recent match results.
     const home = homeRoster
-        ? parseTeamRosterEntry(homeRoster, String(homeTeamId), formArray[homeFormIdx] || null, substitutionEvents)
+        ? parseTeamRosterEntry(homeRoster, String(homeTeamId), null, substitutionEvents)
         : null;
     const away = awayRoster
-        ? parseTeamRosterEntry(awayRoster, String(awayTeamId), formArray[awayFormIdx] || null, substitutionEvents)
+        ? parseTeamRosterEntry(awayRoster, String(awayTeamId), null, substitutionEvents)
         : null;
 
     if (!home && !away) return null;
