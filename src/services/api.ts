@@ -609,7 +609,7 @@ export const fetchPlayerStatus = async (): Promise<PlayerStatusEntry[]> => {
             )
             .map(entry => {
                 const statusValue = String(entry.status ?? 'fit');
-                const validStatuses: PlayerStatusEntry['status'][] = ['injured', 'suspended', 'doubtful', 'fit'];
+                const validStatuses: PlayerStatusEntry['status'][] = ['injured', 'suspended', 'card-risk', 'doubtful', 'fit'];
                 const status: PlayerStatusEntry['status'] = validStatuses.includes(statusValue as PlayerStatusEntry['status'])
                     ? (statusValue as PlayerStatusEntry['status'])
                     : 'fit';

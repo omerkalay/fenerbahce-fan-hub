@@ -11,6 +11,8 @@ const getStatusBadge = (status: PlayerStatusEntry['status']): { label: string; t
             return { label: 'Sakat', text: 'text-red-400' };
         case 'suspended':
             return { label: 'Cezalı', text: 'text-yellow-400' };
+        case 'card-risk':
+            return { label: 'Sınırda', text: 'text-amber-400' };
         case 'doubtful':
             return { label: 'Belirsiz', text: 'text-orange-400' };
         default:
@@ -114,6 +116,16 @@ const Statistics: React.FC = () => {
     const activeStatusEntries = playerStatus.filter((entry) => entry.status !== 'fit');
     const latestUpdatedAt = playerStatus.reduce((max, entry) => Math.max(max, entry.updatedAt || 0), 0);
 
+    const statusGroups: { key: PlayerStatusEntry['status']; title: string }[] = [
+        { key: 'injured', title: 'Sakatlar' },
+        { key: 'suspended', title: 'Cezalılar' },
+        { key: 'card-risk', title: 'Kart Sınırındakiler' },
+        { key: 'doubtful', title: 'Belirsiz' },
+    ];
+    const groupedStatus = statusGroups
+        .map(g => ({ ...g, entries: activeStatusEntries.filter(e => e.status === g.key) }))
+        .filter(g => g.entries.length > 0);
+
     return (
         <div className="min-h-screen pb-24 space-y-4">
             <PlayerRankingSection
@@ -159,34 +171,39 @@ const Statistics: React.FC = () => {
                     {statusError ? (
                         <p className="text-xs text-rose-300">{statusError}</p>
                     ) : activeStatusEntries.length === 0 ? (
-                        <p className="text-xs text-slate-400">Sakatlık veya ceza verisi bulunmuyor.</p>
+                        <p className="text-xs text-slate-400">Sakatlık, ceza veya kart sınırı verisi bulunmuyor.</p>
                     ) : (
                         <>
-                            <div className="space-y-0">
-                                {activeStatusEntries.map((entry, index) => {
-                                    const badge = getStatusBadge(entry.status);
-                                    return (
-                                        <div key={`${entry.name}-${index}`} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-baseline gap-2">
-                                                    <span className="text-sm text-white font-semibold truncate">{entry.name}</span>
-                                                    {entry.detail && (
-                                                        <span className="text-[13px] text-slate-400">{entry.detail}</span>
-                                                    )}
-                                                </div>
-                                                {entry.returnDate && (
-                                                    <span className="text-[13px] text-slate-500 block mt-0.5">
-                                                        Tahmini dönüş: {entry.returnDate}
+                            {groupedStatus.map((group, gi) => (
+                                <div key={group.key} className={gi > 0 ? 'mt-3' : ''}>
+                                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">{group.title}</h4>
+                                    <div className="space-y-0">
+                                        {group.entries.map((entry, index) => {
+                                            const badge = getStatusBadge(entry.status);
+                                            return (
+                                                <div key={`${entry.name}-${index}`} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="text-sm text-white font-semibold truncate">{entry.name}</span>
+                                                            {entry.detail && (
+                                                                <span className="text-[13px] text-slate-400">{entry.detail}</span>
+                                                            )}
+                                                        </div>
+                                                        {entry.returnDate && (entry.status === 'injured' || entry.status === 'doubtful') && (
+                                                            <span className="text-[13px] text-slate-500 block mt-0.5">
+                                                                Tahmini dönüş: {entry.returnDate}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <span className={`text-[13px] uppercase tracking-wider font-semibold shrink-0 ${badge.text} opacity-70 -ml-1`}>
+                                                        {badge.label}
                                                     </span>
-                                                )}
-                                            </div>
-                                            <span className={`text-[13px] uppercase tracking-wider font-semibold shrink-0 ${badge.text} opacity-70 -ml-1`}>
-                                                {badge.label}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
                             {latestUpdatedAt > 0 && (
                                 <p className="text-[13px] text-slate-500 mt-3 text-right">
                                     Son güncelleme: {formatRelativeTime(latestUpdatedAt)}

@@ -296,7 +296,7 @@ export interface FormResult {
 
 export interface PlayerStatusEntry {
   name: string;
-  status: "injured" | "suspended" | "doubtful" | "fit";
+  status: "injured" | "suspended" | "card-risk" | "doubtful" | "fit";
   detail: string;
   returnDate: string;
   updatedAt: number;
