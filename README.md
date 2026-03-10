@@ -198,7 +198,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Top Scorers**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with Toplam / Süper Lig / Avrupa filters
 - **Top Assisters**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with per-competition filtering
 - **Team Form**: Interactive SVG trend over the last 6 completed matches (G/B/M trajectory + expandable goal performance and possession trend)
-- **Injury & Suspension Status**: Reads from `admin/playerStatus` in Firebase Realtime Database. Displays injured, suspended, and doubtful players with status label and return estimate
+- **Injury, Suspension & Card Risk Status**: Reads from `admin/playerStatus` in Firebase Realtime Database. Displays injured, suspended, doubtful, and card-risk players with status label and return estimate. Card-risk entries highlight players approaching a yellow card suspension threshold
 
 #### `admin/playerStatus` Schema
 
@@ -207,7 +207,7 @@ This node is managed manually via the Firebase Console. Each entry:
 ```json
 {
   "name": "Player Name",
-  "status": "injured | suspended | doubtful | fit",
+  "status": "injured | suspended | doubtful | card-risk | fit",
   "detail": "Right knee ligament injury",
   "returnDate": "March 2026",
   "updatedAt": 1709500000000
@@ -217,14 +217,14 @@ This node is managed manually via the Firebase Console. Each entry:
 | Field | Type | Description |
 |-------|------|-------------|
 | `name` | `string` | Player display name |
-| `status` | `"injured" \| "suspended" \| "doubtful" \| "fit"` | Current status. Only non-fit entries are rendered. |
+| `status` | `"injured" \| "suspended" \| "doubtful" \| "card-risk" \| "fit"` | Current status. Only non-fit entries are rendered. `card-risk` marks players near a yellow card suspension threshold. |
 | `detail` | `string` | Description of injury/suspension |
 | `returnDate` | `string` | Estimated return date (free text) |
 | `updatedAt` | `number` | Unix timestamp in milliseconds. Used to show "Last updated: X hours ago" |
 
 ### Starting XI Publishing
 - **Manual RTDB Control**: Reads from `admin/startingXI`; the banner stays hidden until a valid lineup exists
-- **Photo Matching**: Shirt numbers are matched against `/api/squad` so published players can reuse the cached SofaScore images
+- **Photo Matching**: Players are matched against `/api/squad` photos by jersey number first, then by display name and known aliases as fallback
 - **Safe Failure Mode**: Invalid player entries are ignored, and if no valid starters remain the lineup is hidden instead of rendering broken UI
 
 #### `admin/startingXI` Schema
@@ -284,6 +284,54 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 - **PWA**: Installable app with offline support
 - **Deployment**: GitHub Pages (frontend) + Firebase Cloud Functions (backend)
 
+## Testing & Quality
+
+### Test Stack
+
+- **Vitest** — test runner (globals mode, jsdom environment)
+- **@testing-library/react** — component testing utilities
+- **@testing-library/jest-dom** — DOM assertion matchers
+- **jsdom** — browser environment simulation
+
+### Quality Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run typecheck` | Run `tsc --noEmit` (zero-error TypeScript check) |
+| `npm run lint` | Run ESLint on `src/` (TypeScript + React rules) |
+| `npm run test` | Run Vitest in watch mode |
+| `npm run test:run` | Run Vitest once (CI mode) |
+| `npm run build` | Production build (includes service worker generation) |
+
+### Test Coverage
+
+| Area | File | What's tested |
+|------|------|---------------|
+| ESPN parsing | `functions/services/espn.test.js` | Event flag normalization, summary event filtering, key event parsing, ordered stat picking |
+| Formation engine | `src/components/match-lineups/formation-engine.test.ts` | Position classification, formation parsing, preset/numeric/detailed/fallback row building |
+| Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, goal summary formatting, Starting XI normalization |
+| Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
+
+Backend tests (`functions/services/espn.test.js`) import from `espn-helpers.js` (pure module, no Firebase dependency) so they run without any mocks or side effects.
+
+### CI Quality Gate
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR to `main`:
+
+**typecheck** → **lint** → **test** → **build**
+
+All four steps must pass for the pipeline to succeed.
+
+## Development Workflow
+
+After making changes, run the quality checks locally before pushing:
+
+```bash
+npm run typecheck && npm run lint && npm run test:run && npm run build
+```
+
+CI runs the same four steps. If all pass locally, the pipeline will pass.
+
 ## Architecture
 
 ```
@@ -328,13 +376,14 @@ Note: The fixture tab fetches ESPN fixture schedules directly from the frontend 
 ```
 fenerbahce-fan-hub/
 ├── functions/
-│   ├── index.js           # Cloud Functions re-export hub
-│   ├── config.js          # Firebase init, secrets, constants, helpers
+│   ├── index.js               # Cloud Functions re-export hub
+│   ├── config.js              # Firebase init, secrets, constants, helpers
 │   ├── services/
-│   │   ├── espn.js        # ESPN data fetching & event parsing
-│   │   └── sofascore.js   # SofaScore API calls (matches, squad, images)
+│   │   ├── espn.js            # ESPN data fetching & event parsing
+│   │   ├── espn-helpers.js    # Pure ESPN helpers (zero side effects, no Firebase)
+│   │   └── sofascore.js       # SofaScore API calls (matches, squad, images)
 │   ├── handlers/
-│   │   └── api.js         # HTTP endpoint routing & handler functions
+│   │   └── api.js             # HTTP endpoint routing & handler functions
 │   ├── schedulers/
 │   │   ├── dailyRefresh.js    # Daily data refresh (03:00 UTC)
 │   │   ├── liveMatch.js       # Live match updater (every 1 min)
@@ -342,51 +391,71 @@ fenerbahce-fan-hub/
 │   │   └── topicSync.js       # all_fans topic reconciler (every 5 min)
 │   ├── triggers/
 │   │   └── startingXI.js      # One-shot Starting XI push (RTDB trigger)
-│   └── package.json       # Functions dependencies
+│   └── package.json           # Functions dependencies
 ├── src/
 │   ├── components/
-│   │   ├── Dashboard.tsx          # Main dashboard with matches & poll
-│   │   ├── MatchCountdown.tsx     # Countdown timer sub-component
-│   │   ├── StartingXIModal.tsx    # Matchday starting XI modal
-│   │   ├── NextMatchesPanel.tsx   # Upcoming 3 matches panel
-│   │   ├── LiveMatchModal.tsx     # Live match detail modal
-│   │   ├── StandingsModal.tsx     # Standings modal wrapper
-│   │   ├── FixtureSchedule.tsx    # Fixture tab with ESPN-backed filters
-│   │   ├── MatchSummaryModal.tsx  # Match statistics modal
-│   │   ├── MatchLineups.tsx      # Post-match lineup viewer (shared)
-│   │   ├── Statistics.tsx          # Statistics tab (scorers, assists, form, injuries)
-│   │   ├── FormationBuilder.tsx   # Interactive pitch & formations
-│   │   ├── PlayerSelectionModal.tsx # Player picker modal
-│   │   ├── PlayerPool.tsx         # Draggable player grid
-│   │   ├── NotificationSettings.tsx # Global notification preferences
-│   │   ├── Poll.tsx               # Real-time voting component
-│   │   ├── CustomStandings.tsx    # Standings table
-│   │   ├── LiveMatchScore.tsx     # Live match tracker
-│   │   ├── MatchEventIcon.tsx     # Match event icon renderer
-│   │   ├── ErrorBoundary.tsx       # Reusable error boundary with recovery UI
-│   │   └── TeamLogo.tsx           # Team logo with fallback
+│   │   ├── Dashboard.tsx              # Main dashboard (orchestrator, helpers in utils/)
+│   │   ├── match-lineups/             # Post-match lineup viewer (split module)
+│   │   │   ├── formation-engine.ts    # Pure formation/row-building logic
+│   │   │   ├── MiniPitch.tsx          # SVG pitch visualization
+│   │   │   ├── BenchList.tsx          # Bench player list
+│   │   │   └── SubstitutionList.tsx   # Substitution timeline
+│   │   ├── MatchLineups.tsx           # Thin orchestrator (imports match-lineups/*)
+│   │   ├── MatchCountdown.tsx         # Countdown timer sub-component
+│   │   ├── StartingXIModal.tsx        # Matchday starting XI modal
+│   │   ├── NextMatchesPanel.tsx       # Upcoming 3 matches panel
+│   │   ├── LiveMatchModal.tsx         # Live match detail modal
+│   │   ├── StandingsModal.tsx         # Standings modal wrapper
+│   │   ├── FixtureSchedule.tsx        # Fixture tab with ESPN-backed filters
+│   │   ├── MatchSummaryModal.tsx      # Match statistics modal
+│   │   ├── Statistics.tsx             # Statistics tab
+│   │   ├── FormationBuilder.tsx       # Interactive pitch & formations
+│   │   ├── PlayerSelectionModal.tsx   # Player picker modal
+│   │   ├── PlayerPool.tsx            # Draggable player grid
+│   │   ├── NotificationSettings.tsx   # Notification preferences (helpers in utils/)
+│   │   ├── Poll.tsx                   # Real-time voting component
+│   │   ├── CustomStandings.tsx        # Standings table
+│   │   ├── LiveMatchScore.tsx         # Live match tracker
+│   │   ├── MatchEventIcon.tsx         # Match event icon renderer
+│   │   ├── ErrorBoundary.tsx          # Error boundary with recovery UI
+│   │   └── TeamLogo.tsx              # Team logo with fallback
 │   ├── hooks/
-│   │   ├── useCooldown.ts         # Reusable async action cooldown hook
-│   │   └── useFixtureData.ts      # Fixture data fetching & filtering hook
+│   │   ├── useCooldown.ts             # Async action cooldown hook
+│   │   └── useFixtureData.ts          # Fixture data fetching & filtering hook
 │   ├── contexts/
-│   │   └── AuthContext.tsx        # Firebase Auth context (Google sign-in flows)
+│   │   └── AuthContext.tsx            # Firebase Auth context (Google sign-in)
 │   ├── services/
-│   │   └── api.ts                 # Firebase API integration + ESPN fixture aggregation
+│   │   ├── api.ts                     # Barrel re-export (preserves import surface)
+│   │   └── api/
+│   │       ├── base.ts               # BACKEND_ORIGIN, BACKEND_URL, ensureAbsolutePhoto
+│   │       ├── poll.ts               # submitPollVote
+│   │       ├── fixtures.ts           # fetchNextMatch, fetchSquad, fetchNext3Matches, etc.
+│   │       ├── standings.ts          # fetchEspnStandings
+│   │       ├── espn-fixtures.ts      # fetchEspnFenerbahceFixtures
+│   │       └── statistics.ts         # fetchPlayerStats, fetchFormResults, fetchPlayerStatus
 │   ├── data/
-│   │   ├── formations.ts          # Formation position definitions
-│   │   └── mockData.ts            # Mock player data
+│   │   ├── formations.ts             # Formation position definitions
+│   │   └── mockData.ts               # Mock player data
 │   ├── types/
-│   │   └── index.ts               # Centralized TypeScript type definitions
+│   │   └── index.ts                   # Centralized TypeScript type definitions
 │   ├── utils/
-│   │   ├── localize.ts            # Turkish localization for ESPN team/competition names
-│   │   └── matchClock.ts          # Match clock formatting utility
-│   ├── firebase.ts                # Firebase client initialization (Auth, RTDB, Messaging)
-│   ├── App.tsx                    # Main app & routing
-│   └── main.tsx                   # React entry point
-├── tsconfig.json                  # TypeScript configuration (strict mode)
-├── public/                        # Static assets & PWA icons
-├── backend/                       # [DEPRECATED] Old Render.com backend (kept for rollback)
-└── firebase.json                  # Firebase configuration
+│   │   ├── dashboardHelpers.ts        # Pure Dashboard logic (halftime, goals, Starting XI)
+│   │   ├── notificationHelpers.ts     # FCM token, option normalization helpers
+│   │   ├── squadPhotoLookup.ts        # Squad photo matching (jersey/name/alias)
+│   │   ├── localize.ts               # Turkish localization for ESPN names
+│   │   └── matchClock.ts             # Match clock formatting utility
+│   ├── test/
+│   │   └── setup.ts                   # Test environment setup
+│   ├── firebase.ts                    # Firebase client init (Auth, RTDB, Messaging)
+│   ├── App.tsx                        # Main app & routing
+│   └── main.tsx                       # React entry point
+├── .github/workflows/
+│   └── ci.yml                         # CI quality gate (typecheck, lint, test, build)
+├── vitest.config.ts                   # Vitest test runner configuration
+├── tsconfig.json                      # TypeScript configuration (strict mode)
+├── public/                            # Static assets & PWA icons
+├── backend/                           # [DEPRECATED] Old Render.com backend
+└── firebase.json                      # Firebase configuration
 ```
 
 > **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, build the frontend with `VITE_BACKEND_ORIGIN=https://fenerbahce-backend.onrender.com` and keep the PWA cache config aligned with that same origin.
