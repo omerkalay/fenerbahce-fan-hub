@@ -1,61 +1,17 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import type { NotificationOptions } from '../types';
 import { useAuth, getSignInErrorMessage } from '../contexts/AuthContext';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
+import {
+    createEmptyOptions,
+    normalizeOptions,
+    countEnabledOptions,
+    countMatchOptions,
+    acquireFcmToken
+} from '../utils/notificationHelpers';
 
 const FCM_TOKEN_STORAGE_KEY = 'fb_fcm_token';
-const VAPID_KEY = 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwfeoitmAIyhMTC5TdhB7CSBRAz-4';
-
-/** Try getToken; on AbortError clear stale push subscription and retry once. */
-const acquireFcmToken = async (): Promise<string | null> => {
-  const { messaging } = await import('../firebase');
-  const { getToken } = await import('firebase/messaging');
-  if (!messaging) return null;
-
-  const registration = await navigator.serviceWorker.ready;
-
-  const attempt = () =>
-    getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: registration });
-
-  try {
-    return await attempt();
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      console.warn('Push subscription stale, clearing and retrying…');
-      try {
-        const sub = await registration.pushManager.getSubscription();
-        if (sub) await sub.unsubscribe();
-      } catch { /* ignore unsubscribe failure */ }
-      return await attempt();
-    }
-    throw err;
-  }
-};
-
-const createEmptyOptions = (): NotificationOptions => ({
-  generalNotifications: false,
-  threeHours: false,
-  oneHour: false,
-  thirtyMinutes: false,
-  fifteenMinutes: false,
-  dailyCheck: false
-});
-
-const normalizeOptions = (options?: Partial<NotificationOptions>): NotificationOptions => ({
-  ...createEmptyOptions(),
-  ...options
-});
-
-const countEnabledOptions = (options: NotificationOptions): number => (
-  Object.entries(options).filter(([key, value]) => key !== 'updatedAt' && value === true).length
-);
-
-const MATCH_OPTION_KEYS = ['threeHours', 'oneHour', 'thirtyMinutes', 'fifteenMinutes', 'dailyCheck'] as const;
-
-const countMatchOptions = (options: NotificationOptions): number => (
-  MATCH_OPTION_KEYS.filter(key => options[key]).length
-);
 
 const NotificationSettings = () => {
   const { user, signInWithGoogle } = useAuth();
@@ -238,13 +194,13 @@ const NotificationSettings = () => {
       if (!isDisablingAll) {
         try {
           if (!('Notification' in window)) {
-            alert('❌ Bu tarayıcı bildirimleri desteklemiyor.');
+            alert('Bu tarayıcı bildirimleri desteklemiyor.');
             return;
           }
 
           const permission = await Notification.requestPermission();
           if (permission !== 'granted') {
-            alert('⚠️ Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
+            alert('Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
             return;
           }
 
@@ -254,7 +210,7 @@ const NotificationSettings = () => {
           }
         } catch (err) {
           console.error('Token alınamadı:', err);
-          alert(`❌ Bildirim hatası: ${(err as Error).message}`);
+          alert(`Bildirim hatası: ${(err as Error).message}`);
           return;
         }
       }
@@ -287,7 +243,7 @@ const NotificationSettings = () => {
           localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
         }
       } else if (!isDisablingAll) {
-        alert('❌ Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
+        alert('Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
         return;
       }
 
@@ -296,12 +252,12 @@ const NotificationSettings = () => {
         setHasActiveNotifications(false);
         localStorage.removeItem('fb_has_notifications');
         localStorage.removeItem('fb_notification_options');
-        alert('✅ Tüm bildirimler temizlendi!' + syncNote);
+        alert('Tüm bildirimler temizlendi!' + syncNote);
       } else {
         setHasActiveNotifications(true);
         localStorage.setItem('fb_has_notifications', 'true');
         localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
-        alert(`✅ ${count} bildirim ayarlandı!` + syncNote);
+        alert(`${count} bildirim ayarlandı!` + syncNote);
       }
 
       setSelectedOptions(optionsToSave);
@@ -309,7 +265,7 @@ const NotificationSettings = () => {
       setShowModal(false);
     } catch (saveError) {
       console.error('Bildirim kaydetme hatası:', saveError);
-      alert('❌ Bağlantı hatası! Lütfen tekrar deneyin.');
+      alert('Bağlantı hatası! Lütfen tekrar deneyin.');
     } finally {
       setIsSaving(false);
     }

@@ -12,85 +12,13 @@ import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName, localizeCompetitionName } from '../utils/localize';
 import { onValue, ref } from 'firebase/database';
-import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData, StartingXIPlayer } from '../types';
-
-const isHalftimeDisplay = (statusDetail = '', displayClock = ''): boolean => {
-    const status = String(statusDetail || '').trim().toLowerCase();
-    const clock = String(displayClock || '').trim().toLowerCase();
-
-    return (
-        status === 'ht' ||
-        status === 'halftime' ||
-        status.includes('half time') ||
-        status.includes('devre') ||
-        clock === 'ht'
-    );
-};
-
-const resolveGoalTeamId = (event: MatchEvent): string => String(event.team || '');
-
-const formatGoalSummaryText = (event: MatchEvent): string => {
-    const parts: string[] = [localizePlayerName(event.player || '') || 'Gol'];
-
-    if (event.isPenalty) parts.push('(P)');
-    if (event.isOwnGoal) parts.push('(K.K)');
-
-    return parts.join(' ');
-};
-
-const STARTING_XI_GROUPS: StartingXIPlayer['group'][] = ['GK', 'DEF', 'MID', 'FWD'];
-
-const normalizeStartingXIPlayer = (value: unknown): StartingXIPlayer | null => {
-    if (!value || typeof value !== 'object') return null;
-
-    const entry = value as Record<string, unknown>;
-    const name = typeof entry.name === 'string' ? entry.name.trim() : '';
-    const number = typeof entry.number === 'number' ? entry.number : Number(entry.number);
-    const group = typeof entry.group === 'string' ? entry.group.trim().toUpperCase() : '';
-
-    if (!name || !Number.isFinite(number) || !STARTING_XI_GROUPS.includes(group as StartingXIPlayer['group'])) {
-        return null;
-    }
-
-    return {
-        name,
-        number,
-        group: group as StartingXIPlayer['group']
-    };
-};
-
-const normalizeStartingXIArray = (value: unknown): StartingXIPlayer[] => {
-    const entries = Array.isArray(value)
-        ? value
-        : value && typeof value === 'object'
-            ? Object.values(value as Record<string, unknown>)
-            : [];
-
-    return entries
-        .map(normalizeStartingXIPlayer)
-        .filter((player): player is StartingXIPlayer => player !== null);
-};
-
-const normalizeStartingXIData = (value: unknown): StartingXIData | null => {
-    if (!value || typeof value !== 'object') return null;
-
-    const entry = value as Record<string, unknown>;
-    const starters = normalizeStartingXIArray(entry.starters);
-
-    if (starters.length === 0) {
-        return null;
-    }
-
-    const publishedAt = typeof entry.publishedAt === 'number'
-        ? entry.publishedAt
-        : Number(entry.publishedAt);
-
-    return {
-        publishedAt: Number.isFinite(publishedAt) ? publishedAt : Date.now(),
-        starters,
-        bench: normalizeStartingXIArray(entry.bench)
-    };
-};
+import {
+    isHalftimeDisplay,
+    resolveGoalTeamId,
+    formatGoalSummaryText,
+    normalizeStartingXIData
+} from '../utils/dashboardHelpers';
+import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData } from '../types';
 
 interface DashboardProps {
     matchData: MatchData | null;
@@ -111,8 +39,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     loading,
     onRetry,
     errorMessage,
-    lastUpdated,
-    isRefreshing,
+    lastUpdated: _lastUpdated,
+    isRefreshing: _isRefreshing,
     liveMatchState = 'countdown',
     liveMatchData = null,
     onCountdownEnd
@@ -176,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const matchDate = new Date(matchData.startTimestamp * 1000);
     const FENERBAHCE_ID: number = 3052;
-    const isHome = matchData.homeTeam.id === 3052; // 3052 is FB ID
+    const isHome = matchData.homeTeam.id === 3052;
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
     const isLiveHalftime = liveMatchState === 'in' && liveMatchData
         ? isHalftimeDisplay(liveMatchData.statusDetail, liveMatchData.displayClock)
@@ -192,8 +120,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         return scoringTeamId !== liveHomeTeamId && scoringTeamId !== liveAwayTeamId;
     });
     const nonGoalEvents = timelineEvents.filter((event: MatchEvent) => !event.isGoal);
-
-    // Live state is now managed by App.jsx via liveMatchState prop
 
     return (
         <div className="min-h-screen pb-20">
@@ -512,7 +438,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-            {/* Standings */}
             {/* Poll */}
             <div className="mb-6">
                 <div className="mb-6">
