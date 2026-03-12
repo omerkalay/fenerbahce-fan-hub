@@ -68,12 +68,6 @@ export function useFixtureData() {
         };
     }, []);
 
-    useEffect(() => {
-        if (!loading && fixtureData && statusFilter === 'upcoming' && upcomingMatches.length === 0) {
-            setStatusFilter('played');
-        }
-    }, [loading, fixtureData]);
-
     const refreshAction = async () => {
         setError(null);
         setIsRefreshing(true);
@@ -104,6 +98,12 @@ export function useFixtureData() {
             .sort((a, b) => getMatchTimestamp(a) - getMatchTimestamp(b)),
         [matches]
     );
+
+    useEffect(() => {
+        if (!loading && fixtureData && statusFilter === 'upcoming' && upcomingMatches.length === 0) {
+            setStatusFilter('played');
+        }
+    }, [loading, fixtureData, statusFilter, upcomingMatches.length]);
 
     const statusFilteredMatches = useMemo(() => {
         if (statusFilter === 'played') return playedMatches;

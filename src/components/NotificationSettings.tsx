@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { BACKEND_URL } from '../services/api';
 import type { NotificationOptions } from '../types';
-import { useAuth, getSignInErrorMessage } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/authContextDef';
+import { getSignInErrorMessage } from '../utils/authHelpers';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 import {
     createEmptyOptions,

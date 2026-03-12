@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { auth, googleProvider } from '../firebase';
 import {
     onAuthStateChanged,
@@ -6,30 +6,15 @@ import {
     signInWithPopup,
     signInWithRedirect,
     signOut as firebaseSignOut,
-    type User
+    type User,
 } from 'firebase/auth';
+import { AuthContext } from './authContextDef';
 
 type SignInOutcome = 'success' | 'redirect' | 'cancelled';
 type SignInErrorCode =
     | 'auth/pwa-cross-origin-redirect-unsupported'
     | 'auth/popup-blocked-required'
     | 'auth/sign-in-failed';
-
-interface AuthContextType {
-    user: User | null;
-    loading: boolean;
-    signInWithGoogle: () => Promise<SignInOutcome>;
-    signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType>({
-    user: null,
-    loading: true,
-    signInWithGoogle: async () => 'cancelled',
-    signOut: async () => {}
-});
-
-export const useAuth = () => useContext(AuthContext);
 
 const REDIRECT_PENDING_KEY = 'fb_auth_redirect_pending';
 const REDIRECT_PENDING_TTL_MS = 5 * 60 * 1000;
@@ -40,13 +25,6 @@ const DEFAULT_SIGN_IN_ERROR_MESSAGE = 'Google girişi başlatılamadı. Lütfen 
 const createSignInError = (code: SignInErrorCode, message: string) => (
     Object.assign(new Error(message), { code })
 );
-
-export const getSignInErrorMessage = (error: unknown): string => {
-    if (error instanceof Error && error.message) {
-        return error.message;
-    }
-    return DEFAULT_SIGN_IN_ERROR_MESSAGE;
-};
 
 const isStandaloneDisplayMode = (): boolean => {
     if (typeof window === 'undefined') return false;

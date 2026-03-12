@@ -1,4 +1,5 @@
-import MatchEventIcon, { getEventVisualType } from './MatchEventIcon';
+import MatchEventIcon from './MatchEventIcon';
+import { getEventVisualType } from '../utils/eventVisualType';
 import MatchLineups from './MatchLineups';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';

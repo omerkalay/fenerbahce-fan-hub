@@ -2,7 +2,8 @@
 import { ref, onValue, get } from 'firebase/database';
 import { BarChart3, CheckCircle } from 'lucide-react';
 import { database } from '../firebase';
-import { useAuth, getSignInErrorMessage } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/authContextDef';
+import { getSignInErrorMessage } from '../utils/authHelpers';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 import { submitPollVote } from '../services/api';
 

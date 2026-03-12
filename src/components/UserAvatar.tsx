@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
-import { getSignInErrorMessage, useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/authContextDef';
+import { getSignInErrorMessage } from '../utils/authHelpers';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
 const UserAvatar = () => {

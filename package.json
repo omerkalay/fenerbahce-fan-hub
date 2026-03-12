@@ -7,7 +7,7 @@
     "generate-sw": "node scripts/generate-sw.js",
     "dev": "npm run generate-sw && vite",
     "build": "npm run generate-sw && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
