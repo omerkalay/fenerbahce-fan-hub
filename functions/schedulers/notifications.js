@@ -7,7 +7,7 @@ const { admin, db, FENERBAHCE_ID, ISTANBUL_TIMEZONE, formatDateKey } = require('
  */
 const checkMatchNotifications = onSchedule(
     { schedule: "every 1 minutes", maxInstances: 1 },
-    async (event) => {
+    async (_event) => {
     try {
         const matchesSnapshot = await db.ref('cache/next3Matches').once('value');
         const nextMatches = matchesSnapshot.val();

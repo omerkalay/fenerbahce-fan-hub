@@ -4,7 +4,6 @@ const {
     normalizeSummaryEvents,
     pickOrderedSummaryStats: _pickOrderedSummaryStats,
     parseSummaryKeyEvent,
-    pickAssistNameFromSummaryItem
 } = require('./espn-helpers');
 
 // Bind config into the parameterized helper
@@ -130,7 +129,7 @@ const parseTeamRosterEntry = (rosterEntry, teamId, formation, substitutionEvents
 };
 
 // Fallback: build roster-like entries from boxscore.players arrays
-const buildRosterFromBoxscorePlayers = (summaryJson, homeTeamId, awayTeamId) => {
+const buildRosterFromBoxscorePlayers = (summaryJson, _homeTeamId, _awayTeamId) => {
     const bsPlayers = Array.isArray(summaryJson?.boxscore?.players) ? summaryJson.boxscore.players : [];
     if (bsPlayers.length === 0) return [];
 

@@ -10,7 +10,7 @@ const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
 const dailyDataRefresh = onSchedule({
     schedule: "0 3 * * *",
     secrets: [rapidApiKey, rapidApiHost]
-}, async (event) => {
+}, async (_event) => {
     console.log('⏰ Daily data refresh started (03:00 UTC = 06:00 TR)');
 
     try {

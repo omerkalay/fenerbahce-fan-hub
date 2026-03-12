@@ -25,7 +25,6 @@ export function useCooldown<T extends (...args: never[]) => Promise<void>>(
                 }, cooldownMs);
             }
         },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         [action, cooldownMs, isCoolingDown],
     );
 

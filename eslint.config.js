@@ -6,9 +6,16 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'dev-dist', 'functions', 'scripts', 'node_modules']),
+  globalIgnores([
+    'dist/',
+    'dev-dist/',
+    'public/firebase-messaging-sw.js',
+    '**/node_modules/**',
+  ]),
+
+  // Browser + React + TypeScript — src/**/*.{ts,tsx}
   {
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}'],
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
@@ -31,6 +38,30 @@ export default defineConfig([
       'react-refresh/only-export-components': 'warn',
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/preserve-manual-memoization': 'off',
+    },
+  },
+
+  // Node / CommonJS — functions, scripts, config files
+  {
+    files: ['functions/**/*.js', 'scripts/**/*.js', 'vite.config.js', 'postcss.config.js', 'tailwind.config.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: { ...globals.node },
+      sourceType: 'module',
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_' }],
+    },
+  },
+
+  // Service worker files
+  {
+    files: ['public/firebase-messaging-sw-template.js'],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      ecmaVersion: 2020,
+      globals: { ...globals.serviceworker, firebase: 'readonly', importScripts: 'readonly' },
     },
   },
 ])

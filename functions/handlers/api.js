@@ -660,7 +660,7 @@ async function handleRefresh(req, res) {
         try {
             const squad = await fetchSquad();
             // handleRefresh doesn't include marketValue in its mapping
-            cache.squad = squad.map(({ marketValue, ...rest }) => rest);
+            cache.squad = squad.map(({ marketValue: _mv, ...rest }) => rest);
         } catch (error) {
             console.error('Squad fetch failed:', error.message);
         }

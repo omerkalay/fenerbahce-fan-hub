@@ -454,11 +454,8 @@ fenerbahce-fan-hub/
 ├── vitest.config.ts                   # Vitest test runner configuration
 ├── tsconfig.json                      # TypeScript configuration (strict mode)
 ├── public/                            # Static assets & PWA icons
-├── backend/                           # [DEPRECATED] Old Render.com backend
 └── firebase.json                      # Firebase configuration
 ```
-
-> **Note:** The `backend/` folder contains the old Express.js server that ran on Render.com. It's kept for emergency rollback purposes. To rollback, build the frontend with `VITE_BACKEND_ORIGIN=https://fenerbahce-backend.onrender.com` and keep the PWA cache config aligned with that same origin.
 
 ## Installation & Setup
 

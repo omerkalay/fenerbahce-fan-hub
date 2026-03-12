@@ -7,10 +7,11 @@
     "generate-sw": "node scripts/generate-sw.js",
     "dev": "npm run generate-sw && vite",
     "build": "npm run generate-sw && vite build",
-    "lint": "eslint src/",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "check": "npm run lint && npm run typecheck && npm run test:run && npm run build",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"

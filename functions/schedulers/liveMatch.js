@@ -7,7 +7,7 @@ const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, bu
  * Maç günü ESPN'den canlı veri çeker, cache/liveMatch'e yazar
  * Maç yoksa veya bitmişse cache'i temizler
  */
-const updateLiveMatch = onSchedule("every 1 minutes", async (event) => {
+const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
     try {
         const nextMatchSnapshot = await db.ref('cache/nextMatch').once('value');
         const nextMatch = nextMatchSnapshot.val();
