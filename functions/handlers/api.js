@@ -6,20 +6,15 @@ const { handleSquad } = require('./squad');
 const { handlePlayerImage, handleTeamImage } = require('./assets');
 const { handlePollVote } = require('./polls');
 const { handleHealth, handleRefresh } = require('./admin');
-
-const buildNotificationOptions = (data = {}) => ({
-    generalNotifications: data.generalNotifications !== false,
-    threeHours: !!data.defaultOptions?.threeHours,
-    oneHour: !!data.defaultOptions?.oneHour,
-    thirtyMinutes: !!data.defaultOptions?.thirtyMinutes,
-    fifteenMinutes: !!data.defaultOptions?.fifteenMinutes,
-    dailyCheck: !!data.dailyCheck,
-    updatedAt: data.defaultOptions?.updatedAt || null
-});
-
-const countActiveOptions = (options = {}) => (
-    Object.entries(options).filter(([key, value]) => key !== 'updatedAt' && value === true).length
-);
+const {
+    buildNotificationOptions,
+    countActiveOptions,
+    isDisablingAll,
+    hasPathTraversal,
+    shouldCleanupOldToken,
+    canCleanupOldTokenNow,
+    buildSavedOptions
+} = require('./notificationLogic');
 
 async function handleReminder(req, res) {
     const authenticatedUid = await requireAuthenticatedUid(req, res);
@@ -37,14 +32,10 @@ async function handleReminder(req, res) {
         return res.status(400).json({ error: 'Missing options' });
     }
 
-    const isDisablingAll = !options.generalNotifications && !options.dailyCheck &&
-        !options.threeHours && !options.oneHour && !options.thirtyMinutes && !options.fifteenMinutes;
-
-    if (!fcmToken && !isDisablingAll) {
+    if (!fcmToken && !isDisablingAll(options)) {
         return res.status(400).json({ error: 'Missing fcmToken' });
     }
 
-    const hasPathTraversal = (v) => typeof v === 'string' && v.includes('/');
     if (hasPathTraversal(fcmToken) || hasPathTraversal(oldFcmToken)) {
         return res.status(400).json({ error: 'Invalid token format' });
     }
@@ -144,9 +135,9 @@ async function handleReminder(req, res) {
         }
 
         // Old token topic cleanup: defer if current subscribe is pending to avoid coverage gap
-        const hasOldToken = oldFcmToken && oldFcmToken !== fcmToken && oldFcmToken !== authenticatedUid;
+        const hasOldToken = shouldCleanupOldToken({ oldFcmToken, fcmToken, authenticatedUid });
         if (hasOldToken) {
-            if (!topicSyncPending || !desiredTopicState) {
+            if (canCleanupOldTokenNow({ topicSyncPending, desiredTopicState })) {
                 // Safe: new token confirmed, or unsubscribing anyway
                 try {
                     const oldResult = await admin.messaging().unsubscribeFromTopic(oldFcmToken, 'all_fans');
@@ -174,15 +165,7 @@ async function handleReminder(req, res) {
             }
         }
 
-        const savedOptions = {
-            generalNotifications: !!options.generalNotifications,
-            threeHours: !!options.threeHours,
-            oneHour: !!options.oneHour,
-            thirtyMinutes: !!options.thirtyMinutes,
-            fifteenMinutes: !!options.fifteenMinutes,
-            dailyCheck: !!options.dailyCheck,
-            updatedAt: rootUpdates[`${basePath}/defaultOptions/updatedAt`]
-        };
+        const savedOptions = buildSavedOptions(options, rootUpdates[`${basePath}/defaultOptions/updatedAt`]);
         const activeCount = countActiveOptions(savedOptions);
 
         return res.json({

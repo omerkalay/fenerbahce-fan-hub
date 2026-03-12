@@ -69,6 +69,83 @@ describe('countMatchOptions', () => {
     });
 });
 
+describe('countEnabledOptions — edge cases', () => {
+    it('returns 6 when all options are true', () => {
+        const opts = normalizeOptions({
+            generalNotifications: true,
+            threeHours: true,
+            oneHour: true,
+            thirtyMinutes: true,
+            fifteenMinutes: true,
+            dailyCheck: true,
+        });
+        expect(countEnabledOptions(opts)).toBe(6);
+    });
+
+    it('generalNotifications only → count 1', () => {
+        expect(countEnabledOptions(normalizeOptions({ generalNotifications: true }))).toBe(1);
+    });
+
+    it('match reminders without generalNotifications', () => {
+        const opts = normalizeOptions({
+            generalNotifications: false,
+            threeHours: true,
+            oneHour: true,
+            thirtyMinutes: true,
+            fifteenMinutes: true,
+            dailyCheck: true,
+        });
+        expect(countEnabledOptions(opts)).toBe(5);
+    });
+});
+
+describe('normalizeOptions — edge cases', () => {
+    it('preserves all true values', () => {
+        const all = {
+            generalNotifications: true,
+            threeHours: true,
+            oneHour: true,
+            thirtyMinutes: true,
+            fifteenMinutes: true,
+            dailyCheck: true,
+        };
+        expect(normalizeOptions(all)).toEqual(all);
+    });
+
+    it('overrides only provided keys', () => {
+        const opts = normalizeOptions({ dailyCheck: true, fifteenMinutes: true });
+        expect(opts.dailyCheck).toBe(true);
+        expect(opts.fifteenMinutes).toBe(true);
+        expect(opts.generalNotifications).toBe(false);
+        expect(opts.threeHours).toBe(false);
+    });
+});
+
+describe('countMatchOptions — edge cases', () => {
+    it('returns 5 when all match options enabled', () => {
+        const opts = normalizeOptions({
+            threeHours: true,
+            oneHour: true,
+            thirtyMinutes: true,
+            fifteenMinutes: true,
+            dailyCheck: true,
+        });
+        expect(countMatchOptions(opts)).toBe(5);
+    });
+
+    it('does not count generalNotifications', () => {
+        const opts = normalizeOptions({
+            generalNotifications: true,
+            threeHours: false,
+            oneHour: false,
+            thirtyMinutes: false,
+            fifteenMinutes: false,
+            dailyCheck: false,
+        });
+        expect(countMatchOptions(opts)).toBe(0);
+    });
+});
+
 describe('MATCH_OPTION_KEYS', () => {
     it('contains 5 entries', () => {
         expect(MATCH_OPTION_KEYS).toHaveLength(5);
@@ -76,5 +153,13 @@ describe('MATCH_OPTION_KEYS', () => {
 
     it('does not include generalNotifications', () => {
         expect(MATCH_OPTION_KEYS).not.toContain('generalNotifications');
+    });
+
+    it('contains all expected keys', () => {
+        expect(MATCH_OPTION_KEYS).toContain('threeHours');
+        expect(MATCH_OPTION_KEYS).toContain('oneHour');
+        expect(MATCH_OPTION_KEYS).toContain('thirtyMinutes');
+        expect(MATCH_OPTION_KEYS).toContain('fifteenMinutes');
+        expect(MATCH_OPTION_KEYS).toContain('dailyCheck');
     });
 });
