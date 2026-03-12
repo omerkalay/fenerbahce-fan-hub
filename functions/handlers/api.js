@@ -307,4 +307,4 @@ const api = onRequest({
     }
 });
 
-module.exports = { api };
+module.exports = { api, handleReminder, handleReminderPreferences };
