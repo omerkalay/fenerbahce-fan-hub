@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
 import NotificationSettings from './components/NotificationSettings';
@@ -7,52 +7,32 @@ import Statistics from './components/Statistics';
 import ErrorBoundary from './components/ErrorBoundary';
 import UserAvatar from './components/UserAvatar';
 import { BarChart2 } from 'lucide-react';
-import { fetchNextMatch, fetchNext3Matches, BACKEND_URL } from './services/api';
-import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from './types';
 import { AuthProvider } from './contexts/AuthContext';
+import { useMatchBootstrap } from './hooks/useMatchBootstrap';
+import { useLiveMatchState } from './hooks/useLiveMatchState';
+import { useForegroundMessaging } from './hooks/useForegroundMessaging';
 
 type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
-
-const readCachedMatchData = (): CachedMatchPayload | null => {
-  if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem('fb_last_match');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    console.warn('fb_last_match parse error:', err);
-    return null;
-  }
-};
-
-const shouldCheckLiveImmediately = (match: MatchData | null | undefined): boolean => {
-  if (!match?.startTimestamp) return false;
-  return (match.startTimestamp * 1000) <= Date.now();
-};
-
 
 function AppContent() {
   const [fontsReady, setFontsReady] = useState(typeof window === 'undefined');
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
-  const cachedData = useMemo(() => {
-    if (typeof window === 'undefined') return null;
-    return readCachedMatchData();
-  }, []);
-  const [matchData, setMatchData] = useState<MatchData | null>(cachedData?.nextMatch ?? null);
-  const [next3Matches, setNext3Matches] = useState<MatchData[]>(cachedData?.next3Matches ?? []);
-  const [lastUpdated, setLastUpdated] = useState<number | null>(cachedData?.timestamp ?? null);
-  const [loading, setLoading] = useState(!cachedData);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
 
-  // Live match states
-  const [liveMatchState, setLiveMatchState] = useState<LiveMatchState>(
-    shouldCheckLiveImmediately(cachedData?.nextMatch) ? 'checking' : 'countdown'
-  );
-  const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null);
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
-  const livePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const {
+    cachedData,
+    matchData,
+    next3Matches,
+    lastUpdated,
+    loading,
+    isRefreshing,
+    errorMessage,
+    currentMatch,
+    loadMatchData,
+  } = useMatchBootstrap();
+
+  const { liveMatchState, liveMatchData, onCountdownEnd } = useLiveMatchState(cachedData, currentMatch);
+
+  useForegroundMessaging();
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -87,196 +67,6 @@ function AppContent() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    hasDataRef.current = Boolean(matchData);
-  }, [matchData]);
-
-  // Foreground FCM: uygulama açıkken gelen bildirimleri göster
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    const setupForegroundMessaging = async () => {
-      try {
-        if (!('Notification' in window) || Notification.permission !== 'granted') return;
-
-        const { messaging } = await import('./firebase');
-        const { onMessage } = await import('firebase/messaging');
-        if (!messaging) return;
-
-        unsubscribe = onMessage(messaging, (payload) => {
-          console.log('📩 Foreground message:', payload);
-          const title = payload.notification?.title || payload.data?.title;
-          const body = payload.notification?.body || payload.data?.body || '';
-          if (title) {
-            new Notification(title, {
-              body,
-              icon: 'https://media.api-sports.io/football/teams/611.png',
-              data: payload.data
-            });
-          }
-        });
-      } catch (err) {
-        console.error('Foreground messaging setup error:', err);
-      }
-    };
-
-    setupForegroundMessaging();
-    return () => { if (unsubscribe) unsubscribe(); };
-  }, []);
-
-  // Fetch match data once when app loads
-  const loadMatchData = useCallback(async () => {
-    const hasCached = hasDataRef.current;
-    setErrorMessage(null);
-    if (hasCached) {
-      setIsRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const [nextMatch, upcomingMatches] = await Promise.all([
-        fetchNextMatch(),
-        fetchNext3Matches()
-      ]);
-
-      const normalizedUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches : [];
-      setNext3Matches(normalizedUpcoming);
-
-      if (nextMatch) {
-        setMatchData(nextMatch);
-        setCurrentMatchIndex(0);
-        const payload: CachedMatchPayload = {
-          nextMatch,
-          next3Matches: normalizedUpcoming,
-          timestamp: Date.now()
-        };
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('fb_last_match', JSON.stringify(payload));
-        }
-
-        setLastUpdated(payload.timestamp);
-      } else {
-        setMatchData(null);
-        setErrorMessage('Maç verisi alınamadı. Lütfen bağlantını kontrol edip tekrar dene.');
-      }
-    } catch (err) {
-      console.error('loadMatchData error:', err);
-      setMatchData(null);
-      setNext3Matches([]);
-      setErrorMessage('Beklenmeyen bir hata oluştu. Tekrar dene veya biraz sonra gel.');
-    } finally {
-      setLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadMatchData();
-  }, [loadMatchData]);
-
-  // Get current match based on index
-  const currentMatch = useMemo(() => {
-    if (currentMatchIndex === 0) return matchData;
-    if (next3Matches.length > currentMatchIndex) return next3Matches[currentMatchIndex];
-    return matchData;
-  }, [matchData, next3Matches, currentMatchIndex]);
-
-  // Live match polling
-  const fetchLiveMatch = useCallback(async (): Promise<string | null> => {
-    try {
-      const response = await fetch(`${BACKEND_URL}/live-match`);
-      if (!response.ok) {
-        setLiveMatchData(null);
-        return null;
-      }
-      const data: LiveMatchData = await response.json();
-      if (data.matchState === 'no-match') {
-        setLiveMatchData(null);
-        return 'no-match';
-      }
-      setLiveMatchData(data);
-      return data.matchState;
-    } catch (err) {
-      console.error('Live match fetch error:', err);
-      return null;
-    }
-  }, []);
-
-  const stopLivePolling = useCallback(() => {
-    if (livePollingRef.current) {
-      clearInterval(livePollingRef.current);
-      livePollingRef.current = null;
-    }
-  }, []);
-
-  const resolveNoMatchState = useCallback((): LiveMatchState => {
-    if (!currentMatch?.startTimestamp) return 'checking';
-    return (currentMatch.startTimestamp * 1000) > Date.now() ? 'countdown' : 'checking';
-  }, [currentMatch]);
-
-  // Start live polling when countdown reaches 0
-  const startLivePolling = useCallback(() => {
-    if (livePollingRef.current) return; // Already polling
-
-    const poll = async () => {
-      const state = await fetchLiveMatch();
-      if (state) {
-        setLiveMatchState(state === 'no-match' ? resolveNoMatchState() : state as LiveMatchState);
-      }
-    };
-
-    // Initial check
-    poll();
-
-    // Poll every 30 seconds
-    livePollingRef.current = setInterval(poll, 30000);
-  }, [fetchLiveMatch, resolveNoMatchState]);
-
-  // Handle countdown reaching 0 — transition to live checking
-  const onCountdownEnd = useCallback(() => {
-    setLiveMatchState('checking');
-    startLivePolling();
-  }, [startLivePolling]);
-
-  // If cached/current match is already started, avoid rendering stale countdown/pre flashes.
-  useEffect(() => {
-    if (!currentMatch?.startTimestamp) return;
-
-    const started = shouldCheckLiveImmediately(currentMatch);
-
-    if (started && liveMatchState === 'countdown') {
-      setLiveMatchState('checking');
-      return;
-    }
-
-    if (!started && (liveMatchState === 'pre' || liveMatchState === 'checking') && !liveMatchData) {
-      stopLivePolling();
-      setLiveMatchState('countdown');
-    }
-  }, [currentMatch, liveMatchState, liveMatchData, stopLivePolling]);
-
-  // Checking state reuses existing live polling flow without adding extra calls.
-  useEffect(() => {
-    if (liveMatchState === 'checking') {
-      startLivePolling();
-    }
-  }, [liveMatchState, startLivePolling]);
-
-  // Post state is stable (no auto-transition). Stop polling to avoid unnecessary requests.
-  useEffect(() => {
-    if (liveMatchState === 'post') {
-      stopLivePolling();
-    }
-  }, [liveMatchState, stopLivePolling]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopLivePolling();
-    };
-  }, [stopLivePolling]);
 
   if (!fontsReady) {
     return (
