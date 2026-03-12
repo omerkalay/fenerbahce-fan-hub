@@ -6,13 +6,22 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.8-blue)
+![Version](https://img.shields.io/badge/version-2.9.9-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.8
+## What's New in v2.9.9
+
+- **Release Gate for Deploys** - GitHub Pages deploy now waits for the CI quality workflow to succeed and checks out the exact tested commit SHA before publishing
+- **Node Runtime Alignment** - CI, Pages build, and Firebase Functions are all pinned to Node 22 to avoid runtime drift between verification and production
+- **Notification Race Condition Guards** - Notification preference loading and FCM token sync now abort stale in-flight work so old user sessions cannot overwrite current state or complete stale syncs
+- **ESPN Fetch Timeout Hardening** - Shared timeout wrappers now protect live match and ESPN fixture/stat calls from hanging indefinitely when the upstream API is slow
+- **Maintenance Cleanup Pass** - Removed dead match bootstrap state, dropped unused `react-router-dom`, and kept API metadata aligned with the current app release
+
+<details>
+<summary>Previous: v2.9.8</summary>
 
 - **Quality Gate Hardening** - Added a strict `lint + typecheck + test + build` release gate, plus new Vitest coverage for notification decision helpers and `/api/reminder` endpoint contracts
 - **Backend Cleanup Without Behavior Drift** - Removed the legacy backend, split Firebase API handlers into focused modules, and extracted reminder handlers while preserving routes, response shapes, and topic sync behavior
@@ -20,6 +29,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Single Source of Truth for Live Match Data** - `LiveMatchScore` is now prop-driven and no longer performs its own `/live-match` polling, preventing duplicate fetch flows between the app shell and the live modal
 - **Notification Settings Maintainability Pass** - Extracted notification storage, server preference load/save flow, draft state management, and token sync into dedicated hooks/helpers without changing UI or notification semantics
 - **CI Reliability Fix** - The GitHub Actions quality gate now installs `functions/` dependencies before running tests, keeping reminder contract tests aligned with the local environment
+
+</details>
 
 <details>
 <summary>Previous: v2.9.7</summary>
@@ -622,4 +633,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.8** | March 2026
+**v2.9.9** | March 2026

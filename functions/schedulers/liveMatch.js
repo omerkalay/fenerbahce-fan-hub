@@ -1,6 +1,7 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db } = require('../config');
 const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, buildSummaryPayloadFromLiveData } = require('../services/espn');
+const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 
 /**
  * Update Live Match - Her dakika çalışır
@@ -52,7 +53,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             for (const league of leagues) {
                 try {
                     const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${dateStr}`;
-                    const response = await fetch(scoreboardUrl);
+                    const response = await fetchWithTimeout(scoreboardUrl);
                     if (!response.ok) continue;
 
                     const data = await response.json();
@@ -146,7 +147,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         let summaryKeyEvents = [];
         let summaryLineups = null;
         try {
-            const summaryResponse = await fetch(summaryUrl);
+            const summaryResponse = await fetchWithTimeout(summaryUrl);
             if (summaryResponse.ok) {
                 const summaryJson = await summaryResponse.json();
                 summaryKeyEvents = Array.isArray(summaryJson?.keyEvents) ? summaryJson.keyEvents : [];

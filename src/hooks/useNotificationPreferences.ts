@@ -43,6 +43,8 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
 
     // Load server preferences when user changes
     useEffect(() => {
+        const abortController = new AbortController();
+
         const clearLocalState = () => {
             setSelectedOptions(createEmptyOptions());
             setDraftOptions(null);
@@ -61,7 +63,8 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
                 const response = await fetch(`${BACKEND_URL}/reminder`, {
                     headers: {
                         Authorization: `Bearer ${idToken}`
-                    }
+                    },
+                    signal: abortController.signal
                 });
 
                 if (response.status === 404) {
@@ -74,6 +77,10 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
                 }
 
                 const result = await response.json();
+
+                // Guard: don't update state if effect was cleaned up during async work
+                if (abortController.signal.aborted) return;
+
                 const serverOptions = normalizeOptions(result.options);
                 const enabledCount = countEnabledOptions(serverOptions);
 
@@ -88,11 +95,14 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
                     clearFcmToken();
                 }
             } catch (err) {
+                if ((err as Error).name === 'AbortError') return;
                 console.error('Notification preferences load error:', err);
             }
         };
 
         loadServerPreferences();
+
+        return () => { abortController.abort(); };
     }, [user]);
 
     // FCM token sync

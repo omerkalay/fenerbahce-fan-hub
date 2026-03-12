@@ -12,13 +12,15 @@ const useNotificationTokenSync = (hasActiveNotifications: boolean, user: User | 
     useEffect(() => {
         if (!hasActiveNotifications) return;
 
+        const abortController = new AbortController();
+
         const syncToken = async () => {
             try {
                 if (!('Notification' in window) || Notification.permission !== 'granted') return;
                 if (!('serviceWorker' in navigator)) return;
 
                 const currentToken = await acquireFcmToken();
-                if (!currentToken) return;
+                if (!currentToken || abortController.signal.aborted) return;
 
                 const storedToken = loadFcmToken();
                 if (currentToken === storedToken) return;
@@ -28,6 +30,8 @@ const useNotificationTokenSync = (hasActiveNotifications: boolean, user: User | 
 
                 const options = normalizeOptions(savedOptions);
                 const idToken = await user.getIdToken();
+                if (abortController.signal.aborted) return;
+
                 const response = await fetch(`${BACKEND_URL}/reminder`, {
                     method: 'POST',
                     headers: {
@@ -38,20 +42,26 @@ const useNotificationTokenSync = (hasActiveNotifications: boolean, user: User | 
                         fcmToken: currentToken,
                         oldFcmToken: storedToken || undefined,
                         options
-                    })
+                    }),
+                    signal: abortController.signal
                 });
 
                 if (!response.ok) {
                     throw new Error(`Backend error: ${response.status}`);
                 }
 
+                // Final guard before persisting locally
+                if (abortController.signal.aborted) return;
                 persistFcmToken(currentToken);
             } catch (err) {
+                if ((err as Error).name === 'AbortError') return;
                 console.error('FCM token sync error:', err);
             }
         };
 
         syncToken();
+
+        return () => { abortController.abort(); };
     }, [hasActiveNotifications, user]);
 };
 

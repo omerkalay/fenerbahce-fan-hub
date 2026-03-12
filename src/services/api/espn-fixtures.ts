@@ -4,6 +4,7 @@ import type {
     EspnTeam,
 } from '../../types';
 import { localizeCompetitionName } from '../../utils/localize';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
@@ -145,8 +146,8 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
         const perCompetitionResults = await Promise.all(
             ESPN_FIXTURE_COMPETITIONS.map(async (competition) => {
                 const [resultsResponse, fixturesResponse] = await Promise.all([
-                    fetch(buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear) })),
-                    fetch(buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear), fixture: 'true' }))
+                    fetchWithTimeout(buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear) })),
+                    fetchWithTimeout(buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear), fixture: 'true' }))
                 ]);
 
                 if (!resultsResponse.ok && !fixturesResponse.ok) {

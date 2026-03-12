@@ -26,7 +26,6 @@ export function useMatchBootstrap() {
   const [loading, setLoading] = useState(!cachedData);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
 
   useEffect(() => {
@@ -53,7 +52,6 @@ export function useMatchBootstrap() {
 
       if (nextMatch) {
         setMatchData(nextMatch);
-        setCurrentMatchIndex(0);
         const payload: CachedMatchPayload = {
           nextMatch,
           next3Matches: normalizedUpcoming,
@@ -84,11 +82,7 @@ export function useMatchBootstrap() {
     loadMatchData();
   }, [loadMatchData]);
 
-  const currentMatch = useMemo(() => {
-    if (currentMatchIndex === 0) return matchData;
-    if (next3Matches.length > currentMatchIndex) return next3Matches[currentMatchIndex];
-    return matchData;
-  }, [matchData, next3Matches, currentMatchIndex]);
+  const currentMatch = matchData;
 
   return {
     cachedData,
