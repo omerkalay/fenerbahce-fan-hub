@@ -41,7 +41,7 @@ Object.defineProperty(config.admin, 'auth', {
     configurable: true,
 });
 
-const { handleReminder, handleReminderPreferences } = await import('./api.js');
+const { handleReminder, handleReminderPreferences } = await import('./reminders.js');
 
 // ─── Helpers ─────────────────────────────────────────────
 
