@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Set env BEFORE any Firebase modules load
 process.env.FIREBASE_CONFIG = JSON.stringify({
     projectId: 'test-dummy',
     databaseURL: 'https://test-dummy.firebaseio.com',
 });
 process.env.GCLOUD_PROJECT = 'test-dummy';
 
-// Now import config — the real config.js will load with env vars
 const config = await import('../config.js');
 
-// Replace config exports with mocks
 const mockUpdate = vi.fn().mockResolvedValue(undefined);
 const mockSet = vi.fn().mockResolvedValue(undefined);
 const mockOnce = vi.fn();
@@ -23,7 +20,6 @@ const mockSubscribeToTopic = vi.fn();
 const mockUnsubscribeFromTopic = vi.fn();
 const mockVerifyIdToken = vi.fn();
 
-// Override config exports with mocks
 config.db.ref = mockRef;
 Object.defineProperty(config.admin, 'messaging', {
     value: () => ({
