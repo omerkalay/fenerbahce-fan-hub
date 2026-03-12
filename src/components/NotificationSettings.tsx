@@ -1,40 +1,27 @@
 import { useState, useEffect } from 'react';
-import { BACKEND_URL } from '../services/api';
 import type { NotificationOptions } from '../types';
 import { useAuth } from '../contexts/authContextDef';
 import { getSignInErrorMessage } from '../utils/authHelpers';
+import useNotificationPreferences from '../hooks/useNotificationPreferences';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
-import {
-    createEmptyOptions,
-    normalizeOptions,
-    countEnabledOptions,
-    countMatchOptions,
-    acquireFcmToken
-} from '../utils/notificationHelpers';
-
-const FCM_TOKEN_STORAGE_KEY = 'fb_fcm_token';
 
 const NotificationSettings = () => {
   const { user, signInWithGoogle } = useAuth();
   const [showModal, setShowModal] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [selectedOptions, setSelectedOptions] = useState<NotificationOptions>(() => {
-    const saved = localStorage.getItem('fb_notification_options');
-    if (saved) {
-      try {
-        return normalizeOptions(JSON.parse(saved));
-      } catch {
-        return createEmptyOptions();
-      }
-    }
-    return createEmptyOptions();
-  });
-  const [draftOptions, setDraftOptions] = useState<NotificationOptions | null>(null);
-  const [hasActiveNotifications, setHasActiveNotifications] = useState(() => {
-    const saved = localStorage.getItem('fb_has_notifications');
-    return saved === 'true';
-  });
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const {
+    currentDraftOptions,
+    hasDraftChanges,
+    draftMatchCount,
+    draftGeneralCount,
+    hasActiveNotifications,
+    isSaving,
+    toggleOption,
+    openDraft,
+    closeDraft,
+    saveNotifications
+  } = useNotificationPreferences(user);
 
   useEffect(() => {
     if (showModal) {
@@ -48,228 +35,21 @@ const NotificationSettings = () => {
     };
   }, [showModal]);
 
-  useEffect(() => {
-    const clearLocalState = () => {
-      setSelectedOptions(createEmptyOptions());
-      setDraftOptions(null);
-      setHasActiveNotifications(false);
-      localStorage.removeItem('fb_has_notifications');
-      localStorage.removeItem('fb_notification_options');
-    };
-
-    const loadServerPreferences = async () => {
-      if (!user) {
-        clearLocalState();
-        return;
-      }
-
-      try {
-        const idToken = await user.getIdToken();
-        const response = await fetch(`${BACKEND_URL}/reminder`, {
-          headers: {
-            Authorization: `Bearer ${idToken}`
-          }
-        });
-
-        if (response.status === 404) {
-          clearLocalState();
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        const serverOptions = normalizeOptions(result.options);
-        const enabledCount = countEnabledOptions(serverOptions);
-
-        setSelectedOptions(serverOptions);
-        setDraftOptions(null);
-        setHasActiveNotifications(enabledCount > 0);
-
-        if (enabledCount > 0) {
-          localStorage.setItem('fb_has_notifications', 'true');
-          localStorage.setItem('fb_notification_options', JSON.stringify(serverOptions));
-        } else {
-          localStorage.removeItem('fb_has_notifications');
-          localStorage.removeItem('fb_notification_options');
-        }
-
-        if (result.fcmToken) {
-          localStorage.setItem(FCM_TOKEN_STORAGE_KEY, result.fcmToken);
-        } else {
-          localStorage.removeItem(FCM_TOKEN_STORAGE_KEY);
-        }
-      } catch (err) {
-        console.error('Notification preferences load error:', err);
-      }
-    };
-
-    loadServerPreferences();
-  }, [user]);
-
-  useEffect(() => {
-    if (!hasActiveNotifications) return;
-
-    const syncToken = async () => {
-      try {
-        if (!('Notification' in window) || Notification.permission !== 'granted') return;
-        if (!('serviceWorker' in navigator)) return;
-
-        const currentToken = await acquireFcmToken();
-        if (!currentToken) return;
-
-        const storedToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
-        if (currentToken === storedToken) return;
-
-        const savedOptions = localStorage.getItem('fb_notification_options');
-        if (!savedOptions || !user) return;
-
-        const options = normalizeOptions(JSON.parse(savedOptions));
-        const idToken = await user.getIdToken();
-        const response = await fetch(`${BACKEND_URL}/reminder`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`
-          },
-          body: JSON.stringify({
-            fcmToken: currentToken,
-            oldFcmToken: storedToken || undefined,
-            options
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`);
-        }
-
-        localStorage.setItem(FCM_TOKEN_STORAGE_KEY, currentToken);
-      } catch (err) {
-        console.error('FCM token sync error:', err);
-      }
-    };
-
-    syncToken();
-  }, [hasActiveNotifications, user]);
-
-  const toggleOption = (optionId: keyof NotificationOptions) => {
-    setDraftOptions((previous) => {
-      const base = previous ?? selectedOptions;
-      return {
-        ...base,
-        [optionId]: !base?.[optionId]
-      };
-    });
-  };
-
   const handleOpenModal = () => {
     setAuthError(null);
-    setDraftOptions({ ...selectedOptions });
+    openDraft();
     setShowModal(true);
   };
 
   const handleCloseModal = () => {
     setAuthError(null);
-    setDraftOptions(null);
+    closeDraft();
     setShowModal(false);
   };
 
-  const currentDraftOptions = draftOptions ?? selectedOptions;
-  const hasDraftChanges = JSON.stringify(currentDraftOptions) !== JSON.stringify(selectedOptions);
-  const draftMatchCount = countMatchOptions(currentDraftOptions);
-  const draftGeneralCount = currentDraftOptions.generalNotifications ? 1 : 0;
-
-  const saveNotifications = async () => {
-    if (isSaving) return;
-
-    setIsSaving(true);
-    const optionsToSave = normalizeOptions(currentDraftOptions);
-    const count = Object.entries(optionsToSave).filter(([key, value]) => key !== 'updatedAt' && value).length;
-    const isDisablingAll = count === 0;
-    const previousToken = localStorage.getItem(FCM_TOKEN_STORAGE_KEY);
-    let token = previousToken;
-
-    try {
-      if (!isDisablingAll) {
-        try {
-          if (!('Notification' in window)) {
-            alert('Bu tarayıcı bildirimleri desteklemiyor.');
-            return;
-          }
-
-          const permission = await Notification.requestPermission();
-          if (permission !== 'granted') {
-            alert('Bildirim izni reddedildi! Tarayıcı ayarlarından izin vermelisiniz.');
-            return;
-          }
-
-          token = await acquireFcmToken();
-          if (!token) {
-            throw new Error('Firebase Messaging başlatılamadı');
-          }
-        } catch (err) {
-          console.error('Token alınamadı:', err);
-          alert(`Bildirim hatası: ${(err as Error).message}`);
-          return;
-        }
-      }
-
-      let topicSyncPending = false;
-      if (user && (token || isDisablingAll)) {
-        const oldFcmToken = previousToken && previousToken !== token ? previousToken : undefined;
-        const idToken = await user.getIdToken();
-        const response = await fetch(`${BACKEND_URL}/reminder`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${idToken}`
-          },
-          body: JSON.stringify({
-            ...(token ? { fcmToken: token, oldFcmToken } : {}),
-            options: optionsToSave
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`Backend error: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('Backend response:', result);
-        topicSyncPending = !!result.topicSyncPending;
-
-        if (token && token !== previousToken) {
-          localStorage.setItem(FCM_TOKEN_STORAGE_KEY, token);
-        }
-      } else if (!isDisablingAll) {
-        alert('Bildirim tokeni alınamadı. Lütfen tekrar deneyin.');
-        return;
-      }
-
-      const syncNote = topicSyncPending ? '\nGenel bildirim senkronu otomatik tekrar denenecek.' : '';
-      if (count === 0) {
-        setHasActiveNotifications(false);
-        localStorage.removeItem('fb_has_notifications');
-        localStorage.removeItem('fb_notification_options');
-        alert('Tüm bildirimler temizlendi!' + syncNote);
-      } else {
-        setHasActiveNotifications(true);
-        localStorage.setItem('fb_has_notifications', 'true');
-        localStorage.setItem('fb_notification_options', JSON.stringify(optionsToSave));
-        alert(`${count} bildirim ayarlandı!` + syncNote);
-      }
-
-      setSelectedOptions(optionsToSave);
-      setDraftOptions(null);
-      setShowModal(false);
-    } catch (saveError) {
-      console.error('Bildirim kaydetme hatası:', saveError);
-      alert('Bağlantı hatası! Lütfen tekrar deneyin.');
-    } finally {
-      setIsSaving(false);
-    }
+  const handleSave = async () => {
+    const saved = await saveNotifications();
+    if (saved) setShowModal(false);
   };
 
   const notificationOptions: Array<{ id: keyof NotificationOptions; label: string; description: string }> = [
@@ -461,7 +241,7 @@ const NotificationSettings = () => {
               </button>
               <button
                 type="button"
-                onClick={saveNotifications}
+                onClick={handleSave}
                 disabled={!hasDraftChanges || isSaving}
                 className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${!hasDraftChanges || isSaving ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'}`}
               >

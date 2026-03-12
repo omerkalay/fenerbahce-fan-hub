@@ -6,13 +6,23 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.7-blue)
+![Version](https://img.shields.io/badge/version-2.9.8-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.7
+## What's New in v2.9.8
+
+- **Quality Gate Hardening** - Added a strict `lint + typecheck + test + build` release gate, plus new Vitest coverage for notification decision helpers and `/api/reminder` endpoint contracts
+- **Backend Cleanup Without Behavior Drift** - Removed the legacy backend, split Firebase API handlers into focused modules, and extracted reminder handlers while preserving routes, response shapes, and topic sync behavior
+- **App State Orchestration Refactor** - Moved cached match bootstrap, live match polling/state transitions, and foreground messaging setup into dedicated hooks so the app shell is easier to reason about
+- **Single Source of Truth for Live Match Data** - `LiveMatchScore` is now prop-driven and no longer performs its own `/live-match` polling, preventing duplicate fetch flows between the app shell and the live modal
+- **Notification Settings Maintainability Pass** - Extracted notification storage, server preference load/save flow, draft state management, and token sync into dedicated hooks/helpers without changing UI or notification semantics
+- **CI Reliability Fix** - The GitHub Actions quality gate now installs `functions/` dependencies before running tests, keeping reminder contract tests aligned with the local environment
+
+<details>
+<summary>Previous: v2.9.7</summary>
 
 - **Formation Rendering Stabilization** - Single source-of-truth for formation coordinates (`formations.ts`), eliminating duplicate layout data. Preset and numeric formation renderers now use the same canonical coordinate set
 - **Role-Aware Player Assignment** - Numeric formation renderer replaced blind `formationPlace` bucket-fill with a global scoring algorithm that matches players to rows by positional depth (DEF→HOLD→MID→AM→FWD), preventing midfielders from appearing in the forward line and vice versa
@@ -20,6 +30,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **ESPN Lineup Parsing Hardening** - Removed misuse of `boxscore.form` (recent results, not tactical formation), added `normalizeFormation()` for safe string/object handling, and enriched lineup data with `positionCode`/`formationPlace` fields
 - **Turkish Text Fixes** - Fixed 20+ mojibake strings across `LiveMatchScore`, `MatchSummaryModal`, and `playerDisplay` where UTF-8 Turkish characters (ş, ı, ç, İ, ö, ü) were rendered as garbled Latin-1
 - **Substitution & Bench UI Polish** - Bench sub-in pills now use the same dark badge design language as pitch overlays. Substitution rows are more compact with subtle backgrounds, slate-toned minute badges, and tighter spacing
+
+</details>
 
 <details>
 <summary>Previous: v2.9.6</summary>
@@ -610,4 +622,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.7** | March 2026
+**v2.9.8** | March 2026
