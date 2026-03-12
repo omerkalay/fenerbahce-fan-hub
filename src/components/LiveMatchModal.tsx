@@ -1,11 +1,13 @@
 import LiveMatchScore from './LiveMatchScore';
+import type { LiveMatchData } from '../types';
 
 interface LiveMatchModalProps {
     visible: boolean;
     onClose: () => void;
+    liveMatchData: LiveMatchData | null;
 }
 
-const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose }) => {
+const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveMatchData }) => {
     if (!visible) return null;
 
     return (
@@ -38,7 +40,13 @@ const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose }) => 
 
                 {/* Live Match Component */}
                 <div className="w-full">
-                    <LiveMatchScore />
+                    {liveMatchData ? (
+                        <LiveMatchScore data={liveMatchData} />
+                    ) : (
+                        <div className="text-center text-slate-400 py-8">
+                            <p>Canlı maç verisi bulunamadı</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

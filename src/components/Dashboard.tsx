@@ -459,6 +459,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <LiveMatchModal
                 visible={showLiveMatchModal}
                 onClose={() => setShowLiveMatchModal(false)}
+                liveMatchData={liveMatchData}
             />
 
             {/* Standings Modal */}

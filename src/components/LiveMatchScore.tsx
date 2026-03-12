@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react';
-import { BACKEND_URL } from '../services/api';
 import MatchEventIcon from './MatchEventIcon';
 import { getEventVisualType } from '../utils/eventVisualType';
 import MatchLineups from './MatchLineups';
@@ -60,54 +58,11 @@ const formatIncidentLabel = (event: NonNullable<LiveMatchData['events']>[number]
     return [playerName, ...suffixes].join(' ');
 };
 
-const LiveMatchScore = () => {
-    const [liveData, setLiveData] = useState<LiveMatchData | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+interface LiveMatchScoreProps {
+    data: LiveMatchData;
+}
 
-    useEffect(() => {
-        fetchLiveScore();
-        const interval = setInterval(fetchLiveScore, 30000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchLiveScore = async () => {
-        try {
-            const response = await fetch(`${BACKEND_URL}/live-match`);
-            if (!response.ok) {
-                throw new Error('Canlı maç verisi alınamadı');
-            }
-            const data: LiveMatchData = await response.json();
-            if (data.matchState === 'no-match') {
-                setError('Şu anda canlı maç yok');
-                setLiveData(null);
-            } else {
-                setLiveData(data);
-                setError(null);
-            }
-        } catch (err) {
-            console.error('Error fetching live score:', err);
-            setError(err instanceof Error ? err.message : 'Canlı maç bilgisi yüklenemedi');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
-            </div>
-        );
-    }
-
-    if (error || !liveData) {
-        return (
-            <div className="text-center text-red-400 py-8">
-                <p>{error || 'Veri bulunamadı'}</p>
-            </div>
-        );
-    }
+const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
 
     const orderedStats: (MatchStat & { label: string })[] = STAT_GROUPS
         .map((group) => {
