@@ -19,6 +19,7 @@ import {
     formatGoalSummaryText,
     normalizeStartingXIData
 } from '../utils/dashboardHelpers';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData } from '../types';
 
 interface DashboardProps {
@@ -71,17 +72,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         };
     }, []);
 
-    // Modal açıkken arka plan scroll'unu engelle
-    useEffect(() => {
-        if (showLiveMatchModal || showStandingsModal || showStartingXIModal) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [showLiveMatchModal, showStandingsModal, showStartingXIModal]);
+    useBodyScrollLock(showLiveMatchModal || showStandingsModal || showStartingXIModal);
 
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
     if (!matchData) {

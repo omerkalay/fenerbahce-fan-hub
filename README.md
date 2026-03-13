@@ -6,19 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.9-blue)
+![Version](https://img.shields.io/badge/version-2.9.10-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.9
+## What's New in v2.9.10
+
+- **Notification Hook Coverage** - Added targeted tests for preference loading and FCM token sync so stale requests, abort cleanup, and local persistence behavior are now locked down
+- **Poll Contract Protection** - Added frontend and backend poll tests covering sign-in gating, vote submission, duplicate-vote handling, response shape, and vote count normalization
+- **Shared Body Scroll Lock Hook** - Replaced repeated `document.body.style.overflow` logic with one reusable hook across dashboard, notification settings, and fixture summary flows
+- **DOM Test Environment Stabilization** - Added a dedicated DOM test environment for the new hook and component tests while leaving utility and backend suites on the lighter default setup
+- **Maintenance Confidence Pass** - Expanded regression coverage around notifications and polls without changing the user-facing feature set
+
+<details>
+<summary>Previous: v2.9.9</summary>
 
 - **Release Gate for Deploys** - GitHub Pages deploy now waits for the CI quality workflow to succeed and checks out the exact tested commit SHA before publishing
 - **Node Runtime Alignment** - CI, Pages build, and Firebase Functions are all pinned to Node 22 to avoid runtime drift between verification and production
 - **Notification Race Condition Guards** - Notification preference loading and FCM token sync now abort stale in-flight work so old user sessions cannot overwrite current state or complete stale syncs
 - **ESPN Fetch Timeout Hardening** - Shared timeout wrappers now protect live match and ESPN fixture/stat calls from hanging indefinitely when the upstream API is slow
 - **Maintenance Cleanup Pass** - Removed dead match bootstrap state, dropped unused `react-router-dom`, and kept API metadata aligned with the current app release
+
+</details>
 
 <details>
 <summary>Previous: v2.9.8</summary>
@@ -633,4 +644,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.9** | March 2026
+**v2.9.10** | March 2026

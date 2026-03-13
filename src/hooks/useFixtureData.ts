@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api';
 import { useCooldown } from './useCooldown';
+import useBodyScrollLock from './useBodyScrollLock';
 import type { EspnFixtureMatch, EspnFixtureData, MatchSummaryData } from '../types';
 
 import { localizeTeamName } from '../utils/localize';
@@ -29,18 +30,7 @@ export function useFixtureData() {
     const [competitionFilter, setCompetitionFilter] = useState<string>('all');
     const nextMatchFocusRef = useRef<HTMLElement | null>(null);
 
-    // Lock body scroll while summary modal is open
-    useEffect(() => {
-        if (activeSummaryMatch) {
-            document.body.style.overflow = 'hidden';
-        } else {
-            document.body.style.overflow = 'unset';
-        }
-
-        return () => {
-            document.body.style.overflow = 'unset';
-        };
-    }, [activeSummaryMatch]);
+    useBodyScrollLock(activeSummaryMatch !== null);
 
     // Initial data load
     useEffect(() => {

@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { NotificationOptions } from '../types';
 import { useAuth } from '../contexts/authContextDef';
 import { getSignInErrorMessage } from '../utils/authHelpers';
 import useNotificationPreferences from '../hooks/useNotificationPreferences';
+import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
 const NotificationSettings = () => {
@@ -23,17 +24,7 @@ const NotificationSettings = () => {
     saveNotifications
   } = useNotificationPreferences(user);
 
-  useEffect(() => {
-    if (showModal) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
-    }
-
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
-  }, [showModal]);
+  useBodyScrollLock(showModal);
 
   const handleOpenModal = () => {
     setAuthError(null);
