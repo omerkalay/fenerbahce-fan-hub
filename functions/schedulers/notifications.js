@@ -1,5 +1,5 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { admin, db, FENERBAHCE_ID, ISTANBUL_TIMEZONE, formatDateKey } = require('../config');
+const { admin, db, ISTANBUL_TIMEZONE, formatDateKey } = require('../config');
 
 /**
  * Check Match Notifications - Her dakika çalışır
@@ -92,8 +92,6 @@ const checkMatchNotifications = onSchedule(
                 if (matchDayStr === todayStr) {
                     const lastDaily = playerData.lastDailyNotification;
                     if (!lastDaily || lastDaily !== todayStr) {
-                        const isHome = nextMatch.homeTeam.id === FENERBAHCE_ID;
-                        const opponent = isHome ? nextMatch.awayTeam.name : nextMatch.homeTeam.name;
                         const timeString = matchDate.toLocaleTimeString('tr-TR', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -107,7 +105,7 @@ const checkMatchNotifications = onSchedule(
                                 token,
                                 data: {
                                     title: '📅 Bugün Maç Var!',
-                                    body: `💛💙 Fenerbahçe - ${opponent} | ${timeString}`,
+                                    body: `💛💙 ${nextMatch.homeTeam.name} - ${nextMatch.awayTeam.name} | ${timeString}`,
                                     url: 'https://omerkalay.com/fenerbahce-fan-hub/'
                                 }
                             },
@@ -137,8 +135,6 @@ const checkMatchNotifications = onSchedule(
                     const triggerWindowEnd = triggerTime + (5 * 60 * 1000);
 
                     if (now >= triggerTime && now < triggerWindowEnd) {
-                        const isHome = match.homeTeam.id === FENERBAHCE_ID;
-                        const opponent = isHome ? match.awayTeam.name : match.homeTeam.name;
                         const timeString = new Date(matchTime).toLocaleTimeString('tr-TR', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -152,7 +148,7 @@ const checkMatchNotifications = onSchedule(
                             message: {
                                 token,
                                 data: {
-                                    title: `💛💙 Fenerbahçe - ${opponent}`,
+                                    title: `💛💙 ${match.homeTeam.name} - ${match.awayTeam.name}`,
                                     body: `${timeString} · ${config.timeText}`,
                                     matchId: matchId,
                                     type: optionKey,
