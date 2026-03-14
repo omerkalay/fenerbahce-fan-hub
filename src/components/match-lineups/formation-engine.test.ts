@@ -312,6 +312,32 @@ describe('buildPresetRows', () => {
         expect(rows).not.toBeNull();
         expect(rows!.length).toBeGreaterThan(0);
     });
+
+    it('maps 4-3-2-1 starters into the correct christmas tree rows', () => {
+        const starters: LineupPlayer[] = [
+            makePlayer({ name: 'Mert Gunok', positionCode: 'GK', formationPlace: 1 }),
+            makePlayer({ name: 'Mert Muldur', positionCode: 'RB', formationPlace: 2 }),
+            makePlayer({ name: 'Munir Mercan', positionCode: 'LB', formationPlace: 3 }),
+            makePlayer({ name: 'Matteo Guendouzi', positionCode: 'CM', formationPlace: 4 }),
+            makePlayer({ name: 'Yigit Demir', positionCode: 'CD-R', formationPlace: 5 }),
+            makePlayer({ name: 'Jayden Oosterwolde', positionCode: 'CD-L', formationPlace: 6 }),
+            makePlayer({ name: 'Ismail Yuksek', positionCode: 'CM-L', formationPlace: 7 }),
+            makePlayer({ name: 'Ngolo Kante', positionCode: 'CM-R', formationPlace: 8 }),
+            makePlayer({ name: 'Sidiki Cherif', positionCode: 'F', formationPlace: 9 }),
+            makePlayer({ name: 'Fred', positionCode: 'CF-R', formationPlace: 10 }),
+            makePlayer({ name: 'Kerem Akturkoglu', positionCode: 'CF-L', formationPlace: 11 }),
+        ];
+
+        const result = buildRows('4-3-2-1', starters);
+        const findRow = (y: number) => result.rows.find((row) => row.y === y);
+
+        expect(result.strategy).toBe('preset');
+        expect(result.renderedFormation).toBe('4-3-2-1');
+        expect(findRow(16)?.slots[0]?.player.name).toBe('Sidiki Cherif');
+        expect(findRow(34)?.slots.map((slot) => slot.player.name)).toEqual(['Kerem Akturkoglu', 'Fred']);
+        expect(findRow(50)?.slots.map((slot) => slot.player.name)).toEqual(['Ismail Yuksek', 'Matteo Guendouzi', 'Ngolo Kante']);
+        expect(findRow(79)?.slots.map((slot) => slot.player.name)).toEqual(['Munir Mercan', 'Jayden Oosterwolde', 'Yigit Demir', 'Mert Muldur']);
+    });
 });
 
 // ─── buildNumericFormationRows ───────────────────────────

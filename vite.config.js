@@ -1,9 +1,13 @@
-﻿import { defineConfig, loadEnv } from 'vite';
+﻿import { readFileSync } from 'node:fs';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 const DEFAULT_BACKEND_ORIGIN = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net';
 const APP_BASE = '/fenerbahce-fan-hub/';
+const APP_VERSION = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8')
+).version;
 
 const normalizeBaseUrl = (value = '') => value.replace(/\/+$/g, '');
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -79,13 +83,13 @@ export default defineConfig(({ mode }) => {
               urlPattern: new RegExp(`${backendPattern}/api/(player|team)-image/\\d+`),
               handler: 'CacheFirst',
               options: {
-                cacheName: 'fb-image-cache',
+                cacheName: `fb-image-cache-${APP_VERSION}`,
                 expiration: {
                   maxEntries: 60,
                   maxAgeSeconds: 60 * 60 * 24
                 },
                 cacheableResponse: {
-                  statuses: [0, 200]
+                  statuses: [200]
                 }
               }
             }
@@ -93,6 +97,9 @@ export default defineConfig(({ mode }) => {
         }
       })
     ],
+    define: {
+      __APP_VERSION__: JSON.stringify(APP_VERSION)
+    },
     base: APP_BASE
   };
 });

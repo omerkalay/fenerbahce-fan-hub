@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchSquad } from '../services/api';
+import PlayerImage from './PlayerImage';
 import type { Player } from '../types';
 
 const SquadList = () => {
@@ -74,11 +75,14 @@ const SquadList = () => {
                                 {groupPlayers.map(player => (
                                     <div key={player.id} className="p-3 flex items-center gap-4 hover:bg-white/5 transition-colors">
                                         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center overflow-hidden border border-blue-800 shrink-0">
-                                            {player.photo ? (
-                                                <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
-                                            ) : (
+                                            <PlayerImage
+                                                src={player.photo}
+                                                alt={player.name}
+                                                className="w-full h-full object-cover"
+                                                fallback={
                                                 <span className="text-yellow-400 font-bold text-xs">{player.number || '-'}</span>
-                                            )}
+                                                }
+                                            />
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex justify-between items-center">

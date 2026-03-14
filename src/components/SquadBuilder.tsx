@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, X, AlertCircle } from 'lucide-react';
 import { fetchSquad, fetchInjuries } from '../services/api';
+import PlayerImage from './PlayerImage';
 import type { Player, PlayerStatus, PositionCoord } from '../types';
 
 const POSITIONS: Record<string, PositionCoord> = {
@@ -91,11 +92,14 @@ const SquadBuilder = () => {
                                 <>
                                     <div className="relative">
                                         <div className="w-12 h-12 rounded-full bg-gradient-to-b from-blue-800 to-blue-900 border-2 border-yellow-400 shadow-lg flex items-center justify-center overflow-hidden z-10 relative">
-                                            {player.photo ? (
-                                                <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
-                                            ) : (
+                                            <PlayerImage
+                                                src={player.photo}
+                                                alt={player.name}
+                                                className="w-full h-full object-cover"
+                                                fallback={
                                                 <span className="text-white font-bold text-sm">{player.number || '?'}</span>
-                                            )}
+                                                }
+                                            />
 
                                             {player.status?.type === 'injured' && (
                                                 <div className="absolute -top-1 -right-1 bg-white rounded-full p-0.5 shadow-sm z-20">
@@ -144,11 +148,14 @@ const SquadBuilder = () => {
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-blue-900 flex items-center justify-center overflow-hidden border border-blue-800">
-                                                {player.photo ? (
-                                                    <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
-                                                ) : (
+                                                <PlayerImage
+                                                    src={player.photo}
+                                                    alt={player.name}
+                                                    className="w-full h-full object-cover"
+                                                    fallback={
                                                     <span className="text-yellow-400 font-bold text-xs">{player.number || '-'}</span>
-                                                )}
+                                                    }
+                                                />
                                             </div>
                                             <div>
                                                 <p className="text-white font-medium text-sm">{player.name}</p>

@@ -113,9 +113,9 @@ const matchOnlyFormations: Record<string, Record<string, { top: string; left: st
         CB1: { top: '79%', left: '35%' },
         CB2: { top: '79%', left: '65%' },
         RB: { top: '79%', left: '88%' },
-        CM1: { top: '53%', left: '24%' },
-        CM2: { top: '49%', left: '50%' },
-        CM3: { top: '53%', left: '76%' },
+        CM1: { top: '50%', left: '24%' },
+        CM2: { top: '50%', left: '50%' },
+        CM3: { top: '50%', left: '76%' },
         CAM: { top: '34%', left: '50%' },
         ST1: { top: '18%', left: '36%' },
         ST2: { top: '18%', left: '64%' }
@@ -132,6 +132,19 @@ const matchOnlyFormations: Record<string, Record<string, { top: string; left: st
         CAM: { top: '36%', left: '50%' },
         ST1: { top: '18%', left: '34%' },
         ST2: { top: '18%', left: '66%' }
+    },
+    '4-3-2-1': {
+        GK: { top: '93%', left: '50%' },
+        LB: { top: '79%', left: '12%' },
+        CB1: { top: '79%', left: '35%' },
+        CB2: { top: '79%', left: '65%' },
+        RB: { top: '79%', left: '88%' },
+        CM1: { top: '50%', left: '24%' },
+        CM2: { top: '50%', left: '50%' },
+        CM3: { top: '50%', left: '76%' },
+        LAM: { top: '34%', left: '36%' },
+        RAM: { top: '34%', left: '64%' },
+        ST: { top: '16%', left: '50%' }
     }
 };
 

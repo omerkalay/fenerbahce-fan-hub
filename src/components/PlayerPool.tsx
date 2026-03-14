@@ -1,3 +1,4 @@
+import PlayerImage from './PlayerImage';
 import type { Player } from '../types';
 
 interface PlayerPoolProps {
@@ -24,13 +25,17 @@ const PlayerPool = ({ squad, loading, isTouchDevice, onDragStart }: PlayerPoolPr
                                 className="rounded-lg p-2 flex flex-col items-center gap-1 cursor-move active:scale-95 transition-transform bg-slate-900/75 border border-white/10 shadow-lg hover:bg-slate-800/80"
                             >
                                 <div className="w-10 h-10 rounded-full bg-slate-800 overflow-hidden border border-white/10 pointer-events-none">
-                                    {player.photo ? (
-                                        <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" draggable="false" />
-                                    ) : (
+                                    <PlayerImage
+                                        src={player.photo}
+                                        alt={player.name}
+                                        className="w-full h-full object-cover"
+                                        draggable="false"
+                                        fallback={
                                         <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
                                             {player.number}
                                         </div>
-                                    )}
+                                        }
+                                    />
                                 </div>
                                 <span className="text-[9px] text-center leading-tight line-clamp-2 h-6 flex items-center pointer-events-none">
                                     {player.name.split(' ').slice(-1)[0]}

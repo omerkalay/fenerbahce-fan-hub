@@ -3,6 +3,7 @@ import { fetchSquad } from '../services/api';
 import { toPng } from 'html-to-image';
 import { PITCH_SVG, formations, getPositionFamily } from '../data/formations';
 import PlayerSelectionModal from './PlayerSelectionModal';
+import PlayerImage from './PlayerImage';
 import PlayerPool from './PlayerPool';
 import type { Player, FormationName, PitchPlayers, PositionCoord } from '../types';
 
@@ -310,11 +311,14 @@ const FormationBuilder = () => {
                                     }}
                                 >
                                     <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-move z-10 group-hover:scale-110 transition-transform">
-                                        {player.photo ? (
-                                            <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                        ) : (
+                                        <PlayerImage
+                                            src={player.photo}
+                                            alt={player.name}
+                                            className="w-full h-full object-cover"
+                                            fallback={
                                             <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
-                                        )}
+                                            }
+                                        />
                                     </div>
                                     {!isExporting && (
                                         <button

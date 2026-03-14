@@ -85,6 +85,7 @@ export const FORMATION_ALIASES: Record<string, string> = {
     '4-4-1-1': '4-4-1-1',
     '4-2-3-1': '4-2-3-1',
     '4-3-1-2': '4-3-1-2',
+    '4-3-2-1': '4-3-2-1',
     '4-1-4-1': '4-1-4-1',
     '3-5-2': '3-5-2',
     '4-1-2-1-2': '4-1-2-1-2 Diamond',
@@ -95,6 +96,7 @@ export const FORMATION_ALIASES: Record<string, string> = {
 export const FORMATION_PLACE_SLOT_MAPS: Record<string, Record<number, SlotKey>> = {
     '4-2-3-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CDM1', 5: 'CB2', 6: 'CB1', 7: 'RAM', 8: 'CDM2', 9: 'ST', 10: 'CAM', 11: 'LAM' },
     '4-3-1-2': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM2', 5: 'CB2', 6: 'CB1', 7: 'CM3', 8: 'CAM', 9: 'ST2', 10: 'ST1', 11: 'CM1' },
+    '4-3-2-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM2', 5: 'CB2', 6: 'CB1', 7: 'CM1', 8: 'CM3', 9: 'ST', 10: 'RAM', 11: 'LAM' },
     '4-1-4-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CDM', 5: 'CB2', 6: 'CB1', 7: 'RM', 8: 'CM2', 9: 'ST', 10: 'CM1', 11: 'LM' },
     '4-4-1-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM1', 5: 'CB2', 6: 'CB1', 7: 'RM', 8: 'CM2', 9: 'ST', 10: 'CAM', 11: 'LM' },
     '4-4-2': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM1', 5: 'CB2', 6: 'CB1', 7: 'RM', 8: 'CM2', 9: 'ST2', 10: 'ST1', 11: 'LM' },
@@ -328,10 +330,12 @@ const getCandidateSlotKeys = (player: LineupPlayer, formation: string | null): S
         return presetFormation === '4-2-3-1' ? ['RAM', 'RW', 'ST2'] : ['RW', 'ST2', 'RAM'];
     }
     if (code === 'CF-L') {
-        return presetFormation === '4-2-3-1' ? ['LAM', 'LW', 'ST1'] : ['ST1', 'LW', 'LAM'];
+        if (presetFormation === '4-2-3-1' || presetFormation === '4-3-2-1') return ['LAM', 'LW', 'ST1'];
+        return ['ST1', 'LW', 'LAM'];
     }
     if (code === 'CF-R') {
-        return presetFormation === '4-2-3-1' ? ['RAM', 'RW', 'ST2', 'ST'] : ['ST2', 'ST', 'RW', 'RAM'];
+        if (presetFormation === '4-2-3-1' || presetFormation === '4-3-2-1') return ['RAM', 'RW', 'ST2', 'ST'];
+        return ['ST2', 'ST', 'RW', 'RAM'];
     }
     if (code === 'CF' || code === 'ST' || code === 'F' || position.includes('forward') || position.includes('striker')) return ['ST', 'ST1', 'ST2', 'LW', 'RW'];
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { StartingXIData } from '../types';
 import { fetchSquad } from '../services/api';
 import { buildSquadPhotoMaps, findPlayerPhoto, type SquadPhotoMaps } from '../utils/squadPhotoLookup';
+import PlayerImage from './PlayerImage';
 
 interface StartingXIModalProps {
     visible: boolean;
@@ -50,18 +51,17 @@ const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClos
                             return (
                             <div key={`s-${idx}`} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
                                 <div className="w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                                    {photo ? (
-                                        <img
-                                            src={photo}
-                                            alt=""
-                                            className="w-full h-full object-cover"
-                                            loading="lazy"
-                                        />
-                                    ) : (
+                                    <PlayerImage
+                                        src={photo}
+                                        alt={player.name}
+                                        className="w-full h-full object-cover"
+                                        loading="lazy"
+                                        fallback={
                                         <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
                                             {player.number}
                                         </div>
-                                    )}
+                                        }
+                                    />
                                 </div>
                                 <span className="text-sm font-bold text-yellow-400/80 w-7 text-right">{player.number}</span>
                                 <span className="text-sm text-white font-medium">{player.name}</span>
@@ -79,18 +79,17 @@ const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClos
                                     return (
                                     <div key={`b-${idx}`} className="flex items-center gap-2 py-1">
                                         <div className="w-6 h-6 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                                            {photo ? (
-                                                <img
-                                                    src={photo}
-                                                    alt=""
-                                                    className="w-full h-full object-cover"
-                                                    loading="lazy"
-                                                />
-                                            ) : (
+                                            <PlayerImage
+                                                src={photo}
+                                                alt={player.name}
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                                fallback={
                                                 <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-500">
                                                     {player.number}
                                                 </div>
-                                            )}
+                                                }
+                                            />
                                         </div>
                                         <span className="text-xs text-slate-400 truncate">{player.name}</span>
                                     </div>

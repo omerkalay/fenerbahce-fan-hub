@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import PlayerImage from './PlayerImage';
 import type { Player, PitchPlayers } from '../types';
 
 interface PlayerSelectionModalProps {
@@ -90,13 +91,16 @@ const PlayerSelectionModal = ({ visible, squad, activePitchPlayers, onSelect, on
                                             }`}
                                     >
                                         <div className="w-12 h-12 rounded-full bg-slate-800 overflow-hidden border border-white/10">
-                                            {player.photo ? (
-                                                <img src={player.photo} alt={player.name} className="w-full h-full object-cover" crossOrigin="anonymous" />
-                                            ) : (
+                                            <PlayerImage
+                                                src={player.photo}
+                                                alt={player.name}
+                                                className="w-full h-full object-cover"
+                                                fallback={
                                                 <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
                                                     {player.number}
                                                 </div>
-                                            )}
+                                                }
+                                            />
                                         </div>
                                         <span className="text-[9px] text-center leading-tight line-clamp-2 h-6 flex items-center">
                                             {player.name.split(' ').slice(-1)[0]}

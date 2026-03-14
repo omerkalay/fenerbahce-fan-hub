@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchSquad } from '../services/api';
+import PlayerImage from './PlayerImage';
 import type { Player, PositionCoord } from '../types';
 
 const ProbableLineup = () => {
@@ -91,11 +92,14 @@ const ProbableLineup = () => {
                             style={style}
                         >
                             <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative">
-                                {player.photo ? (
-                                    <img src={player.photo} alt={player.name} className="w-full h-full object-cover" />
-                                ) : (
+                                <PlayerImage
+                                    src={player.photo}
+                                    alt={player.name}
+                                    className="w-full h-full object-cover"
+                                    fallback={
                                     <div className="w-full h-full flex items-center justify-center text-xs font-bold">{player.number}</div>
-                                )}
+                                    }
+                                />
                             </div>
                             <div className="mt-1 bg-slate-900/80 px-2 py-0.5 rounded text-[10px] text-white font-medium truncate w-full text-center border border-white/10 backdrop-blur-sm">
                                 {player.name.split(' ').pop()}

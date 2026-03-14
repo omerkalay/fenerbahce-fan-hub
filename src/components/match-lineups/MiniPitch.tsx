@@ -1,4 +1,5 @@
 import { PITCH_SVG } from '../../data/formations';
+import PlayerImage from '../PlayerImage';
 import { localizePlayerName } from '../../utils/playerDisplay';
 import { findPlayerPhoto, normalizeLookupKey } from '../../utils/squadPhotoLookup';
 import type { SquadPhotoMaps } from '../../utils/squadPhotoLookup';
@@ -44,16 +45,15 @@ export default function MiniPitch({
                             >
                                 <div className="relative">
                                     <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-yellow-400 bg-slate-950 text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:h-10 sm:w-10 sm:text-xs">
-                                        {photoUrl ? (
-                                            <img
-                                                src={photoUrl}
-                                                alt={displayName}
-                                                className="h-full w-full object-cover"
-                                                loading="lazy"
-                                            />
-                                        ) : (
+                                        <PlayerImage
+                                            src={photoUrl}
+                                            alt={displayName}
+                                            className="h-full w-full object-cover"
+                                            loading="lazy"
+                                            fallback={
                                             player.jersey || displayName.slice(0, 1).toUpperCase()
-                                        )}
+                                            }
+                                        />
                                     </span>
                                     {subOutMinute && (
                                         <span className="absolute -right-3 -top-2 inline-flex items-center gap-0.5 rounded-full border border-white/15 bg-slate-950/95 px-1 py-[2px] text-[8px] font-semibold text-rose-300 shadow-lg">
