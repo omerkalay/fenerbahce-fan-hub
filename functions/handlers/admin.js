@@ -17,7 +17,7 @@ async function handleHealth(req, res) {
 }
 
 async function handleRefresh(req, res) {
-    const adminKey = req.headers['x-admin-key'] || req.query.key;
+    const adminKey = req.headers['x-admin-key'];
     if (!adminKey || adminKey !== adminRefreshKey.value()) {
         return res.status(403).json({ error: 'Forbidden' });
     }
