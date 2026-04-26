@@ -14,10 +14,11 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ## What's New in v2.9.11
 
-- **SofaScore Image Proxy Restore** - Confirmed SofaScore's image CDN still returns images over HTTP but 403s over HTTPS, so the backend proxy keeps the HTTP origin for both player and team images
-- **Backend-Only Team Logos** - Removed the direct browser fallback to SofaScore; team badges use `/api/team-image/:id` again so the HTTPS app never hotlinks the upstream HTTP image CDN
+- **Daily Image Cache Refresh** - The 06:00 TR refresh and protected `/refresh` now cache player photos and team logos in Firebase once, using RapidAPI's SofaScore image/logo endpoints (`players/get-image`, `teams/get-logo`) only during refresh
+- **Backend-Only Cached Images** - Public `/api/player-image/:id` and `/api/team-image/:id` serve cached backend binaries only, so normal app traffic no longer spends RapidAPI image calls
 - **Image Request Noise Reduction** - Raised the asset rate-limit budget for squad/lineup image bursts and disabled client-side player image retries by default to avoid repeated failed requests
-- **Image Response Guardrails** - The backend image fetcher follows redirects, logs upstream status failures, and rejects non-image responses before returning them
+- **Image Response Guardrails** - The backend image fetcher follows redirects, logs upstream status failures, rejects non-image responses, and keeps the old SofaScore CDN path only as a fallback
+- **Deploy Note** - After deploying Functions, run the protected `/refresh` once to seed the new `imageCache`; the scheduled 06:00 TR refresh keeps it warm after that
 
 <details>
 <summary>Previous: v2.9.10</summary>

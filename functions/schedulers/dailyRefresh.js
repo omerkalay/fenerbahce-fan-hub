@@ -1,6 +1,7 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db, rapidApiKey, rapidApiHost, sleep, formatDateKey } = require('../config');
 const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
+const { refreshCachedImagesForCache } = require('../services/imageCache');
 
 /**
  * Daily Data Refresh - Günde 1 kez çalışır
@@ -53,6 +54,12 @@ const dailyDataRefresh = onSchedule({
         // 3. Save to Firebase
         console.log('3️⃣ Saving to Firebase cache...');
         await db.ref('cache').set(cache);
+        try {
+            const imageStats = await refreshCachedImagesForCache(cache);
+            console.log('Image cache refresh complete:', imageStats);
+        } catch (error) {
+            console.error(`Image cache refresh failed: ${error.message}`);
+        }
         console.log(`✨ Cache updated at ${new Date().toISOString()}`);
 
         // 5. Eski poll verilerini temizle

@@ -1,5 +1,6 @@
 const { db, adminRefreshKey, sleep } = require('../config');
 const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
+const { refreshCachedImagesForCache } = require('../services/imageCache');
 
 async function handleHealth(req, res) {
     const cacheSnapshot = await db.ref('cache/lastUpdate').once('value');
@@ -7,11 +8,14 @@ async function handleHealth(req, res) {
 
     const notifSnapshot = await db.ref('notifications').once('value');
     const notifCount = Object.keys(notifSnapshot.val() || {}).length;
+    const imageCacheSnapshot = await db.ref('imageCache/meta').once('value');
+    const imageCache = imageCacheSnapshot.val() || null;
 
     return res.json({
         status: 'ok',
         platform: 'Firebase Cloud Functions',
         lastCacheUpdate: lastUpdate ? new Date(lastUpdate).toISOString() : null,
+        imageCache,
         subscribedUsers: notifCount
     });
 }
@@ -59,6 +63,7 @@ async function handleRefresh(req, res) {
         }
 
         await db.ref('cache').set(cache);
+        const imageStats = await refreshCachedImagesForCache(cache);
 
         return res.json({
             success: true,
@@ -66,7 +71,8 @@ async function handleRefresh(req, res) {
             lastUpdate: new Date(cache.lastUpdate).toISOString(),
             stats: {
                 matches: cache.next3Matches.length,
-                squad: cache.squad.length
+                squad: cache.squad.length,
+                images: imageStats
             }
         });
 

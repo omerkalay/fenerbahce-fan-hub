@@ -1,4 +1,4 @@
-const { fetchImage } = require('../services/sofascore');
+const { readCachedImage } = require('../services/imageCache');
 
 async function handlePlayerImage(req, res, playerId) {
     if (!playerId) {
@@ -6,12 +6,14 @@ async function handlePlayerImage(req, res, playerId) {
     }
 
     try {
-        const result = await fetchImage('player', playerId);
+        const result = await readCachedImage('player', playerId);
         if (!result) {
-            return res.status(404).send('Image not found');
+            console.warn(`Player image cache miss for ${playerId}`);
+            return res.status(404).send('Image not cached');
         }
 
         res.set('Content-Type', result.contentType);
+        res.set('X-Image-Source', result.source);
         res.set('Cache-Control', 'public, max-age=86400');
         return res.send(result.buffer);
     } catch (error) {
@@ -26,12 +28,14 @@ async function handleTeamImage(req, res, teamId) {
     }
 
     try {
-        const result = await fetchImage('team', teamId);
+        const result = await readCachedImage('team', teamId);
         if (!result) {
-            return res.status(404).send('Image not found');
+            console.warn(`Team image cache miss for ${teamId}`);
+            return res.status(404).send('Image not cached');
         }
 
         res.set('Content-Type', result.contentType);
+        res.set('X-Image-Source', result.source);
         res.set('Cache-Control', 'public, max-age=86400');
         return res.send(result.buffer);
     } catch (error) {

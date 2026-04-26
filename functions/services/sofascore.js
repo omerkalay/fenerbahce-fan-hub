@@ -32,30 +32,79 @@ const fetchSquad = async () => {
     }));
 };
 
-const fetchImage = async (type, id) => {
-    const imageUrl = `${SOFASCORE_IMAGE_BASE}/${type}/${id}/image`;
-    const response = await fetch(imageUrl, {
-        redirect: 'follow',
-        headers: {
-            'User-Agent': IMAGE_USER_AGENT,
-            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
-        }
-    });
+const IMAGE_ACCEPT = 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8';
+const RAPIDAPI_IMAGE_ENDPOINTS = {
+    player: { route: '/players/get-image', param: 'playerId' },
+    team: { route: '/teams/get-logo', param: 'teamId' }
+};
+
+const getImageHeaders = () => ({
+    'User-Agent': IMAGE_USER_AGENT,
+    'Accept': IMAGE_ACCEPT
+});
+
+const readImageResponse = async (response, type, id, source) => {
     if (!response.ok) {
-        console.warn(`SofaScore image fetch failed for ${type}/${id}: ${response.status}`);
+        console.warn(`${source} image fetch failed for ${type}/${id}: ${response.status}`);
+        return null;
+    }
+
+    if (response.status === 204) {
+        console.warn(`${source} image fetch returned no content for ${type}/${id}`);
         return null;
     }
 
     const contentType = response.headers.get('content-type') || 'image/png';
     if (!contentType.startsWith('image/')) {
-        console.warn(`SofaScore image fetch returned non-image content for ${type}/${id}: ${contentType}`);
+        console.warn(`${source} image fetch returned non-image content for ${type}/${id}: ${contentType}`);
+        return null;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length === 0) {
+        console.warn(`${source} image fetch returned an empty body for ${type}/${id}`);
         return null;
     }
 
     return {
         contentType,
-        buffer: Buffer.from(await response.arrayBuffer())
+        source,
+        buffer
     };
+};
+
+const fetchRapidApiImage = async (type, id) => {
+    const endpoint = RAPIDAPI_IMAGE_ENDPOINTS[type];
+    if (!endpoint) return null;
+
+    const imageUrl = new URL(`https://${getApiHost()}${endpoint.route}`);
+    imageUrl.searchParams.set(endpoint.param, id);
+    const response = await fetch(imageUrl, {
+        redirect: 'follow',
+        headers: {
+            ...getSofascoreHeaders(),
+            ...getImageHeaders()
+        }
+    });
+
+    return readImageResponse(response, type, id, 'RapidAPI SofaScore');
+};
+
+const fetchSofascoreCdnImage = async (type, id) => {
+    const imageUrl = `${SOFASCORE_IMAGE_BASE}/${type}/${id}/image`;
+    const response = await fetch(imageUrl, {
+        redirect: 'follow',
+        headers: getImageHeaders()
+    });
+
+    return readImageResponse(response, type, id, 'SofaScore CDN');
+};
+
+const fetchImage = async (type, id) => {
+    const rapidApiImage = await fetchRapidApiImage(type, id);
+    if (rapidApiImage) return rapidApiImage;
+
+    return fetchSofascoreCdnImage(type, id);
 };
 
 module.exports = {
