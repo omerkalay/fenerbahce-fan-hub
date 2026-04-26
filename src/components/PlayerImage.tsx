@@ -18,7 +18,7 @@ const PlayerImage = ({
     src,
     alt,
     fallback,
-    retryCount = 2,
+    retryCount = 0,
     crossOrigin = 'anonymous',
     ...imgProps
 }: PlayerImageProps) => {

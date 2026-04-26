@@ -14,9 +14,10 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ## What's New in v2.9.11
 
-- **Team Logo Proxy Recovery** - Backend image proxy now uses SofaScore's HTTPS image origin instead of the legacy HTTP endpoint that started returning missing images
-- **Backend-First Logo Fallback** - Team badges still prefer `/api/team-image/:id`, but fall back once to the public SofaScore logo URL if the proxy is unavailable, preventing repeated 404 noise and blank badges
-- **Image Response Guardrails** - The backend image fetcher now follows redirects, logs upstream status failures, and rejects non-image responses before caching or returning them
+- **SofaScore Image Proxy Restore** - Confirmed SofaScore's image CDN still returns images over HTTP but 403s over HTTPS, so the backend proxy keeps the HTTP origin for both player and team images
+- **Backend-Only Team Logos** - Removed the direct browser fallback to SofaScore; team badges use `/api/team-image/:id` again so the HTTPS app never hotlinks the upstream HTTP image CDN
+- **Image Request Noise Reduction** - Raised the asset rate-limit budget for squad/lineup image bursts and disabled client-side player image retries by default to avoid repeated failed requests
+- **Image Response Guardrails** - The backend image fetcher follows redirects, logs upstream status failures, and rejects non-image responses before returning them
 
 <details>
 <summary>Previous: v2.9.10</summary>

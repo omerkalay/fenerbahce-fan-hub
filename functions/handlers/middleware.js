@@ -30,7 +30,7 @@ async function requireAuthenticatedUid(req, res) {
 const RATE_LIMIT_CONFIGS = {
     default: { windowMs: 60 * 1000, max: 120 },
     expensive: { windowMs: 60 * 1000, max: 20 },
-    asset: { windowMs: 60 * 1000, max: 90 },
+    asset: { windowMs: 60 * 1000, max: 240 },
     write: { windowMs: 15 * 60 * 1000, max: 25 },
     health: { windowMs: 60 * 1000, max: 10 }
 };

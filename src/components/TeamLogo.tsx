@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { BACKEND_URL } from '../services/api';
 
-const SOFASCORE_TEAM_IMAGE_BASE = 'https://img.sofascore.com/api/v1/team';
-const buildBackendLogoUrl = (teamId: number): string => `${BACKEND_URL}/team-image/${teamId}`;
-const buildFallbackLogoUrl = (teamId: number): string => `${SOFASCORE_TEAM_IMAGE_BASE}/${teamId}/image`;
+const buildLogoUrl = (teamId: number): string => `${BACKEND_URL}/team-image/${teamId}`;
 
 interface TeamLogoProps {
     teamId: number | null | undefined;
@@ -19,33 +17,22 @@ const TeamLogo = ({
     wrapperClassName = '',
     imageClassName = ''
 }: TeamLogoProps) => {
-    const [source, setSource] = useState<'backend' | 'fallback'>('backend');
+    const [src, setSrc] = useState<string | null>(() => (teamId ? buildLogoUrl(teamId) : null));
     const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'idle'>(teamId ? 'loading' : 'idle');
 
     useEffect(() => {
         if (!teamId) {
+            setSrc(null);
             setStatus('idle');
             return;
         }
-        setSource('backend');
+        setSrc(buildLogoUrl(teamId));
         setStatus('loading');
     }, [teamId]);
 
     const handleError = () => {
-        if (source === 'backend') {
-            setSource('fallback');
-            setStatus('loading');
-            return;
-        }
-
         setStatus('error');
     };
-
-    const src = teamId
-        ? source === 'backend'
-            ? buildBackendLogoUrl(teamId)
-            : buildFallbackLogoUrl(teamId)
-        : null;
 
     const initials = name
         ?.split(' ')
@@ -61,7 +48,7 @@ const TeamLogo = ({
                 <img
                     src={src}
                     alt={`${name} logosu`}
-                    crossOrigin={source === 'backend' ? 'anonymous' : undefined}
+                    crossOrigin="anonymous"
                     className={clsx(
                         'w-full h-full object-contain transition-opacity duration-300',
                         imageClassName
