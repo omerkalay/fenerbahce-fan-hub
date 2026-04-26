@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { BACKEND_URL } from '../services/api';
 
-const buildLogoUrl = (teamId: number): string => `${BACKEND_URL}/team-image/${teamId}`;
+const SOFASCORE_TEAM_IMAGE_BASE = 'https://img.sofascore.com/api/v1/team';
+const buildBackendLogoUrl = (teamId: number): string => `${BACKEND_URL}/team-image/${teamId}`;
+const buildFallbackLogoUrl = (teamId: number): string => `${SOFASCORE_TEAM_IMAGE_BASE}/${teamId}/image`;
 
 interface TeamLogoProps {
     teamId: number | null | undefined;
@@ -17,32 +19,33 @@ const TeamLogo = ({
     wrapperClassName = '',
     imageClassName = ''
 }: TeamLogoProps) => {
-    const [src, setSrc] = useState<string | null>(() => (teamId ? buildLogoUrl(teamId) : null));
+    const [source, setSource] = useState<'backend' | 'fallback'>('backend');
     const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'idle'>(teamId ? 'loading' : 'idle');
-    const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
         if (!teamId) {
-            setSrc(null);
             setStatus('idle');
             return;
         }
-        setSrc(buildLogoUrl(teamId));
-        setAttempt(0);
+        setSource('backend');
         setStatus('loading');
     }, [teamId]);
 
     const handleError = () => {
-        if (!teamId) return;
-
-        if (attempt < 2) {
-            const retryToken = `${Date.now()}-${attempt + 1}`;
-            setAttempt((prev) => prev + 1);
-            setSrc(`${buildLogoUrl(teamId)}?retry=${retryToken}`);
-        } else {
-            setStatus('error');
+        if (source === 'backend') {
+            setSource('fallback');
+            setStatus('loading');
+            return;
         }
+
+        setStatus('error');
     };
+
+    const src = teamId
+        ? source === 'backend'
+            ? buildBackendLogoUrl(teamId)
+            : buildFallbackLogoUrl(teamId)
+        : null;
 
     const initials = name
         ?.split(' ')
@@ -58,7 +61,7 @@ const TeamLogo = ({
                 <img
                     src={src}
                     alt={`${name} logosu`}
-                    crossOrigin="anonymous"
+                    crossOrigin={source === 'backend' ? 'anonymous' : undefined}
                     className={clsx(
                         'w-full h-full object-contain transition-opacity duration-300',
                         imageClassName

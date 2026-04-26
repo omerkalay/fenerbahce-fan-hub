@@ -35,16 +35,25 @@ const fetchSquad = async () => {
 const fetchImage = async (type, id) => {
     const imageUrl = `${SOFASCORE_IMAGE_BASE}/${type}/${id}/image`;
     const response = await fetch(imageUrl, {
+        redirect: 'follow',
         headers: {
             'User-Agent': IMAGE_USER_AGENT,
             'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8'
         }
     });
     if (!response.ok) {
+        console.warn(`SofaScore image fetch failed for ${type}/${id}: ${response.status}`);
         return null;
     }
+
+    const contentType = response.headers.get('content-type') || 'image/png';
+    if (!contentType.startsWith('image/')) {
+        console.warn(`SofaScore image fetch returned non-image content for ${type}/${id}: ${contentType}`);
+        return null;
+    }
+
     return {
-        contentType: response.headers.get('content-type') || 'image/png',
+        contentType,
         buffer: Buffer.from(await response.arrayBuffer())
     };
 };

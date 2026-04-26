@@ -6,19 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.10-blue)
+![Version](https://img.shields.io/badge/version-2.9.11-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.10
+## What's New in v2.9.11
+
+- **Team Logo Proxy Recovery** - Backend image proxy now uses SofaScore's HTTPS image origin instead of the legacy HTTP endpoint that started returning missing images
+- **Backend-First Logo Fallback** - Team badges still prefer `/api/team-image/:id`, but fall back once to the public SofaScore logo URL if the proxy is unavailable, preventing repeated 404 noise and blank badges
+- **Image Response Guardrails** - The backend image fetcher now follows redirects, logs upstream status failures, and rejects non-image responses before caching or returning them
+
+<details>
+<summary>Previous: v2.9.10</summary>
 
 - **Notification Hook Coverage** - Added targeted tests for preference loading and FCM token sync so stale requests, abort cleanup, and local persistence behavior are now locked down
 - **Poll Contract Protection** - Added frontend and backend poll tests covering sign-in gating, vote submission, duplicate-vote handling, response shape, and vote count normalization
 - **Shared Body Scroll Lock Hook** - Replaced repeated `document.body.style.overflow` logic with one reusable hook across dashboard, notification settings, and fixture summary flows
 - **DOM Test Environment Stabilization** - Added a dedicated DOM test environment for the new hook and component tests while leaving utility and backend suites on the lighter default setup
 - **Maintenance Confidence Pass** - Expanded regression coverage around notifications and polls without changing the user-facing feature set
+
+</details>
 
 <details>
 <summary>Previous: v2.9.9</summary>
@@ -644,4 +653,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.10** | March 2026
+**v2.9.11** | April 2026
