@@ -30,10 +30,10 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
             onClick={onClose}
         >
             <div
-                className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20 animate-slideUp"
+                className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20 animate-slideUp flex flex-col"
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-                <div className="p-4 border-b border-white/10 flex items-start justify-between gap-3">
+                <div className="p-4 border-b border-white/10 flex items-start justify-between gap-3 shrink-0">
                     <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-white">
                             {league === 'superlig' ? 'Süper Lig Puan Durumu' : 'UEFA Avrupa Ligi Puan Durumu'}
@@ -57,7 +57,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
                     </button>
                 </div>
 
-                <div className="w-full overflow-y-auto max-h-[calc(88vh-60px)]">
+                <div className="w-full flex-1 min-h-0 overflow-y-auto">
                     <CustomStandings league={league} seasonStartYear={selectedSeasonStartYear} />
                 </div>
             </div>
