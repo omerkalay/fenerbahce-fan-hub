@@ -1,12 +1,27 @@
+import { useEffect, useMemo, useState } from 'react';
 import CustomStandings from './CustomStandings';
+import SeasonSelector from './SeasonSelector';
+import { getCurrentSeasonStartYear, getRecentSeasonOptions } from '../utils/seasons';
 
 interface StandingsModalProps {
     visible: boolean;
     league: string;
+    initialSeasonStartYear?: number;
     onClose: () => void;
 }
 
-const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, onClose }) => {
+const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initialSeasonStartYear, onClose }) => {
+    const [selectedSeasonStartYear, setSelectedSeasonStartYear] = useState<number>(
+        () => initialSeasonStartYear ?? getCurrentSeasonStartYear()
+    );
+    const seasonOptions = useMemo(() => getRecentSeasonOptions(), []);
+
+    useEffect(() => {
+        if (visible) {
+            setSelectedSeasonStartYear(initialSeasonStartYear ?? getCurrentSeasonStartYear());
+        }
+    }, [initialSeasonStartYear, visible]);
+
     if (!visible) return null;
 
     return (
@@ -18,11 +33,18 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, onClos
                 className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20 animate-slideUp"
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                    <div>
+                <div className="p-4 border-b border-white/10 flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                         <p className="text-sm font-bold text-white">
                             {league === 'superlig' ? 'Süper Lig Puan Durumu' : 'UEFA Avrupa Ligi Puan Durumu'}
                         </p>
+                        <SeasonSelector
+                            value={selectedSeasonStartYear}
+                            options={seasonOptions}
+                            onChange={setSelectedSeasonStartYear}
+                            minimal
+                            className="mt-2"
+                        />
                     </div>
                     <button
                         onClick={onClose}
@@ -36,7 +58,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, onClos
                 </div>
 
                 <div className="w-full overflow-y-auto max-h-[calc(88vh-60px)]">
-                    <CustomStandings league={league} />
+                    <CustomStandings league={league} seasonStartYear={selectedSeasonStartYear} />
                 </div>
             </div>
         </div>

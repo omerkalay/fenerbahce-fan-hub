@@ -1,5 +1,6 @@
 const { db } = require('../config');
 const { fetchEspnSummaryForMatch } = require('../services/espn');
+const { buildSeasonMeta, resolveLegacySeasonState } = require('../utils/seasonState');
 
 async function handleNextMatch(req, res) {
     const snapshot = await db.ref('cache/nextMatch').once('value');
@@ -14,6 +15,27 @@ async function handleNext3Matches(req, res) {
     const snapshot = await db.ref('cache/next3Matches').once('value');
     const data = snapshot.val() || [];
     return res.json(data);
+}
+
+async function handleMatchStatus(req, res) {
+    const snapshot = await db.ref('cache').once('value');
+    const cache = snapshot.val() || {};
+    const next3Matches = Array.isArray(cache.next3Matches) ? cache.next3Matches : [];
+    const referenceDate = new Date();
+    const seasonState = cache.seasonState || resolveLegacySeasonState({
+        nextMatch: cache.nextMatch || null,
+        nextMatches: next3Matches,
+        referenceDate
+    });
+
+    return res.json({
+        nextMatch: cache.nextMatch || null,
+        next3Matches,
+        seasonState,
+        season: cache.season || buildSeasonMeta(referenceDate),
+        matchFetchStatus: cache.matchFetchStatus || null,
+        lastUpdate: cache.lastUpdate || null
+    });
 }
 
 async function handleStandings(req, res) {
@@ -98,4 +120,4 @@ async function handleMatchSummary(req, res, matchId) {
     }
 }
 
-module.exports = { handleNextMatch, handleNext3Matches, handleLiveMatch, handleMatchSummary, handleStandings };
+module.exports = { handleNextMatch, handleNext3Matches, handleMatchStatus, handleLiveMatch, handleMatchSummary, handleStandings };

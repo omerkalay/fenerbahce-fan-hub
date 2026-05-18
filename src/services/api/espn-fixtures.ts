@@ -5,6 +5,7 @@ import type {
 } from '../../types';
 import { localizeCompetitionName } from '../../utils/localize';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { getCurrentSeasonStartYear } from '../../utils/seasons';
 
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
@@ -19,12 +20,6 @@ const ESPN_FIXTURE_COMPETITIONS: EspnFixtureCompetition[] = [
     { slug: 'tur.1', group: 'superlig', label: 'Süper Lig' },
     { slug: 'uefa.europa', group: 'europe', label: 'Avrupa' }
 ];
-
-export const getCurrentSeasonStartYear = (referenceDate = new Date()): number => {
-    const month = referenceDate.getMonth();
-    const year = referenceDate.getFullYear();
-    return month >= 6 ? year : year - 1;
-};
 
 const buildEspnTeamScheduleUrl = (leagueSlug: string, params: Record<string, string> = {}): string => {
     const searchParams = new URLSearchParams(params);

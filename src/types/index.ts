@@ -37,6 +37,24 @@ export interface CachedMatchPayload {
   nextMatch: MatchData | null;
   next3Matches: MatchData[];
   timestamp: number;
+  seasonState?: SeasonState;
+  season?: SeasonMeta | null;
+}
+
+export type SeasonState = 'active' | 'offseason' | 'unknown';
+
+export interface SeasonMeta {
+  startYear: number;
+  label: string;
+}
+
+export interface MatchStatusPayload {
+  nextMatch: MatchData | null;
+  next3Matches: MatchData[];
+  seasonState: SeasonState;
+  season: SeasonMeta | null;
+  matchFetchStatus?: 'pending' | 'ok' | 'error' | null;
+  lastUpdate: number | null;
 }
 
 // ─── Squad / Player ──────────────────────────────────────

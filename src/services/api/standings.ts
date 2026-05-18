@@ -1,5 +1,6 @@
 import type { StandingsRow, StandingsData } from '../../types';
 import { localizeTeamName } from '../../utils/localize';
+import { getCurrentSeasonStartYear } from '../../utils/seasons';
 
 interface EspnStandingsLeague {
   slug: string;
@@ -39,16 +40,15 @@ const parseEspnStandingsEntries = (entries: EspnStandingsEntry[] = []): Standing
         goalDiff: entry.stats.find(s => s.name === 'pointDifferential')?.value || 0
     }));
 
-export const fetchEspnStandings = async (leagueId: string): Promise<StandingsData | null> => {
+export const fetchEspnStandings = async (
+    leagueId: string,
+    seasonStartYear = getCurrentSeasonStartYear()
+): Promise<StandingsData | null> => {
     const league = ESPN_STANDINGS_LEAGUES.find(l => l.id === leagueId);
     if (!league) return null;
 
-    const month = new Date().getMonth();
-    const year = new Date().getFullYear();
-    const season = month >= 6 ? year : year - 1;
-
     try {
-        const url = `https://site.api.espn.com/apis/v2/sports/soccer/${league.slug}/standings?season=${season}`;
+        const url = `https://site.api.espn.com/apis/v2/sports/soccer/${league.slug}/standings?season=${seasonStartYear}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error(`ESPN standings fetch failed: ${response.status}`);
 

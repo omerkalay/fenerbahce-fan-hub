@@ -5,6 +5,8 @@ import type { StandingsRow } from '../types';
 
 interface CustomStandingsProps {
     league: string;
+    seasonStartYear: number;
+    showLegend?: boolean;
 }
 
 /* ── Zone configs ───────────────────────────────────────── */
@@ -39,7 +41,7 @@ const getZoneColor = (rank: number, league: string): string | null => {
     return zone?.color ?? null;
 };
 
-const CustomStandings = ({ league }: CustomStandingsProps) => {
+const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomStandingsProps) => {
     const [standings, setStandings] = useState<StandingsRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ const CustomStandings = ({ league }: CustomStandingsProps) => {
             setError(null);
 
             const leagueId = league === 'superlig' ? 'super-lig' : 'europa-league';
-            const data = await fetchEspnStandings(leagueId);
+            const data = await fetchEspnStandings(leagueId, seasonStartYear);
 
             if (cancelled) return;
 
@@ -65,7 +67,7 @@ const CustomStandings = ({ league }: CustomStandingsProps) => {
 
         load();
         return () => { cancelled = true; };
-    }, [league]);
+    }, [league, seasonStartYear]);
 
     if (loading) {
         return (
@@ -87,15 +89,16 @@ const CustomStandings = ({ league }: CustomStandingsProps) => {
 
     return (
         <div className="w-full">
-            {/* Zone legend */}
-            <div className="flex flex-wrap gap-x-3 gap-y-1 px-4 py-2.5 border-b border-white/5">
-                {zones.map(z => (
-                    <div key={z.label} className="flex items-center gap-1.5">
-                        <span className={`w-2 h-2 rounded-full ${z.color}`} />
-                        <span className="text-[10px] text-slate-500">{z.label}</span>
-                    </div>
-                ))}
-            </div>
+            {showLegend && (
+                <div className="flex flex-wrap gap-x-3 gap-y-1 px-4 py-2.5 border-b border-white/5">
+                    {zones.map(z => (
+                        <div key={z.label} className="flex items-center gap-1.5">
+                            <span className={`w-2 h-2 rounded-full ${z.color}`} />
+                            <span className="text-[10px] text-slate-500">{z.label}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             <table className="w-full text-left border-collapse">
                 <thead className="sticky top-0 z-10" style={{ background: 'rgba(15,23,42,0.97)' }}>

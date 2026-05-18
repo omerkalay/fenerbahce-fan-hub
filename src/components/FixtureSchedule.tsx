@@ -2,6 +2,7 @@ import { useFixtureData } from '../hooks/useFixtureData';
 import MatchSummaryModal from './MatchSummaryModal';
 import { localizeTeamName } from '../utils/localize';
 import type { EspnFixtureMatch, EspnTeam } from '../types';
+import SeasonSelector from './SeasonSelector';
 
 // ─── Filter types ────────────────────────────────────────
 
@@ -175,6 +176,9 @@ function FixtureSchedule() {
         isRefreshing,
         handleRefresh,
         isRefreshCoolingDown,
+        selectedSeasonStartYear,
+        setSelectedSeasonStartYear,
+        seasonOptions,
         statusFilter,
         setStatusFilter,
         showFilters,
@@ -205,6 +209,12 @@ function FixtureSchedule() {
     return (
         <div className="min-h-screen pb-24">
             <section className="sticky top-0 z-30 mb-4 space-y-3 pt-1 pb-2 bg-gradient-to-b from-slate-950/95 via-slate-950/90 to-transparent backdrop-blur-sm">
+                <SeasonSelector
+                    value={selectedSeasonStartYear}
+                    options={seasonOptions}
+                    onChange={setSelectedSeasonStartYear}
+                />
+
                 <div className="flex items-center gap-1.5">
                     <div className="grid grid-cols-3 gap-2 flex-1">
                         {STATUS_FILTERS.map((item) => (
@@ -451,6 +461,7 @@ function FixtureSchedule() {
                 summaryError={summaryError}
                 summaryHomeLogo={summaryHomeLogo}
                 summaryAwayLogo={summaryAwayLogo}
+                seasonStartYear={selectedSeasonStartYear}
                 onClose={closeSummaryModal}
             />
         </div>

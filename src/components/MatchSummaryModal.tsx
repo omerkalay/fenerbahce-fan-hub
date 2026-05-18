@@ -4,6 +4,7 @@ import MatchLineups from './MatchLineups';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName } from '../utils/localize';
+import { getCurrentSeasonStartYear } from '../utils/seasons';
 import type { EspnFixtureMatch, MatchSummaryData } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -40,6 +41,7 @@ interface MatchSummaryModalProps {
     summaryError: string | null;
     summaryHomeLogo: string | null;
     summaryAwayLogo: string | null;
+    seasonStartYear?: number;
     onClose: () => void;
 }
 
@@ -52,6 +54,7 @@ function MatchSummaryModal({
     summaryError,
     summaryHomeLogo,
     summaryAwayLogo,
+    seasonStartYear,
     onClose,
 }: MatchSummaryModalProps) {
     if (!activeSummaryMatch) return null;
@@ -64,6 +67,7 @@ function MatchSummaryModal({
         const teamId = String(event.team || '');
         return teamId !== homeIncidentTeamId && teamId !== awayIncidentTeamId;
     });
+    const useSquadPhotos = seasonStartYear == null || seasonStartYear === getCurrentSeasonStartYear();
 
     return (
         <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4">
@@ -220,6 +224,7 @@ function MatchSummaryModal({
                                     homeTeamName={activeSummaryData.homeTeam?.name}
                                     awayTeamName={activeSummaryData.awayTeam?.name}
                                     matchId={activeSummaryMatch?.id}
+                                    useSquadPhotos={useSquadPhotos}
                                 />
                             )}
 

@@ -23,6 +23,8 @@ function AppContent() {
     matchData,
     next3Matches,
     lastUpdated,
+    seasonState,
+    season,
     loading,
     isRefreshing,
     errorMessage,
@@ -134,6 +136,8 @@ function AppContent() {
                 errorMessage={errorMessage}
                 lastUpdated={lastUpdated}
                 isRefreshing={isRefreshing}
+                seasonState={seasonState}
+                season={season}
                 liveMatchState={liveMatchState}
                 liveMatchData={liveMatchData}
                 onCountdownEnd={onCountdownEnd}

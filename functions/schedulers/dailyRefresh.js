@@ -2,6 +2,7 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db, rapidApiKey, rapidApiHost, sleep, formatDateKey } = require('../config');
 const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
 const { refreshCachedImagesForCache } = require('../services/imageCache');
+const { buildSeasonMeta, resolveSeasonState } = require('../utils/seasonState');
 
 /**
  * Daily Data Refresh - Günde 1 kez çalışır
@@ -15,8 +16,12 @@ const dailyDataRefresh = onSchedule({
     console.log('⏰ Daily data refresh started (03:00 UTC = 06:00 TR)');
 
     try {
+        const now = Date.now();
+        const referenceDate = new Date(now);
         const existingSummariesSnapshot = await db.ref('cache/matchSummaries').once('value');
         const existingMatchSummaries = existingSummariesSnapshot.val() || {};
+        let fetchedMatches = [];
+        let matchFetchOk = false;
 
         const cache = {
             nextMatch: null,
@@ -24,21 +29,36 @@ const dailyDataRefresh = onSchedule({
             lastFinishedMatch: null,
             matchSummaries: existingMatchSummaries,
             squad: [],
-            lastUpdate: Date.now()
+            lastUpdate: now,
+            matchFetchStatus: 'pending',
+            seasonState: 'unknown',
+            season: buildSeasonMeta(referenceDate)
         };
 
         // 1. Fetch matches from SofaScore
         console.log('1️⃣ Fetching matches from SofaScore...');
         try {
             const events = await fetchNextMatches();
+            fetchedMatches = events;
+            matchFetchOk = true;
+            cache.matchFetchStatus = 'ok';
             if (events.length > 0) {
                 cache.nextMatch = events[0];
                 cache.next3Matches = events.slice(0, 3);
                 console.log(`✅ Fetched ${events.length} matches`);
+            } else {
+                console.log('No upcoming matches returned');
             }
         } catch (error) {
+            cache.matchFetchStatus = 'error';
             console.error(`❌ Match fetch failed: ${error.message}`);
         }
+
+        cache.seasonState = resolveSeasonState({
+            nextMatches: fetchedMatches,
+            matchFetchOk,
+            referenceDate
+        });
 
         await sleep(2000); // Rate limit protection
 

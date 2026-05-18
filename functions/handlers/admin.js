@@ -1,6 +1,7 @@
 const { db, adminRefreshKey, sleep } = require('../config');
 const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
 const { refreshCachedImagesForCache } = require('../services/imageCache');
+const { buildSeasonMeta, resolveSeasonState } = require('../utils/seasonState');
 
 async function handleHealth(req, res) {
     const cacheSnapshot = await db.ref('cache/lastUpdate').once('value');
@@ -28,8 +29,12 @@ async function handleRefresh(req, res) {
     console.log('Manual refresh triggered');
 
     try {
+        const now = Date.now();
+        const referenceDate = new Date(now);
         const existingSummariesSnapshot = await db.ref('cache/matchSummaries').once('value');
         const existingMatchSummaries = existingSummariesSnapshot.val() || {};
+        let fetchedMatches = [];
+        let matchFetchOk = false;
 
         const cache = {
             nextMatch: null,
@@ -37,19 +42,32 @@ async function handleRefresh(req, res) {
             lastFinishedMatch: null,
             matchSummaries: existingMatchSummaries,
             squad: [],
-            lastUpdate: Date.now()
+            lastUpdate: now,
+            matchFetchStatus: 'pending',
+            seasonState: 'unknown',
+            season: buildSeasonMeta(referenceDate)
         };
 
         // Fetch matches
         try {
             const events = await fetchNextMatches();
+            fetchedMatches = events;
+            matchFetchOk = true;
+            cache.matchFetchStatus = 'ok';
             if (events.length > 0) {
                 cache.nextMatch = events[0];
                 cache.next3Matches = events.slice(0, 3);
             }
         } catch (error) {
+            cache.matchFetchStatus = 'error';
             console.error('Match fetch failed:', error.message);
         }
+
+        cache.seasonState = resolveSeasonState({
+            nextMatches: fetchedMatches,
+            matchFetchOk,
+            referenceDate
+        });
 
         await sleep(1000);
 

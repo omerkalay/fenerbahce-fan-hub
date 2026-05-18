@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { fetchNextMatch, fetchNext3Matches } from '../services/api';
-import type { MatchData, CachedMatchPayload } from '../types';
+import { fetchMatchStatus } from '../services/api';
+import type { MatchData, CachedMatchPayload, SeasonMeta, SeasonState } from '../types';
 
 const readCachedMatchData = (): CachedMatchPayload | null => {
   if (typeof window === 'undefined') return null;
@@ -23,6 +23,8 @@ export function useMatchBootstrap() {
   const [matchData, setMatchData] = useState<MatchData | null>(cachedData?.nextMatch ?? null);
   const [next3Matches, setNext3Matches] = useState<MatchData[]>(cachedData?.next3Matches ?? []);
   const [lastUpdated, setLastUpdated] = useState<number | null>(cachedData?.timestamp ?? null);
+  const [seasonState, setSeasonState] = useState<SeasonState>(cachedData?.seasonState ?? (cachedData?.nextMatch ? 'active' : 'unknown'));
+  const [season, setSeason] = useState<SeasonMeta | null>(cachedData?.season ?? null);
   const [loading, setLoading] = useState(!cachedData);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -42,20 +44,42 @@ export function useMatchBootstrap() {
     }
 
     try {
-      const [nextMatch, upcomingMatches] = await Promise.all([
-        fetchNextMatch(),
-        fetchNext3Matches()
-      ]);
+      const status = await fetchMatchStatus();
+      const nextMatch = status.nextMatch;
+      const upcomingMatches = status.next3Matches;
+      const resolvedSeasonState = status.seasonState ?? (nextMatch ? 'active' : 'unknown');
+      const timestamp = status.lastUpdate ?? Date.now();
 
       const normalizedUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches : [];
       setNext3Matches(normalizedUpcoming);
+      setSeasonState(resolvedSeasonState);
+      setSeason(status.season);
 
       if (nextMatch) {
         setMatchData(nextMatch);
         const payload: CachedMatchPayload = {
           nextMatch,
           next3Matches: normalizedUpcoming,
-          timestamp: Date.now()
+          timestamp,
+          seasonState: resolvedSeasonState,
+          season: status.season
+        };
+
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('fb_last_match', JSON.stringify(payload));
+        }
+
+        setLastUpdated(payload.timestamp);
+      } else if (resolvedSeasonState === 'offseason') {
+        setMatchData(null);
+        setErrorMessage(null);
+
+        const payload: CachedMatchPayload = {
+          nextMatch: null,
+          next3Matches: normalizedUpcoming,
+          timestamp,
+          seasonState: resolvedSeasonState,
+          season: status.season
         };
 
         if (typeof window !== 'undefined') {
@@ -89,6 +113,8 @@ export function useMatchBootstrap() {
     matchData,
     next3Matches,
     lastUpdated,
+    seasonState,
+    season,
     loading,
     isRefreshing,
     errorMessage,

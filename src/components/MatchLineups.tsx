@@ -27,9 +27,10 @@ interface MatchLineupsProps {
     homeTeamName?: string;
     awayTeamName?: string;
     matchId?: string;
+    useSquadPhotos?: boolean;
 }
 
-function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLineupsProps) {
+function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPhotos = true }: MatchLineupsProps) {
     const homeName = homeTeamName || lineups.home?.teamName || 'Ev Sahibi';
     const awayName = awayTeamName || lineups.away?.teamName || 'Deplasman';
     const localizedHomeName = localizeTeamName(homeName);
@@ -46,7 +47,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLin
     }, [matchId, defaultTab]);
 
     useEffect(() => {
-        if ((!homeIsFb && !awayIsFb) || hasPhotoMaps) return;
+        if (!useSquadPhotos || (!homeIsFb && !awayIsFb) || hasPhotoMaps) return;
 
         let mounted = true;
         fetchSquad()
@@ -61,7 +62,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLin
         return () => {
             mounted = false;
         };
-    }, [awayIsFb, hasPhotoMaps, homeIsFb]);
+    }, [awayIsFb, hasPhotoMaps, homeIsFb, useSquadPhotos]);
 
     const tabs: { key: 'home' | 'away'; label: string }[] = homeIsFb
         ? [
@@ -114,7 +115,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId }: MatchLin
 
             <MiniPitch
                 lineup={activeLineup}
-                isFenerbahceTeam={activeTeamIsFb}
+                isFenerbahceTeam={activeTeamIsFb && useSquadPhotos}
                 photoMaps={photoMaps}
                 subOutByPlayer={subOutByPlayer}
             />

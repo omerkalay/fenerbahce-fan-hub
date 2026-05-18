@@ -4,6 +4,7 @@ import Poll from './Poll';
 import MatchCountdown from './MatchCountdown';
 import NextMatchesPanel from './NextMatchesPanel';
 import StandingsModal from './StandingsModal';
+import DashboardStandingsPanel from './DashboardStandingsPanel';
 import LiveMatchModal from './LiveMatchModal';
 import StartingXIModal from './StartingXIModal';
 import MatchEventIcon from './MatchEventIcon';
@@ -12,6 +13,7 @@ import { database } from '../firebase';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName, localizeCompetitionName } from '../utils/localize';
+import { getCurrentSeasonStartYear } from '../utils/seasons';
 import { onValue, ref } from 'firebase/database';
 import {
     isHalftimeDisplay,
@@ -20,7 +22,7 @@ import {
     normalizeStartingXIData
 } from '../utils/dashboardHelpers';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
-import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData } from '../types';
+import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData, SeasonMeta, SeasonState } from '../types';
 
 interface DashboardProps {
     matchData: MatchData | null;
@@ -30,6 +32,8 @@ interface DashboardProps {
     errorMessage: string | null;
     lastUpdated: number | null;
     isRefreshing: boolean;
+    seasonState: SeasonState;
+    season: SeasonMeta | null;
     liveMatchState: LiveMatchState;
     liveMatchData: LiveMatchData | null;
     onCountdownEnd: () => void;
@@ -43,6 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     errorMessage,
     lastUpdated: _lastUpdated,
     isRefreshing: _isRefreshing,
+    seasonState,
+    season,
     liveMatchState = 'countdown',
     liveMatchData = null,
     onCountdownEnd
@@ -50,6 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const [showLiveMatchModal, setShowLiveMatchModal] = useState<boolean>(false);
     const [showStandingsModal, setShowStandingsModal] = useState<boolean>(false);
     const [standingsLeague, setStandingsLeague] = useState<string>('');
+    const [standingsSeasonStartYear, setStandingsSeasonStartYear] = useState<number>(() => getCurrentSeasonStartYear());
     const [showStartingXIModal, setShowStartingXIModal] = useState<boolean>(false);
     const [startingXI, setStartingXI] = useState<StartingXIData | null>(null);
 
@@ -74,8 +81,49 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     useBodyScrollLock(showLiveMatchModal || showStandingsModal || showStartingXIModal);
 
+    const openStandingsModal = (league: 'superlig' | 'europa', seasonStartYear?: number) => {
+        setStandingsLeague(league);
+        setStandingsSeasonStartYear(seasonStartYear ?? season?.startYear ?? getCurrentSeasonStartYear());
+        setShowStandingsModal(true);
+    };
+
+    const standingsModal = (
+        <StandingsModal
+            visible={showStandingsModal}
+            league={standingsLeague}
+            initialSeasonStartYear={standingsSeasonStartYear}
+            onClose={() => setShowStandingsModal(false)}
+        />
+    );
+
     if (loading) return <div className="flex items-center justify-center h-64 text-yellow-400 animate-pulse">Yükleniyor...</div>;
     if (!matchData) {
+        if (seasonState === 'offseason' && !errorMessage) {
+            return (
+                <div className="min-h-screen pb-20 space-y-4">
+                    <div className="glass-panel rounded-2xl p-6 text-center border border-yellow-400/15 w-full">
+                        <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 p-0.5 shadow-lg shadow-yellow-500/20">
+                            <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                                <img src="https://media.api-sports.io/football/teams/611.png" alt="Fenerbahçe" className="w-11 h-11 object-contain" />
+                            </div>
+                        </div>
+                        <p className="text-lg font-black text-white">
+                            {season?.label ? `${season.label} sezonu tamamlandı` : 'Sezon tamamlandı'}
+                        </p>
+                        <p className="text-sm text-slate-300 mt-2 leading-relaxed">
+                            Yeni sezon fikstürü açıklandığında pano otomatik güncellenecek.
+                        </p>
+                    </div>
+
+                    <DashboardStandingsPanel
+                        onOpen={openStandingsModal}
+                        className="mb-0"
+                    />
+                    {standingsModal}
+                </div>
+            );
+        }
+
         return (
             <div className="text-center text-slate-400 mt-10 space-y-4">
                 <p>Maç bilgisi bulunamadı.</p>
@@ -405,30 +453,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* Next 3 Matches */}
             <NextMatchesPanel next3Matches={next3Matches} />
 
-            {/* Puan Durumu Buttons */}
-            <div className="glass-panel rounded-2xl p-4 mb-6">
-                <h3 className="text-sm font-bold text-white mb-3">Puan Durumu</h3>
-                <div className="grid grid-cols-2 gap-3">
-                    <button
-                        onClick={() => {
-                            setStandingsLeague('superlig');
-                            setShowStandingsModal(true);
-                        }}
-                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400/90 text-yellow-400/80 hover:text-black border border-yellow-400/20 hover:border-yellow-400/80 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)]"
-                    >
-                        Süper Lig
-                    </button>
-                    <button
-                        onClick={() => {
-                            setStandingsLeague('europa');
-                            setShowStandingsModal(true);
-                        }}
-                        className="px-4 py-3 bg-yellow-400/5 hover:bg-yellow-400/90 text-yellow-400/80 hover:text-black border border-yellow-400/20 hover:border-yellow-400/80 rounded-xl text-sm font-bold transition-all duration-300 hover:scale-105 hover:shadow-[0_0_15px_rgba(234,179,8,0.2)]"
-                    >
-                        Avrupa Ligi
-                    </button>
-                </div>
-            </div>
+            <DashboardStandingsPanel onOpen={openStandingsModal} />
 
             {/* Poll */}
             <div className="mb-6">
@@ -453,12 +478,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 liveMatchData={liveMatchData}
             />
 
-            {/* Standings Modal */}
-            <StandingsModal
-                visible={showStandingsModal}
-                league={standingsLeague}
-                onClose={() => setShowStandingsModal(false)}
-            />
+            {standingsModal}
         </div>
     );
 };

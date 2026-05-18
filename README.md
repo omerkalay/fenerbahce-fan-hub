@@ -6,19 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.9.11-blue)
+![Version](https://img.shields.io/badge/version-2.10.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.9.11
+## What's New in v2.10.0
+
+- **Season-End Dashboard State** - The dashboard now distinguishes a true offseason from fixture API failures, showing the season-complete panel only after a successful no-next-match fetch during the conservative May-July break window
+- **Automatic New-Season Recovery** - Scheduled and protected refreshes now cache match fetch status plus season metadata, so the dashboard can return to the normal next-match flow when the new season fixtures arrive without another code push
+- **Historical Standings Selection** - The standings modal supports recent season selection while the dashboard keeps the original clean two-button entry for Super Lig and Europa League tables
+- **Fixture Season Picker** - The fixture screen can switch between recent seasons and resets filters cleanly when the selected season changes
+- **Historical Lineup Photo Guard** - Older match details no longer match players against the current squad photo map, preventing wrong photos when historical player images are unavailable
+
+<details>
+<summary>Previous: v2.9.11</summary>
 
 - **Daily Image Cache Refresh** - The 06:00 TR refresh and protected `/refresh` now cache player photos and team logos in Firebase once, using RapidAPI's SofaScore image/logo endpoints (`players/get-image`, `teams/get-logo`) only during refresh
 - **Backend-Only Cached Images** - Public `/api/player-image/:id` and `/api/team-image/:id` serve cached backend binaries only, so normal app traffic no longer spends RapidAPI image calls
 - **Image Request Noise Reduction** - Raised the asset rate-limit budget for squad/lineup image bursts and disabled client-side player image retries by default to avoid repeated failed requests
 - **Image Response Guardrails** - The backend image fetcher follows redirects, logs upstream status failures, rejects non-image responses, and keeps the old SofaScore CDN path only as a fallback
 - **Deploy Note** - After deploying Functions, run the protected `/refresh` once to seed the new `imageCache`; the scheduled 06:00 TR refresh keeps it warm after that
+
+</details>
 
 <details>
 <summary>Previous: v2.9.10</summary>
@@ -655,4 +666,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.9.11** | April 2026
+**v2.10.0** | May 2026

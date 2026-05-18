@@ -1,7 +1,7 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { rapidApiKey, rapidApiHost, adminRefreshKey, corsOptions } = require('../config');
 const { enforceRateLimit, resolveRateLimitProfile } = require('./middleware');
-const { handleNextMatch, handleNext3Matches, handleLiveMatch, handleMatchSummary, handleStandings } = require('./matches');
+const { handleNextMatch, handleNext3Matches, handleMatchStatus, handleLiveMatch, handleMatchSummary, handleStandings } = require('./matches');
 const { handleSquad } = require('./squad');
 const { handlePlayerImage, handleTeamImage } = require('./assets');
 const { handlePollVote } = require('./polls');
@@ -34,6 +34,10 @@ const api = onRequest({
             case 'next-3-matches':
             case 'next3Matches':
                 return await handleNext3Matches(req, res);
+
+            case 'match-status':
+            case 'matchStatus':
+                return await handleMatchStatus(req, res);
 
             case 'squad':
                 return await handleSquad(req, res);
@@ -86,6 +90,7 @@ const api = onRequest({
                     endpoints: [
                         '/next-match',
                         '/next-3-matches',
+                        '/match-status',
                         '/squad',
                         '/standings',
                         '/live-match',

@@ -3,6 +3,7 @@ import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api'
 import { useCooldown } from './useCooldown';
 import useBodyScrollLock from './useBodyScrollLock';
 import type { EspnFixtureMatch, EspnFixtureData, MatchSummaryData } from '../types';
+import { getCurrentSeasonStartYear, getRecentSeasonOptions } from '../utils/seasons';
 
 import { localizeTeamName } from '../utils/localize';
 
@@ -29,8 +30,18 @@ export function useFixtureData() {
     const [venueFilter, setVenueFilter] = useState<string>('all');
     const [competitionFilter, setCompetitionFilter] = useState<string>('all');
     const nextMatchFocusRef = useRef<HTMLElement | null>(null);
+    const [selectedSeasonStartYear, setSelectedSeasonStartYearState] = useState<number>(() => getCurrentSeasonStartYear());
+    const seasonOptions = useMemo(() => getRecentSeasonOptions(), []);
 
     useBodyScrollLock(activeSummaryMatch !== null);
+
+    const setSelectedSeasonStartYear = (seasonStartYear: number) => {
+        setSelectedSeasonStartYearState(seasonStartYear);
+        setStatusFilter('upcoming');
+        setSearchTerm('');
+        setVenueFilter('all');
+        setCompetitionFilter('all');
+    };
 
     // Initial data load
     useEffect(() => {
@@ -40,7 +51,7 @@ export function useFixtureData() {
             setLoading(true);
             setError(null);
 
-            const data = await fetchEspnFenerbahceFixtures();
+            const data = await fetchEspnFenerbahceFixtures(selectedSeasonStartYear);
             if (!isMounted) return;
 
             if (data?.error) {
@@ -56,12 +67,12 @@ export function useFixtureData() {
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [selectedSeasonStartYear]);
 
     const refreshAction = async () => {
         setError(null);
         setIsRefreshing(true);
-        const data = await fetchEspnFenerbahceFixtures();
+        const data = await fetchEspnFenerbahceFixtures(selectedSeasonStartYear);
         if (data?.error) {
             setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
         }
@@ -90,10 +101,10 @@ export function useFixtureData() {
     );
 
     useEffect(() => {
-        if (!loading && fixtureData && statusFilter === 'upcoming' && upcomingMatches.length === 0) {
+        if (!loading && fixtureData && statusFilter === 'upcoming' && upcomingMatches.length === 0 && playedMatches.length > 0) {
             setStatusFilter('played');
         }
-    }, [loading, fixtureData, statusFilter, upcomingMatches.length]);
+    }, [loading, fixtureData, statusFilter, upcomingMatches.length, playedMatches.length]);
 
     const statusFilteredMatches = useMemo(() => {
         if (statusFilter === 'played') return playedMatches;
@@ -196,6 +207,9 @@ export function useFixtureData() {
         isRefreshing,
         handleRefresh,
         isRefreshCoolingDown,
+        selectedSeasonStartYear,
+        setSelectedSeasonStartYear,
+        seasonOptions,
 
         // Filters
         statusFilter,

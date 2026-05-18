@@ -1,5 +1,26 @@
 import { BACKEND_URL, ensureAbsolutePhoto } from './base';
-import type { Player, MatchData, MatchSummaryData } from '../../types';
+import type { Player, MatchData, MatchSummaryData, MatchStatusPayload } from '../../types';
+
+const normalizeMatchStatusPayload = (value: Partial<MatchStatusPayload> = {}): MatchStatusPayload => ({
+    nextMatch: value.nextMatch ?? null,
+    next3Matches: Array.isArray(value.next3Matches) ? value.next3Matches : [],
+    seasonState: value.seasonState ?? (value.nextMatch ? 'active' : 'unknown'),
+    season: value.season ?? null,
+    matchFetchStatus: value.matchFetchStatus ?? null,
+    lastUpdate: value.lastUpdate ?? null
+});
+
+export const fetchMatchStatus = async (): Promise<MatchStatusPayload> => {
+    try {
+        const response = await fetch(`${BACKEND_URL}/match-status`);
+        if (!response.ok) throw new Error('Backend fetch failed');
+        const payload = await response.json();
+        return normalizeMatchStatusPayload(payload);
+    } catch (error) {
+        console.error('Error fetching match status from backend:', error);
+        return normalizeMatchStatusPayload();
+    }
+};
 
 export const fetchNextMatch = async (): Promise<MatchData | null> => {
     try {
