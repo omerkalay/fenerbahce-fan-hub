@@ -6,19 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.10.0-blue)
+![Version](https://img.shields.io/badge/version-2.10.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.10.0
+## What's New in v2.10.1
+
+- **Season-Safe Fixture History** - Historical fixture selections now open on completed matches, disable the invalid remaining-matches view, and reject ESPN events outside the selected July-to-June season window
+- **Visible Opponent Search** - Team search moved beside the compact season picker, stays visible without opening advanced filters, and stacks cleanly on screens narrower than 360px
+- **Season-Aware Goal & Assist Rankings** - The scorer and assister tables share a recent-three-season picker, and every Super Lig/Europa roster request now includes the selected season instead of mixing in ESPN's previous-season fallback
+- **Turkish & Mobile UI Polish** - Club friendly labels render as `Hazırlık Maçı`; the app root now covers the dynamic viewport consistently and prevents horizontal background gaps on mobile/PWA surfaces
+- **Regression Coverage** - Added season-boundary and player-stat request tests; the full quality gate now passes 287 tests before the production build
+
+<details>
+<summary>Previous: v2.10.0</summary>
 
 - **Season-End Dashboard State** - The dashboard now distinguishes a true offseason from fixture API failures, showing the season-complete panel only after a successful no-next-match fetch during the conservative May-July break window
 - **Automatic New-Season Recovery** - Scheduled and protected refreshes now cache match fetch status plus season metadata, so the dashboard can return to the normal next-match flow when the new season fixtures arrive without another code push
 - **Historical Standings Selection** - The standings modal supports recent season selection while the dashboard keeps the original clean two-button entry for Super Lig and Europa League tables
 - **Fixture Season Picker** - The fixture screen can switch between recent seasons and resets filters cleanly when the selected season changes
 - **Historical Lineup Photo Guard** - Older match details no longer match players against the current squad photo map, preventing wrong photos when historical player images are unavailable
+
+</details>
 
 <details>
 <summary>Previous: v2.9.x (v2.9.0 - v2.9.11)</summary>
@@ -112,10 +123,11 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 ### Fixture Explorer
 - **Dedicated Fixture Tab**: Separate bottom-nav screen for season fixtures
-- **Current Season Timeline**: Shows both completed and upcoming matches in one view
+- **Recent Season Picker**: Switch between the current season and the previous two seasons
+- **Season-Safe Timeline**: Current seasons prioritize remaining matches; historical seasons open on completed matches and exclude cross-season ESPN results
 - **Competition Filtering**: Filter by **Süper Lig** or **UEFA Europa League**
 - **Home/Away Filter**: Quickly narrow down to home or away fixtures
-- **Team Search**: Search fixtures by opponent name
+- **Always-Visible Team Search**: Search by opponent directly beside the season picker without opening advanced filters
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
 - **Manual Refresh**: Re-fetch ESPN fixture data on demand
 - **Fixture Match Summary Modal**: For completed matches, opens cached summary data (scoreline, ordered stats, key events, and actual lineups with formation/bench/substitutions when available)
@@ -132,8 +144,9 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Beautiful Format**: `Fenerbahçe - Opponent | 20:45 - 1 saat kaldi`
 
 ### Statistics
-- **Top Scorers**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with Toplam / Süper Lig / Avrupa filters
-- **Top Assisters**: Ranked list (top 5 expandable to 10) from ESPN roster stats, with per-competition filtering
+- **Season-Aware Rankings**: One recent-three-season picker updates both scorer and assister tables using season-scoped ESPN requests
+- **Top Scorers**: Ranked list (top 5 expandable to 10), with Toplam / Süper Lig / Avrupa filters
+- **Top Assisters**: Ranked list (top 5 expandable to 10), with the same season and competition filtering
 - **Team Form**: Interactive SVG trend over the last 6 completed matches (G/B/M trajectory + expandable goal performance and possession trend)
 - **Injury, Suspension & Card Risk Status**: Reads from `admin/playerStatus` in Firebase Realtime Database. Displays injured, suspended, doubtful, and card-risk players with status label and return estimate. Card-risk entries highlight players approaching a yellow card suspension threshold
 
@@ -225,7 +238,7 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 
 ### Test Stack
 
-- **Vitest** — test runner (globals mode, jsdom environment)
+- **Vitest** — test runner (Node environment by default, jsdom where component tests need it)
 - **@testing-library/react** — component testing utilities
 - **@testing-library/jest-dom** — DOM assertion matchers
 - **jsdom** — browser environment simulation
@@ -248,6 +261,8 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 | Formation engine | `src/components/match-lineups/formation-engine.test.ts` | Position classification, formation parsing, preset/numeric/detailed/fallback row building |
 | Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, goal summary formatting, Starting XI normalization |
 | Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
+| Season helpers | `src/utils/seasons.test.ts` | July season rollover, recent-season options, historical detection, selected-season date boundaries |
+| Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Super Lig/Europa requests and combined goal/assist totals |
 
 Backend tests (`functions/services/espn.test.js`) import from `espn-helpers.js` (pure module, no Firebase dependency) so they run without any mocks or side effects.
 
@@ -306,7 +321,7 @@ CI runs the same four steps. If all pass locally, the pipeline will pass.
                 └──────────────┘
 ```
 
-Note: The fixture tab fetches ESPN fixture schedules directly from the frontend (CORS-enabled ESPN endpoints) for the current season. Finished fixture detail summaries are served by `/api/match-summary/:matchId` with cache-first backend behavior.
+Note: The fixture tab fetches ESPN fixture schedules directly from the frontend (CORS-enabled ESPN endpoints) for the selected recent season and discards events outside that season window. Finished fixture detail summaries are served by `/api/match-summary/:matchId` with cache-first backend behavior.
 
 ## Project Structure
 
@@ -343,6 +358,7 @@ fenerbahce-fan-hub/
 │   │   ├── NextMatchesPanel.tsx       # Upcoming 3 matches panel
 │   │   ├── LiveMatchModal.tsx         # Live match detail modal
 │   │   ├── StandingsModal.tsx         # Standings modal wrapper
+│   │   ├── SeasonSelector.tsx          # Shared recent-season picker
 │   │   ├── FixtureSchedule.tsx        # Fixture tab with ESPN-backed filters
 │   │   ├── MatchSummaryModal.tsx      # Match statistics modal
 │   │   ├── Statistics.tsx             # Statistics tab
@@ -380,6 +396,7 @@ fenerbahce-fan-hub/
 │   │   ├── notificationHelpers.ts     # FCM token, option normalization helpers
 │   │   ├── squadPhotoLookup.ts        # Squad photo matching (jersey/name/alias)
 │   │   ├── localize.ts               # Turkish localization for ESPN names
+│   │   ├── seasons.ts                # Shared season labels, options and boundaries
 │   │   └── matchClock.ts             # Match clock formatting utility
 │   ├── test/
 │   │   └── setup.ts                   # Test environment setup
@@ -397,7 +414,7 @@ fenerbahce-fan-hub/
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js 20+
+- Node.js 22+
 - Firebase CLI (`npm install -g firebase-tools`)
 - RapidAPI key for SofaScore
 
@@ -502,8 +519,10 @@ firebase deploy --only functions
 ### Fixture System
 - **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints (free, client-side fetch)
 - **Coverage**: Süper Lig (`tur.1`) + UEFA Europa League (`uefa.europa`)
+- **Seasons**: Current season plus the previous two seasons, with July 1 boundaries
 - **Data Merge**: Results (`schedule`) + upcoming fixtures (`schedule?fixture=true`)
-- **Filtering**: Status (All/Played/Remaining), team search, home/away, competition
+- **Historical Safety**: Past seasons default to played matches and reject events outside the selected season
+- **Filtering**: Status (All/Played/Remaining), always-visible team search, home/away, competition
 - **Summary Details**: Finished-match modal uses `GET /api/match-summary/:matchId` (cache-first, ESPN fallback on cache miss)
 
 ### API Cost Optimization
@@ -547,4 +566,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.10.0** | May 2026
+**v2.10.1** | July 2026

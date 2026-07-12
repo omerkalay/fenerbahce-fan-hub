@@ -3,6 +3,7 @@ import MatchSummaryModal from './MatchSummaryModal';
 import { localizeTeamName } from '../utils/localize';
 import type { EspnFixtureMatch, EspnTeam } from '../types';
 import SeasonSelector from './SeasonSelector';
+import { Search } from 'lucide-react';
 
 // ─── Filter types ────────────────────────────────────────
 
@@ -179,6 +180,7 @@ function FixtureSchedule() {
         selectedSeasonStartYear,
         setSelectedSeasonStartYear,
         seasonOptions,
+        historicalSeasonSelected,
         statusFilter,
         setStatusFilter,
         showFilters,
@@ -209,11 +211,26 @@ function FixtureSchedule() {
     return (
         <div className="min-h-screen pb-24">
             <section className="sticky top-0 z-30 mb-4 space-y-3 pt-1 pb-2 bg-gradient-to-b from-slate-950/95 via-slate-950/90 to-transparent backdrop-blur-sm">
-                <SeasonSelector
-                    value={selectedSeasonStartYear}
-                    options={seasonOptions}
-                    onChange={setSelectedSeasonStartYear}
-                />
+                <div className="grid grid-cols-1 min-[360px]:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-2">
+                    <SeasonSelector
+                        value={selectedSeasonStartYear}
+                        options={seasonOptions}
+                        onChange={setSelectedSeasonStartYear}
+                        compact
+                    />
+
+                    <label className="min-h-14 rounded-2xl border border-white/10 bg-white/[0.035] backdrop-blur-md flex min-w-0 items-center gap-2.5 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus-within:border-yellow-400/35 focus-within:bg-yellow-400/[0.035] transition-colors">
+                        <Search size={18} className="shrink-0 text-yellow-300" aria-hidden="true" />
+                        <input
+                            type="search"
+                            value={searchTerm}
+                            onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(event.target.value)}
+                            placeholder="Takım ara..."
+                            className="block w-full min-w-0 bg-transparent text-sm font-semibold text-white placeholder:text-slate-400 focus:outline-none"
+                            aria-label="Rakip takım ara"
+                        />
+                    </label>
+                </div>
 
                 <div className="flex items-center gap-1.5">
                     <div className="grid grid-cols-3 gap-2 flex-1">
@@ -221,7 +238,9 @@ function FixtureSchedule() {
                             <button
                                 key={item.id}
                                 onClick={() => setStatusFilter(item.id)}
-                                className={`px-2 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${statusFilter === item.id
+                                disabled={historicalSeasonSelected && item.id === 'upcoming'}
+                                title={historicalSeasonSelected && item.id === 'upcoming' ? 'Geçmiş sezonlarda kalan maç bulunmaz' : undefined}
+                                className={`px-2 py-2 rounded-xl text-xs font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40 ${statusFilter === item.id
                                     ? 'bg-yellow-400 text-black shadow-[0_0_18px_rgba(234,179,8,0.25)]'
                                     : 'glass-panel text-slate-300 hover:bg-white/10'
                                     }`}
@@ -289,17 +308,6 @@ function FixtureSchedule() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
-                        </div>
-
-                        <div>
-                            <label className="block text-[11px] uppercase tracking-wider text-slate-400 mb-1.5">Takım Ara</label>
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                                placeholder="Rakip adı yaz..."
-                                className="w-full rounded-xl border border-white/10 bg-slate-950/40 px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-yellow-400/30"
-                            />
                         </div>
 
                         <div>

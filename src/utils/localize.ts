@@ -35,6 +35,8 @@ const TEAM_NAME_REPLACEMENTS: Array<[RegExp, string]> = [
 ];
 
 const COMPETITION_NAME_REPLACEMENTS: Array<[RegExp, string]> = [
+    [/\bClub Friendly(?: Games?)?\b/gi, 'Hazırlık Maçı'],
+    [/\bClub Friendlies\b/gi, 'Hazırlık Maçı'],
     [/\bTurkish Super Lig\b/gi, 'Süper Lig'],
     [/\bTurkiye Kupasi\b/gi, 'Türkiye Kupası'],
     [/\bTurkish Cup\b/gi, 'Türkiye Kupası'],

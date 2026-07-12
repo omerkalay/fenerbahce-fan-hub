@@ -21,8 +21,25 @@
 }
 
 @layer base {
+    html {
+        min-height: 100%;
+        background-color: #020617;
+    }
+
     body {
         @apply bg-slate-950 text-white font-['Outfit'];
+        min-height: 100vh;
+        min-height: 100dvh;
+        margin: 0;
+        overflow-x: hidden;
+    }
+
+    #root {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        background-color: #020617;
+        isolation: isolate;
     }
 }
 

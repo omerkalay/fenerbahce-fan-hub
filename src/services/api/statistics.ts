@@ -4,6 +4,7 @@ import { localizePlayerName } from '../../utils/playerDisplay';
 import type { PlayerStat, FormResult, PlayerStatusEntry } from '../../types';
 import { fetchEspnFenerbahceFixtures } from './espn-fixtures';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { getCurrentSeasonStartYear } from '../../utils/seasons';
 
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
@@ -41,10 +42,10 @@ const getAthleteStat = (athlete: EspnRosterAthlete, statName: string): number =>
     return 0;
 };
 
-const fetchRosterFromLeague = async (leagueSlug: string): Promise<RosterFetchResult> => {
+const fetchRosterFromLeague = async (leagueSlug: string, seasonStartYear: number): Promise<RosterFetchResult> => {
     const map: RosterStatsMap = new Map<string, { name: string; goals: number; assists: number; appearances: number }>();
     try {
-        const url = `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/roster`;
+        const url = `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/roster?season=${seasonStartYear}`;
         const response = await fetchWithTimeout(url);
         if (!response.ok) {
             return { players: map, ok: false };
@@ -67,11 +68,13 @@ const fetchRosterFromLeague = async (leagueSlug: string): Promise<RosterFetchRes
     }
 };
 
-export const fetchPlayerStats = async (): Promise<PlayerStat[]> => {
+export const fetchPlayerStats = async (
+    seasonStartYear = getCurrentSeasonStartYear()
+): Promise<PlayerStat[]> => {
     try {
         const [league, europa] = await Promise.all([
-            fetchRosterFromLeague('tur.1'),
-            fetchRosterFromLeague('uefa.europa'),
+            fetchRosterFromLeague('tur.1', seasonStartYear),
+            fetchRosterFromLeague('uefa.europa', seasonStartYear),
         ]);
 
         if (!league.ok && !europa.ok) {

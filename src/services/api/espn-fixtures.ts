@@ -5,7 +5,7 @@ import type {
 } from '../../types';
 import { localizeCompetitionName } from '../../utils/localize';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
-import { getCurrentSeasonStartYear } from '../../utils/seasons';
+import { getCurrentSeasonStartYear, isDateInSeason } from '../../utils/seasons';
 
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
@@ -192,6 +192,7 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
         const matches = uniqueEvents
             .map(({ event, sourceCompetition }) => normalizeEspnMatch(event, sourceCompetition))
             .filter((m): m is EspnFixtureMatch => m !== null)
+            .filter((match) => isDateInSeason(match.date, seasonStartYear))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         const firstAvailable = perCompetitionResults.find(

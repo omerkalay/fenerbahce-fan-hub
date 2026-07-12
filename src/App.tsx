@@ -72,7 +72,7 @@ function AppContent() {
 
   if (!fontsReady) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white pb-24 relative overflow-hidden">
+      <div className="min-h-dvh w-full bg-slate-950 text-white pb-24 relative overflow-hidden">
         <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
           <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-500/10 rounded-full blur-[100px]"></div>
           <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[100px]"></div>
@@ -97,7 +97,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white pb-24 relative overflow-hidden">
+    <div className="min-h-dvh w-full bg-slate-950 text-white pb-24 relative overflow-hidden">
       {/* Background Effects */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-500/10 rounded-full blur-[100px]"></div>

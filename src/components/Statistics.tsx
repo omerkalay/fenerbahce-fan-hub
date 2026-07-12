@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fetchFormResults, fetchPlayerStats, fetchPlayerStatus } from '../services/api';
 import type { FormResult, PlayerStat, PlayerStatusEntry } from '../types';
 import FormChart from './statistics/FormChart';
 import PlayerRankingSection from './statistics/PlayerRankingSection';
 import SkeletonCard from './statistics/SkeletonCard';
+import SeasonSelector from './SeasonSelector';
+import { getCurrentSeasonStartYear, getRecentSeasonOptions } from '../utils/seasons';
 
 const getStatusBadge = (status: PlayerStatusEntry['status']): { label: string; text: string } => {
     switch (status) {
@@ -29,6 +31,9 @@ const formatRelativeTime = (timestamp: number): string => {
 };
 
 const Statistics: React.FC = () => {
+    const [selectedSeasonStartYear, setSelectedSeasonStartYear] = useState<number>(() => getCurrentSeasonStartYear());
+    const seasonOptions = useMemo(() => getRecentSeasonOptions(), []);
+
     const [scorers, setScorers] = useState<PlayerStat[]>([]);
     const [scorersLoading, setScorersLoading] = useState(true);
     const [scorersError, setScorersError] = useState<string | null>(null);
@@ -48,11 +53,16 @@ const Statistics: React.FC = () => {
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
+            setScorersLoading(true);
+            setAssistersLoading(true);
+            setScorersError(null);
+            setAssistersError(null);
+            setScorers([]);
+            setAssisters([]);
+
             try {
-                const stats = await fetchPlayerStats();
+                const stats = await fetchPlayerStats(selectedSeasonStartYear);
                 if (cancelled) return;
-                setScorersError(null);
-                setAssistersError(null);
                 setScorers(stats);
                 setAssisters(stats);
             } catch {
@@ -71,7 +81,7 @@ const Statistics: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [selectedSeasonStartYear]);
 
     useEffect(() => {
         let cancelled = false;
@@ -128,6 +138,20 @@ const Statistics: React.FC = () => {
 
     return (
         <div className="min-h-screen pb-24 space-y-4">
+            <div className="flex items-center justify-between gap-3 px-1 pb-0.5">
+                <div className="min-w-0">
+                    <p className="text-xs font-semibold text-white">Gol ve Asist Krallığı sezonu</p>
+                    <p className="text-[11px] text-slate-500">İki sıralama da birlikte güncellenir.</p>
+                </div>
+                <SeasonSelector
+                    value={selectedSeasonStartYear}
+                    options={seasonOptions}
+                    onChange={setSelectedSeasonStartYear}
+                    minimal
+                    className="shrink-0"
+                />
+            </div>
+
             <PlayerRankingSection
                 title="Gol Krallığı"
                 players={scorers}

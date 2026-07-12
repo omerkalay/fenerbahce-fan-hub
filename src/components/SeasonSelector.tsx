@@ -62,7 +62,7 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({
                     >
                         {options.map((option) => (
                             <option key={option.startYear} value={option.startYear} className="bg-slate-950 text-white">
-                                {option.label}{option.badge ? ` (${option.badge})` : ''}
+                                {option.label}{!compact && option.badge ? ` (${option.badge})` : ''}
                             </option>
                         ))}
                     </select>

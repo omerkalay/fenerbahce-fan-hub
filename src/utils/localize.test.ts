@@ -93,6 +93,12 @@ describe('localizeCompetitionName', () => {
         expect(localizeCompetitionName('Turkey Cup')).toBe('Türkiye Kupası');
     });
 
+    it('converts club friendly variants', () => {
+        expect(localizeCompetitionName('Club Friendly Games')).toBe('Hazırlık Maçı');
+        expect(localizeCompetitionName('Club Friendly')).toBe('Hazırlık Maçı');
+        expect(localizeCompetitionName('Club Friendlies')).toBe('Hazırlık Maçı');
+    });
+
     it('handles empty and undefined inputs', () => {
         expect(localizeCompetitionName('')).toBe('');
         expect(localizeCompetitionName()).toBe('');

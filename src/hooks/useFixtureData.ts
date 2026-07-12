@@ -3,7 +3,7 @@ import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api'
 import { useCooldown } from './useCooldown';
 import useBodyScrollLock from './useBodyScrollLock';
 import type { EspnFixtureMatch, EspnFixtureData, MatchSummaryData } from '../types';
-import { getCurrentSeasonStartYear, getRecentSeasonOptions } from '../utils/seasons';
+import { getCurrentSeasonStartYear, getRecentSeasonOptions, isHistoricalSeason } from '../utils/seasons';
 
 import { localizeTeamName } from '../utils/localize';
 
@@ -32,12 +32,13 @@ export function useFixtureData() {
     const nextMatchFocusRef = useRef<HTMLElement | null>(null);
     const [selectedSeasonStartYear, setSelectedSeasonStartYearState] = useState<number>(() => getCurrentSeasonStartYear());
     const seasonOptions = useMemo(() => getRecentSeasonOptions(), []);
+    const historicalSeasonSelected = isHistoricalSeason(selectedSeasonStartYear);
 
     useBodyScrollLock(activeSummaryMatch !== null);
 
     const setSelectedSeasonStartYear = (seasonStartYear: number) => {
         setSelectedSeasonStartYearState(seasonStartYear);
-        setStatusFilter('upcoming');
+        setStatusFilter(isHistoricalSeason(seasonStartYear) ? 'played' : 'upcoming');
         setSearchTerm('');
         setVenueFilter('all');
         setCompetitionFilter('all');
@@ -162,12 +163,10 @@ export function useFixtureData() {
 
     const activeAdvancedFilterCount = [
         venueFilter !== 'all',
-        competitionFilter !== 'all',
-        normalizedQuery.length > 0
+        competitionFilter !== 'all'
     ].filter(Boolean).length;
 
     const clearAdvancedFilters = () => {
-        setSearchTerm('');
         setVenueFilter('all');
         setCompetitionFilter('all');
     };
@@ -210,6 +209,7 @@ export function useFixtureData() {
         selectedSeasonStartYear,
         setSelectedSeasonStartYear,
         seasonOptions,
+        historicalSeasonSelected,
 
         // Filters
         statusFilter,
