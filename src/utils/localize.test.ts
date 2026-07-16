@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { localizeTeamName, localizeCompetitionName, localizeText } from './localize';
+import {
+    localizeTeamName,
+    localizeCompetitionName,
+    localizeCompetitionStage,
+    localizeText,
+} from './localize';
 
 describe('localizeTeamName', () => {
     it('converts ASCII Fenerbahce to proper Turkish', () => {
@@ -82,10 +87,22 @@ describe('localizeCompetitionName', () => {
     });
 
     it('converts knockout rounds', () => {
-        expect(localizeCompetitionName('Knockout Round Playoffs')).toBe('Eleme Turu Playoff');
+        expect(localizeCompetitionName('Knockout Round Playoffs')).toBe('Eleme Turu Play-off');
         expect(localizeCompetitionName('Round of 16')).toBe('Son 16');
         expect(localizeCompetitionName('Quarter-finals')).toBe('Çeyrek Final');
         expect(localizeCompetitionName('Semi-finals')).toBe('Yarı Final');
+    });
+
+    it('converts qualification and preliminary round variants', () => {
+        expect(localizeCompetitionName('Qualification Round 2')).toBe('2. Ön Eleme Turu');
+        expect(localizeCompetitionName('3rd Qualifying Round')).toBe('3. Ön Eleme Turu');
+        expect(localizeCompetitionName('Preliminary Round')).toBe('Ön Eleme Turu');
+        expect(localizeCompetitionName('Qualification')).toBe('Ön Eleme');
+    });
+
+    it('normalizes playoff variants without translating the term', () => {
+        expect(localizeCompetitionName('Playoff Round')).toBe('Play-off');
+        expect(localizeCompetitionName('Play-offs')).toBe('Play-off');
     });
 
     it('converts Turkish Cup variants', () => {
@@ -102,6 +119,34 @@ describe('localizeCompetitionName', () => {
     it('handles empty and undefined inputs', () => {
         expect(localizeCompetitionName('')).toBe('');
         expect(localizeCompetitionName()).toBe('');
+    });
+});
+
+describe('localizeCompetitionStage', () => {
+    it('uses the structured SofaScore round number for qualification matches', () => {
+        expect(localizeCompetitionStage({
+            name: 'Qualification Round 2',
+            slug: 'qualification-round-2',
+            round: 2,
+            qualificationOrPreliminary: true,
+        })).toBe('2. Ön Eleme Turu');
+    });
+
+    it('supports future third qualifying round variants', () => {
+        expect(localizeCompetitionStage({ name: '3rd Qualifying Round' })).toBe('3. Ön Eleme Turu');
+        expect(localizeCompetitionStage({ name: 'Third Qualifying Round' })).toBe('3. Ön Eleme Turu');
+    });
+
+    it('keeps playoff as Play-off across source variants', () => {
+        expect(localizeCompetitionStage({ name: 'Playoff Round', round: 4 })).toBe('Play-off');
+        expect(localizeCompetitionStage({ slug: 'qualification-play-offs', round: 4 })).toBe('Play-off');
+    });
+
+    it('falls back to the structured round when the source omits a stage name', () => {
+        expect(localizeCompetitionStage({
+            round: 2,
+            qualificationOrPreliminary: true,
+        })).toBe('2. Ön Eleme Turu');
     });
 });
 

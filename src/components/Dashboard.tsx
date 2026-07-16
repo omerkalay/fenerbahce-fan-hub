@@ -12,7 +12,7 @@ import { getEventVisualType } from '../utils/eventVisualType';
 import { database } from '../firebase';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
-import { localizeTeamName, localizeCompetitionName } from '../utils/localize';
+import { localizeTeamName, localizeCompetitionName, localizeCompetitionStage } from '../utils/localize';
 import { getCurrentSeasonStartYear } from '../utils/seasons';
 import { onValue, ref } from 'firebase/database';
 import {
@@ -143,6 +143,15 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     const matchDate = new Date(matchData.startTimestamp * 1000);
+    const competitionName = localizeCompetitionName(
+        matchData.tournament.uniqueTournament?.name ?? matchData.tournament.name
+    );
+    const competitionStage = localizeCompetitionStage({
+        name: matchData.roundInfo?.name,
+        slug: matchData.roundInfo?.slug,
+        round: matchData.roundInfo?.round,
+        qualificationOrPreliminary: matchData.tournament.qualificationOrPreliminary,
+    });
     const FENERBAHCE_ID: number = 3052;
     const isHome = matchData.homeTeam.id === 3052;
     const opponent = isHome ? matchData.awayTeam : matchData.homeTeam;
@@ -167,12 +176,19 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="glass-card rounded-3xl p-6 relative overflow-hidden group mb-6">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-50"></div>
 
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <span className="text-xs font-bold tracking-wider text-yellow-400 uppercase bg-yellow-400/10 px-3 py-1 rounded-full border border-yellow-400/20">
-                        {localizeCompetitionName(matchData.tournament.name)}
-                    </span>
+                <div className="flex items-start justify-between gap-2 mb-6 relative z-10">
+                    <div className="inline-flex w-fit shrink-0 flex-col items-start rounded-2xl border border-yellow-400/20 bg-yellow-400/10 px-3 py-1 text-yellow-400 uppercase">
+                        <span className="whitespace-nowrap text-[10px] sm:text-xs font-bold tracking-wider">
+                            {competitionName}
+                        </span>
+                        {competitionStage && (
+                            <span className="whitespace-nowrap text-[9px] sm:text-[10px] font-semibold tracking-wide text-yellow-300/90">
+                                {competitionStage}
+                            </span>
+                        )}
+                    </div>
 
-                    <span className="text-xs text-slate-400 font-medium">
+                    <span className="shrink-0 whitespace-nowrap pt-1 text-[11px] sm:text-xs text-slate-400 font-medium">
                         {matchDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })}
                     </span>
                 </div>

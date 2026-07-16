@@ -12,11 +12,18 @@ export interface Team {
 export interface Tournament {
   name: string;
   slug?: string;
+  qualificationOrPreliminary?: boolean;
   uniqueTournament?: {
     name: string;
     slug?: string;
     id?: number;
   };
+}
+
+export interface RoundInfo {
+  name?: string;
+  round?: number;
+  slug?: string;
 }
 
 export interface MatchData {
@@ -25,6 +32,7 @@ export interface MatchData {
   homeTeam: Team;
   awayTeam: Team;
   tournament: Tournament;
+  roundInfo?: RoundInfo;
   slug?: string;
   status?: {
     code?: number;
