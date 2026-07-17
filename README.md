@@ -15,7 +15,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 ## What's New in v2.10.2
 
 - **Failure-Safe Cache Refresh** - Scheduled and protected refreshes now preserve the last known-good match, squad, and finished-match cache when SofaScore fails; the frontend also keeps its local match fallback instead of replacing it with an empty error state
-- **Regression Coverage** - Added backend cache-safety and frontend bootstrap fallback tests; the full quality gate now passes 299 tests before the production build
+- **Frontend Maintenance Cleanup** - Removed unused legacy squad components, mock assets, dead API exports, stale types, and an unused dependency without changing the notification or Firebase Functions code
+- **Regression Coverage** - Added backend cache-safety and frontend bootstrap fallback tests; the full quality gate now passes 297 tests before the production build
 
 <details>
 <summary>Previous: v2.10.1</summary>
@@ -391,13 +392,12 @@ fenerbahce-fan-hub/
 │   │   └── api/
 │   │       ├── base.ts               # BACKEND_ORIGIN, BACKEND_URL, ensureAbsolutePhoto
 │   │       ├── poll.ts               # submitPollVote
-│   │       ├── fixtures.ts           # fetchNextMatch, fetchSquad, fetchNext3Matches, etc.
+│   │       ├── fixtures.ts           # fetchMatchStatus, fetchSquad, fetchMatchSummary
 │   │       ├── standings.ts          # fetchEspnStandings
 │   │       ├── espn-fixtures.ts      # fetchEspnFenerbahceFixtures
 │   │       └── statistics.ts         # fetchPlayerStats, fetchFormResults, fetchPlayerStatus
 │   ├── data/
-│   │   ├── formations.ts             # Formation position definitions
-│   │   └── mockData.ts               # Mock player data
+│   │   └── formations.ts             # Formation position definitions
 │   ├── types/
 │   │   └── index.ts                   # Centralized TypeScript type definitions
 │   ├── utils/
@@ -413,7 +413,8 @@ fenerbahce-fan-hub/
 │   ├── App.tsx                        # Main app & routing
 │   └── main.tsx                       # React entry point
 ├── .github/workflows/
-│   └── ci.yml                         # CI quality gate (typecheck, lint, test, build)
+│   ├── ci.yml                         # CI quality gate (typecheck, lint, test, build)
+│   └── deploy.yml                     # Deploys main to GitHub Pages after CI succeeds
 ├── vitest.config.ts                   # Vitest test runner configuration
 ├── tsconfig.json                      # TypeScript configuration (strict mode)
 ├── public/                            # Static assets & PWA icons
@@ -545,12 +546,21 @@ firebase deploy --only functions
 
 ### Frontend (GitHub Pages)
 
+Pushes and pull requests targeting `main` run the CI quality gate. A successful
+push to `main` automatically triggers the GitHub Pages deployment workflow;
+feature branches do not deploy the live site.
+
+Manual fallback:
+
 ```bash
 npm run build
 npm run deploy
 ```
 
 ### Functions (Firebase)
+
+Deploy Cloud Functions only when files under `functions/` or their runtime
+configuration change:
 
 ```bash
 firebase deploy --only functions
