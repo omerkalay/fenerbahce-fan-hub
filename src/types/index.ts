@@ -73,20 +73,6 @@ export interface Player {
   position: string;
   number?: number;
   photo?: string;
-  status?: PlayerStatus | null;
-}
-
-export interface PlayerStatus {
-  type: 'injured' | 'suspended';
-  reason?: string;
-}
-
-export interface MockPlayer {
-  id: number;
-  name: string;
-  position: string;
-  number: number;
-  status: string;
 }
 
 // ─── Live Match (ESPN via backend) ───────────────────────
@@ -326,14 +312,6 @@ export interface PlayerStatusEntry {
   detail: string;
   returnDate: string;
   updatedAt: number;
-}
-
-export interface StatisticsData {
-  topScorers: PlayerStat[];
-  topAssisters: PlayerStat[];
-  form: FormResult[];
-  playerStatus: PlayerStatusEntry[];
-  lastUpdated: number | null;
 }
 
 // ─── Starting XI ─────────────────────────────────────────

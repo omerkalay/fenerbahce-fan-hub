@@ -22,11 +22,9 @@ export function useMatchBootstrap() {
 
   const [matchData, setMatchData] = useState<MatchData | null>(cachedData?.nextMatch ?? null);
   const [next3Matches, setNext3Matches] = useState<MatchData[]>(cachedData?.next3Matches ?? []);
-  const [lastUpdated, setLastUpdated] = useState<number | null>(cachedData?.timestamp ?? null);
   const [seasonState, setSeasonState] = useState<SeasonState>(cachedData?.seasonState ?? (cachedData?.nextMatch ? 'active' : 'unknown'));
   const [season, setSeason] = useState<SeasonMeta | null>(cachedData?.season ?? null);
   const [loading, setLoading] = useState(!cachedData);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
 
@@ -37,9 +35,7 @@ export function useMatchBootstrap() {
   const loadMatchData = useCallback(async () => {
     const hasCached = hasDataRef.current;
     setErrorMessage(null);
-    if (hasCached) {
-      setIsRefreshing(true);
-    } else {
+    if (!hasCached) {
       setLoading(true);
     }
 
@@ -69,7 +65,6 @@ export function useMatchBootstrap() {
           localStorage.setItem('fb_last_match', JSON.stringify(payload));
         }
 
-        setLastUpdated(payload.timestamp);
       } else if (resolvedSeasonState === 'offseason') {
         setNext3Matches(normalizedUpcoming);
         setSeasonState(resolvedSeasonState);
@@ -89,7 +84,6 @@ export function useMatchBootstrap() {
           localStorage.setItem('fb_last_match', JSON.stringify(payload));
         }
 
-        setLastUpdated(payload.timestamp);
       } else {
         if (!hasCached) {
           setMatchData(null);
@@ -116,7 +110,6 @@ export function useMatchBootstrap() {
       );
     } finally {
       setLoading(false);
-      setIsRefreshing(false);
     }
   }, []);
 
@@ -124,19 +117,14 @@ export function useMatchBootstrap() {
     loadMatchData();
   }, [loadMatchData]);
 
-  const currentMatch = matchData;
-
   return {
     cachedData,
     matchData,
     next3Matches,
-    lastUpdated,
     seasonState,
     season,
     loading,
-    isRefreshing,
     errorMessage,
-    currentMatch,
     loadMatchData,
   };
 }

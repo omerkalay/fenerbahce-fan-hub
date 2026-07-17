@@ -22,17 +22,14 @@ function AppContent() {
     cachedData,
     matchData,
     next3Matches,
-    lastUpdated,
     seasonState,
     season,
     loading,
-    isRefreshing,
     errorMessage,
-    currentMatch,
     loadMatchData,
   } = useMatchBootstrap();
 
-  const { liveMatchState, liveMatchData, onCountdownEnd } = useLiveMatchState(cachedData, currentMatch);
+  const { liveMatchState, liveMatchData, onCountdownEnd } = useLiveMatchState(cachedData, matchData);
 
   useForegroundMessaging();
 
@@ -129,13 +126,11 @@ function AppContent() {
           {activeTab === 'dashboard' && (
             <ErrorBoundary fallbackTitle="Pano">
               <Dashboard
-                matchData={currentMatch}
+                matchData={matchData}
                 next3Matches={next3Matches}
                 loading={loading && !matchData}
                 onRetry={loadMatchData}
                 errorMessage={errorMessage}
-                lastUpdated={lastUpdated}
-                isRefreshing={isRefreshing}
                 seasonState={seasonState}
                 season={season}
                 liveMatchState={liveMatchState}

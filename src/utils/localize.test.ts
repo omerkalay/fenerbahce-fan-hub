@@ -3,7 +3,6 @@ import {
     localizeTeamName,
     localizeCompetitionName,
     localizeCompetitionStage,
-    localizeText,
 } from './localize';
 
 describe('localizeTeamName', () => {
@@ -147,16 +146,5 @@ describe('localizeCompetitionStage', () => {
             round: 2,
             qualificationOrPreliminary: true,
         })).toBe('2. Ön Eleme Turu');
-    });
-});
-
-describe('localizeText', () => {
-    it('applies both team and competition localization', () => {
-        expect(localizeText('Fenerbahce - Super Lig')).toBe('Fenerbahçe - Süper Lig');
-    });
-
-    it('handles empty input', () => {
-        expect(localizeText('')).toBe('');
-        expect(localizeText()).toBe('');
     });
 });

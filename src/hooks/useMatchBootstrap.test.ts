@@ -47,10 +47,9 @@ describe('useMatchBootstrap', () => {
 
     const { result } = renderHook(() => useMatchBootstrap());
 
-    await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+    await waitFor(() => expect(result.current.errorMessage).toContain('Son kayıtlı bilgiler'));
     expect(result.current.matchData).toEqual(cachedMatch);
     expect(result.current.next3Matches).toEqual([cachedMatch]);
-    expect(result.current.errorMessage).toContain('Son kayıtlı bilgiler');
   });
 
   it('keeps locally cached match data when the request throws', async () => {
@@ -59,10 +58,9 @@ describe('useMatchBootstrap', () => {
 
     const { result } = renderHook(() => useMatchBootstrap());
 
-    await waitFor(() => expect(result.current.isRefreshing).toBe(false));
+    await waitFor(() => expect(result.current.errorMessage).toContain('Son kayıtlı bilgiler'));
     expect(result.current.matchData).toEqual(cachedMatch);
     expect(result.current.next3Matches).toEqual([cachedMatch]);
-    expect(result.current.errorMessage).toContain('Son kayıtlı bilgiler');
   });
 
   it('shows an error when neither backend nor local cache has match data', async () => {

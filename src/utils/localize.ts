@@ -137,7 +137,3 @@ export const localizeCompetitionStage = ({
 
     return localizeCompetitionName(name);
 };
-
-export const localizeText = (text: string = ''): string => {
-    return localizeCompetitionName(localizeTeamName(text));
-};

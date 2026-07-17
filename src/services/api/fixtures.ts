@@ -1,5 +1,5 @@
 import { BACKEND_URL, ensureAbsolutePhoto } from './base';
-import type { Player, MatchData, MatchSummaryData, MatchStatusPayload } from '../../types';
+import type { Player, MatchSummaryData, MatchStatusPayload } from '../../types';
 
 const normalizeMatchStatusPayload = (value: Partial<MatchStatusPayload> = {}): MatchStatusPayload => ({
     nextMatch: value.nextMatch ?? null,
@@ -22,17 +22,6 @@ export const fetchMatchStatus = async (): Promise<MatchStatusPayload> => {
     }
 };
 
-export const fetchNextMatch = async (): Promise<MatchData | null> => {
-    try {
-        const response = await fetch(`${BACKEND_URL}/next-match`);
-        if (!response.ok) throw new Error('Backend fetch failed');
-        return await response.json();
-    } catch (error) {
-        console.error("Error fetching next match from backend:", error);
-        return null;
-    }
-};
-
 export const fetchSquad = async (): Promise<Player[]> => {
     try {
         const response = await fetch(`${BACKEND_URL}/squad`);
@@ -44,17 +33,6 @@ export const fetchSquad = async (): Promise<Player[]> => {
         }));
     } catch (error) {
         console.error("Error fetching squad from backend:", error);
-        return [];
-    }
-};
-
-export const fetchNext3Matches = async (): Promise<MatchData[]> => {
-    try {
-        const response = await fetch(`${BACKEND_URL}/next-3-matches`);
-        if (!response.ok) throw new Error('Backend fetch failed');
-        return await response.json();
-    } catch (error) {
-        console.error("Error fetching next 3 matches from backend:", error);
         return [];
     }
 };
@@ -73,8 +51,4 @@ export const fetchMatchSummary = async (matchId: string): Promise<MatchSummaryDa
         console.error('Error fetching match summary from backend:', error);
         return null;
     }
-};
-
-export const fetchInjuries = async (): Promise<never[]> => {
-    return [];
 };

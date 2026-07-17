@@ -30,8 +30,6 @@ interface DashboardProps {
     loading: boolean;
     onRetry: (() => void) | undefined;
     errorMessage: string | null;
-    lastUpdated: number | null;
-    isRefreshing: boolean;
     seasonState: SeasonState;
     season: SeasonMeta | null;
     liveMatchState: LiveMatchState;
@@ -45,8 +43,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     loading,
     onRetry,
     errorMessage,
-    lastUpdated: _lastUpdated,
-    isRefreshing: _isRefreshing,
     seasonState,
     season,
     liveMatchState = 'countdown',

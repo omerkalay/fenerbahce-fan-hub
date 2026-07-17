@@ -28,8 +28,7 @@ export default defineConfig(({ mode }) => {
         includeAssets: [
           'pwa-192.png',
           'pwa-512.png',
-          'pwa-maskable.png',
-          'vite.svg'
+          'pwa-maskable.png'
         ],
         manifest: {
           name: 'Fenerbahçe Fan Hub',
@@ -65,7 +64,7 @@ export default defineConfig(({ mode }) => {
           globIgnores: ['**/firebase-messaging-sw.js', '**/firebase-messaging-sw-template.js'],
           runtimeCaching: [
             {
-              urlPattern: new RegExp(`${backendPattern}/api/(next-match|next-3-matches|squad)`),
+              urlPattern: new RegExp(`${backendPattern}/api/(match-status|next-match|next-3-matches|squad)`),
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'fb-api-cache',
