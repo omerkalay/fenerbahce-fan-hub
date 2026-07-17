@@ -6,19 +6,26 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.10.1-blue)
+![Version](https://img.shields.io/badge/version-2.10.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.10.1
+## What's New in v2.10.2
+
+- **Failure-Safe Cache Refresh** - Scheduled and protected refreshes now preserve the last known-good match, squad, and finished-match cache when SofaScore fails; the frontend also keeps its local match fallback instead of replacing it with an empty error state
+- **Regression Coverage** - Added backend cache-safety and frontend bootstrap fallback tests; the full quality gate now passes 299 tests before the production build
+
+<details>
+<summary>Previous: v2.10.1</summary>
 
 - **Season-Safe Fixture History** - Historical fixture selections now open on completed matches, disable the invalid remaining-matches view, and reject ESPN events outside the selected July-to-June season window
 - **Visible Opponent Search** - Team search moved beside the compact season picker, stays visible without opening advanced filters, and stacks cleanly on screens narrower than 360px
 - **Season-Aware Goal & Assist Rankings** - The scorer and assister tables share a recent-three-season picker, and every Super Lig/Europa roster request now includes the selected season instead of mixing in ESPN's previous-season fallback
 - **Turkish & Mobile UI Polish** - Club friendly labels render as `Hazırlık Maçı`; the app root now covers the dynamic viewport consistently and prevents horizontal background gaps on mobile/PWA surfaces
-- **Regression Coverage** - Added season-boundary and player-stat request tests; the full quality gate now passes 287 tests before the production build
+
+</details>
 
 <details>
 <summary>Previous: v2.10.0</summary>
@@ -238,10 +245,10 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 
 ### Test Stack
 
-- **Vitest** — test runner (Node environment by default, jsdom where component tests need it)
+- **Vitest** — test runner (Node environment by default, happy-dom where component and hook tests need it)
 - **@testing-library/react** — component testing utilities
 - **@testing-library/jest-dom** — DOM assertion matchers
-- **jsdom** — browser environment simulation
+- **happy-dom** — browser environment simulation for React component and hook tests
 
 ### Quality Commands
 
@@ -263,8 +270,10 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 | Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
 | Season helpers | `src/utils/seasons.test.ts` | July season rollover, recent-season options, historical detection, selected-season date boundaries |
 | Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Super Lig/Europa requests and combined goal/assist totals |
+| Cache refresh safety | `functions/utils/cacheRefresh.test.js` | Last known-good cache preservation on provider failure and replacement only after a successful response |
+| Match bootstrap fallback | `src/hooks/useMatchBootstrap.test.ts` | Local match preservation across empty backend responses and request failures |
 
-Backend tests (`functions/services/espn.test.js`) import from `espn-helpers.js` (pure module, no Firebase dependency) so they run without any mocks or side effects.
+Backend parser and cache-safety tests import pure helper modules without Firebase dependencies, so they run without database mocks or side effects.
 
 ### CI Quality Gate
 
@@ -485,7 +494,7 @@ firebase deploy --only functions
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match & squad data from SofaScore, standings from ESPN. Caches in Firebase. Cleans up old polls & notification records. |
+| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache and record the failed attempt without blanking the dashboard. |
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
 | `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches (Süper Lig + Europa League) during match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
 | `reconcileTopicSync` | Every 5 minutes | Retries pending `all_fans` topic subscribe/unsubscribe intents until FCM confirms. |
@@ -566,4 +575,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.10.1** | July 2026
+**v2.10.2** | July 2026

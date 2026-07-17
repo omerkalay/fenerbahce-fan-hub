@@ -1,7 +1,11 @@
 const { db, adminRefreshKey, sleep } = require('../config');
 const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
 const { refreshCachedImagesForCache } = require('../services/imageCache');
-const { buildSeasonMeta, resolveSeasonState } = require('../utils/seasonState');
+const {
+    createRefreshCache,
+    applyMatchFetchSuccess,
+    applyMatchFetchFailure
+} = require('../utils/cacheRefresh');
 
 async function handleHealth(req, res) {
     const cacheSnapshot = await db.ref('cache/lastUpdate').once('value');
@@ -31,43 +35,18 @@ async function handleRefresh(req, res) {
     try {
         const now = Date.now();
         const referenceDate = new Date(now);
-        const existingSummariesSnapshot = await db.ref('cache/matchSummaries').once('value');
-        const existingMatchSummaries = existingSummariesSnapshot.val() || {};
-        let fetchedMatches = [];
-        let matchFetchOk = false;
-
-        const cache = {
-            nextMatch: null,
-            next3Matches: [],
-            lastFinishedMatch: null,
-            matchSummaries: existingMatchSummaries,
-            squad: [],
-            lastUpdate: now,
-            matchFetchStatus: 'pending',
-            seasonState: 'unknown',
-            season: buildSeasonMeta(referenceDate)
-        };
+        const existingCacheSnapshot = await db.ref('cache').once('value');
+        const existingCache = existingCacheSnapshot.val() || {};
+        let cache = createRefreshCache({ existingCache, now, referenceDate });
 
         // Fetch matches
         try {
             const events = await fetchNextMatches();
-            fetchedMatches = events;
-            matchFetchOk = true;
-            cache.matchFetchStatus = 'ok';
-            if (events.length > 0) {
-                cache.nextMatch = events[0];
-                cache.next3Matches = events.slice(0, 3);
-            }
+            cache = applyMatchFetchSuccess(cache, events, { now, referenceDate });
         } catch (error) {
-            cache.matchFetchStatus = 'error';
+            cache = applyMatchFetchFailure(cache);
             console.error('Match fetch failed:', error.message);
         }
-
-        cache.seasonState = resolveSeasonState({
-            nextMatches: fetchedMatches,
-            matchFetchOk,
-            referenceDate
-        });
 
         await sleep(1000);
 
@@ -80,13 +59,13 @@ async function handleRefresh(req, res) {
             console.error('Squad fetch failed:', error.message);
         }
 
-        await db.ref('cache').set(cache);
+        await db.ref('cache').update(cache);
         const imageStats = await refreshCachedImagesForCache(cache);
 
         return res.json({
             success: true,
             message: 'Cache refreshed',
-            lastUpdate: new Date(cache.lastUpdate).toISOString(),
+            lastUpdate: cache.lastUpdate ? new Date(cache.lastUpdate).toISOString() : null,
             stats: {
                 matches: cache.next3Matches.length,
                 squad: cache.squad.length,

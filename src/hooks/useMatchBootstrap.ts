@@ -51,11 +51,11 @@ export function useMatchBootstrap() {
       const timestamp = status.lastUpdate ?? Date.now();
 
       const normalizedUpcoming = Array.isArray(upcomingMatches) ? upcomingMatches : [];
-      setNext3Matches(normalizedUpcoming);
-      setSeasonState(resolvedSeasonState);
-      setSeason(status.season);
 
       if (nextMatch) {
+        setNext3Matches(normalizedUpcoming);
+        setSeasonState(resolvedSeasonState);
+        setSeason(status.season);
         setMatchData(nextMatch);
         const payload: CachedMatchPayload = {
           nextMatch,
@@ -71,6 +71,9 @@ export function useMatchBootstrap() {
 
         setLastUpdated(payload.timestamp);
       } else if (resolvedSeasonState === 'offseason') {
+        setNext3Matches(normalizedUpcoming);
+        setSeasonState(resolvedSeasonState);
+        setSeason(status.season);
         setMatchData(null);
         setErrorMessage(null);
 
@@ -88,14 +91,29 @@ export function useMatchBootstrap() {
 
         setLastUpdated(payload.timestamp);
       } else {
-        setMatchData(null);
-        setErrorMessage('Maç verisi alınamadı. Lütfen bağlantını kontrol edip tekrar dene.');
+        if (!hasCached) {
+          setMatchData(null);
+          setNext3Matches([]);
+          setSeasonState(resolvedSeasonState);
+          setSeason(status.season);
+        }
+        setErrorMessage(
+          hasCached
+            ? 'Maç verisi şu anda yenilenemedi. Son kayıtlı bilgiler gösteriliyor.'
+            : 'Maç verisi şu anda yenilenemedi. Lütfen biraz sonra tekrar dene.'
+        );
       }
     } catch (err) {
       console.error('loadMatchData error:', err);
-      setMatchData(null);
-      setNext3Matches([]);
-      setErrorMessage('Beklenmeyen bir hata oluştu. Tekrar dene veya biraz sonra gel.');
+      if (!hasCached) {
+        setMatchData(null);
+        setNext3Matches([]);
+      }
+      setErrorMessage(
+        hasCached
+          ? 'Maç verisi şu anda yenilenemedi. Son kayıtlı bilgiler gösteriliyor.'
+          : 'Beklenmeyen bir hata oluştu. Tekrar dene veya biraz sonra gel.'
+      );
     } finally {
       setLoading(false);
       setIsRefreshing(false);
