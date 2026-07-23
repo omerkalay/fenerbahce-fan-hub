@@ -61,6 +61,7 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           importScripts: [`${APP_BASE}firebase-messaging-sw.js`],
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           globIgnores: ['**/firebase-messaging-sw.js', '**/firebase-messaging-sw-template.js'],
           runtimeCaching: [
             {

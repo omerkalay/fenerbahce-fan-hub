@@ -20,13 +20,13 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({
 }) => {
     if (minimal) {
         return (
-            <label className={`inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 ${className}`}>
+            <label className={`season-selector inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 ${className}`}>
                 <CalendarDays size={13} className="text-yellow-300 shrink-0" />
                 <span className="relative inline-flex items-center">
                     <select
                         value={value}
                         onChange={(event) => onChange(Number(event.target.value))}
-                        className="appearance-none bg-transparent pr-5 text-xs font-bold text-white focus:outline-none"
+                        className="season-select appearance-none border-0 bg-transparent py-0 pl-0 pr-5 text-xs font-bold text-white focus:outline-none"
                         aria-label="Sezon seç"
                     >
                         {options.map((option) => (
@@ -45,7 +45,7 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({
     }
 
     return (
-        <label className={`glass-panel rounded-2xl border border-white/10 flex items-center gap-2.5 ${compact ? 'px-3 py-2' : 'p-3'} ${className}`}>
+        <label className={`season-selector glass-panel rounded-2xl border border-white/10 flex items-center gap-2.5 ${compact ? 'px-3 py-2' : 'p-3'} ${className}`}>
             <span className="h-9 w-9 rounded-xl bg-yellow-400/10 text-yellow-300 border border-yellow-400/20 inline-flex items-center justify-center shrink-0">
                 <CalendarDays size={17} />
             </span>
@@ -57,7 +57,7 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({
                     <select
                         value={value}
                         onChange={(event) => onChange(Number(event.target.value))}
-                        className="w-full appearance-none bg-transparent pr-6 text-sm font-bold text-white focus:outline-none"
+                        className="season-select w-full appearance-none border-0 bg-transparent py-0 pl-0 pr-6 text-sm font-bold text-white focus:outline-none"
                         aria-label="Sezon seç"
                     >
                         {options.map((option) => (

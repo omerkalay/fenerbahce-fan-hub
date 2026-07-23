@@ -4,6 +4,8 @@ import { localizeTeamName } from '../utils/localize';
 import type { EspnFixtureMatch, EspnTeam } from '../types';
 import SeasonSelector from './SeasonSelector';
 import { Search } from 'lucide-react';
+import { useTheme } from '../contexts/themeContextDef';
+import { resolveTeamCrest } from '../theme/teamCrest';
 
 // ─── Filter types ────────────────────────────────────────
 
@@ -77,31 +79,41 @@ const isScoredMatch = (match: EspnFixtureMatch): boolean => match.status.complet
 
 // ─── Sub-components ──────────────────────────────────────
 
-const TeamInline = ({ team, isFenerbahce = false, align = 'left' }: TeamInlineProps) => (
-    <div className={`flex items-center gap-2 min-w-0 ${align === 'right' ? 'justify-end text-right' : ''}`}>
-        {align === 'right' && (
-            <span className={`text-sm font-semibold truncate max-w-[120px] ${isFenerbahce ? 'text-yellow-300' : 'text-white'}`}>
-                {localizeTeamName(team.shortName || team.name)}
-            </span>
-        )}
+const TeamInline = ({ team, isFenerbahce = false, align = 'left' }: TeamInlineProps) => {
+    const { theme } = useTheme();
+    const teamCrest = resolveTeamCrest({
+        theme,
+        defaultSrc: team.logo,
+        teamName: team.name,
+        isFenerbahce,
+    });
 
-        <div className={`w-9 h-9 rounded-full overflow-hidden border flex items-center justify-center shrink-0 ${isFenerbahce ? 'border-yellow-400/40 bg-yellow-400/10' : 'border-white/10 bg-white/5'}`}>
-            {team.logo ? (
-                <img src={team.logo} alt={localizeTeamName(team.name)} className="w-full h-full object-contain p-1" loading="lazy" />
-            ) : (
-                <span className="text-[10px] font-bold text-slate-200">
-                    {(team.abbreviation || localizeTeamName(team.name).slice(0, 2)).toUpperCase()}
+    return (
+        <div className={`flex items-center gap-2 min-w-0 ${align === 'right' ? 'justify-end text-right' : ''}`}>
+            {align === 'right' && (
+                <span className={`text-sm font-semibold truncate max-w-[120px] ${isFenerbahce ? 'text-yellow-300' : 'text-white'}`}>
+                    {localizeTeamName(team.shortName || team.name)}
+                </span>
+            )}
+
+            <div className={`w-9 h-9 rounded-full overflow-hidden border flex items-center justify-center shrink-0 ${isFenerbahce ? 'border-yellow-400/40 bg-yellow-400/10' : 'border-white/10 bg-white/5'}`}>
+                {teamCrest ? (
+                    <img src={teamCrest} alt={localizeTeamName(team.name)} className="w-full h-full object-contain p-1" loading="lazy" />
+                ) : (
+                    <span className="text-[10px] font-bold text-slate-200">
+                        {(team.abbreviation || localizeTeamName(team.name).slice(0, 2)).toUpperCase()}
+                    </span>
+                )}
+            </div>
+
+            {align !== 'right' && (
+                <span className={`text-sm font-semibold truncate max-w-[120px] ${isFenerbahce ? 'text-yellow-300' : 'text-white'}`}>
+                    {localizeTeamName(team.shortName || team.name)}
                 </span>
             )}
         </div>
-
-        {align !== 'right' && (
-            <span className={`text-sm font-semibold truncate max-w-[120px] ${isFenerbahce ? 'text-yellow-300' : 'text-white'}`}>
-                {localizeTeamName(team.shortName || team.name)}
-            </span>
-        )}
-    </div>
-);
+    );
+};
 
 const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSummary = null }: FixtureMatchCardProps) => {
     const dateInfo = formatMatchDate(match.date);
@@ -210,7 +222,7 @@ function FixtureSchedule() {
 
     return (
         <div className="min-h-screen pb-24">
-            <section className="sticky top-0 z-30 mb-4 space-y-3 pt-1 pb-2 bg-gradient-to-b from-slate-950/95 via-slate-950/90 to-transparent backdrop-blur-sm">
+            <section className="fixture-toolbar sticky top-0 z-30 mb-4 space-y-3 pt-1 pb-2 bg-gradient-to-b from-slate-950/95 via-slate-950/90 to-transparent backdrop-blur-sm">
                 <div className="grid grid-cols-1 min-[360px]:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] gap-2">
                     <SeasonSelector
                         value={selectedSeasonStartYear}
@@ -219,14 +231,14 @@ function FixtureSchedule() {
                         compact
                     />
 
-                    <label className="min-h-14 rounded-2xl border border-white/10 bg-white/[0.035] backdrop-blur-md flex min-w-0 items-center gap-2.5 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus-within:border-yellow-400/35 focus-within:bg-yellow-400/[0.035] transition-colors">
+                    <label className="fixture-search-control min-h-14 rounded-2xl border border-white/10 bg-white/[0.035] backdrop-blur-md flex min-w-0 items-center gap-2.5 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] focus-within:border-yellow-400/35 focus-within:bg-yellow-400/[0.035] transition-colors">
                         <Search size={18} className="shrink-0 text-yellow-300" aria-hidden="true" />
                         <input
                             type="search"
                             value={searchTerm}
                             onChange={(event: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(event.target.value)}
                             placeholder="Takım ara..."
-                            className="block w-full min-w-0 bg-transparent text-sm font-semibold text-white placeholder:text-slate-400 focus:outline-none"
+                            className="fixture-search-input block w-full min-w-0 border-0 bg-transparent p-0 text-sm font-semibold text-white placeholder:text-slate-400 focus:outline-none"
                             aria-label="Rakip takım ara"
                         />
                     </label>

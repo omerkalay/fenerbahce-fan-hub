@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { fetchEspnStandings } from '../services/api';
 import { localizeTeamName } from '../utils/localize';
+import { useTheme } from '../contexts/themeContextDef';
+import { resolveTeamCrest } from '../theme/teamCrest';
 import type { StandingsRow } from '../types';
 
 interface CustomStandingsProps {
@@ -42,6 +44,7 @@ const getZoneColor = (rank: number, league: string): string | null => {
 };
 
 const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomStandingsProps) => {
+    const { theme } = useTheme();
     const [standings, setStandings] = useState<StandingsRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -101,7 +104,7 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
             )}
 
             <table className="w-full text-left border-collapse">
-                <thead className="sticky top-0 z-10" style={{ background: 'rgba(15,23,42,0.97)' }}>
+                <thead className="standings-table-head sticky top-0 z-10">
                     <tr className="text-[10px] sm:text-[11px] text-slate-400 bg-slate-700/20">
                         <th className="py-2.5 pl-3 pr-1 font-medium w-8 text-center">#</th>
                         <th className="py-2.5 px-1 font-medium">Takım</th>
@@ -121,6 +124,12 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
                         const isFener = row.team.name.toLowerCase().includes('fenerbahce') ||
                             row.team.name.toLowerCase().includes('fener');
                         const zoneColor = getZoneColor(row.rank, league);
+                        const teamCrest = resolveTeamCrest({
+                            theme,
+                            defaultSrc: row.team.logo,
+                            teamName: row.team.name,
+                            isFenerbahce: isFener,
+                        });
 
                         return (
                             <tr
@@ -147,9 +156,9 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
                                 <td className="py-2 px-1">
                                     <div className="flex items-center gap-2">
                                         <div className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0">
-                                            {row.team.logo ? (
+                                            {teamCrest ? (
                                                 <img
-                                                    src={row.team.logo}
+                                                    src={teamCrest}
                                                     alt={localizeTeamName(row.team.name)}
                                                     className="w-full h-full object-contain"
                                                     onError={(e) => {

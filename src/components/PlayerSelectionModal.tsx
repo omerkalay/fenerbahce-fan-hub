@@ -26,11 +26,17 @@ const PlayerSelectionModal = ({ visible, squad, activePitchPlayers, onSelect, on
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={handleClose}>
+        <div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="player-selection-title"
+            onClick={handleClose}
+        >
             <div className="glass-card rounded-2xl p-6 w-full max-w-sm max-h-[75vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4 gap-3">
                     <div className="flex-1">
-                        <h3 className="text-lg font-bold text-white">Oyuncu Seç</h3>
+                        <h3 id="player-selection-title" className="text-lg font-bold text-white">Oyuncu Seç</h3>
                         <div className="mt-3 relative">
                             <input
                                 type="text"
@@ -52,6 +58,7 @@ const PlayerSelectionModal = ({ visible, squad, activePitchPlayers, onSelect, on
                     <button
                         onClick={handleClose}
                         className="text-slate-400 hover:text-white"
+                        aria-label="Oyuncu seçimini kapat"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

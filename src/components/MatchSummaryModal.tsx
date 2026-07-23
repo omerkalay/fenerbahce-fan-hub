@@ -5,6 +5,8 @@ import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
 import { localizeTeamName } from '../utils/localize';
 import { getCurrentSeasonStartYear } from '../utils/seasons';
+import { useTheme } from '../contexts/themeContextDef';
+import { resolveTeamCrest } from '../theme/teamCrest';
 import type { EspnFixtureMatch, MatchSummaryData } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -57,7 +59,20 @@ function MatchSummaryModal({
     seasonStartYear,
     onClose,
 }: MatchSummaryModalProps) {
+    const { theme } = useTheme();
     if (!activeSummaryMatch) return null;
+    const summaryHomeName = activeSummaryData?.homeTeam?.name || activeSummaryMatch.homeTeam?.name || '';
+    const summaryAwayName = activeSummaryData?.awayTeam?.name || activeSummaryMatch.awayTeam?.name || '';
+    const displaySummaryHomeLogo = resolveTeamCrest({
+        theme,
+        defaultSrc: summaryHomeLogo,
+        teamName: summaryHomeName,
+    });
+    const displaySummaryAwayLogo = resolveTeamCrest({
+        theme,
+        defaultSrc: summaryAwayLogo,
+        teamName: summaryAwayName,
+    });
     const homeIncidentTeamId = String(activeSummaryMatch.homeTeam?.id || activeSummaryData?.homeTeam?.id || '');
     const awayIncidentTeamId = String(activeSummaryMatch.awayTeam?.id || activeSummaryData?.awayTeam?.id || '');
     const summaryIncidentEvents = (activeSummaryData?.events || []).filter((event) => event.isGoal || event.isRedCard);
@@ -117,8 +132,8 @@ function MatchSummaryModal({
                                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                                            {summaryHomeLogo ? (
-                                                <img src={summaryHomeLogo} alt={localizeTeamName(activeSummaryData.homeTeam?.name || '')} className="w-full h-full object-contain p-1" loading="lazy" />
+                                            {displaySummaryHomeLogo ? (
+                                                <img src={displaySummaryHomeLogo} alt={localizeTeamName(summaryHomeName)} className="w-full h-full object-contain p-1" loading="lazy" />
                                             ) : (
                                                 <span className="text-[10px] text-slate-300 font-bold">
                                                     {localizeTeamName(activeSummaryData.homeTeam?.name || '').slice(0, 2).toUpperCase()}
@@ -133,8 +148,8 @@ function MatchSummaryModal({
                                     <div className="flex items-center justify-end gap-2.5 min-w-0">
                                         <p className="hidden sm:block text-base font-bold text-white text-right truncate">{localizeTeamName(activeSummaryData.awayTeam?.name || '')}</p>
                                         <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                                            {summaryAwayLogo ? (
-                                                <img src={summaryAwayLogo} alt={localizeTeamName(activeSummaryData.awayTeam?.name || '')} className="w-full h-full object-contain p-1" loading="lazy" />
+                                            {displaySummaryAwayLogo ? (
+                                                <img src={displaySummaryAwayLogo} alt={localizeTeamName(summaryAwayName)} className="w-full h-full object-contain p-1" loading="lazy" />
                                             ) : (
                                                 <span className="text-[10px] text-slate-300 font-bold">
                                                     {localizeTeamName(activeSummaryData.awayTeam?.name || '').slice(0, 2).toUpperCase()}
@@ -276,5 +291,4 @@ function MatchSummaryModal({
 }
 
 export default MatchSummaryModal;
-
 

@@ -6,17 +6,27 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.10.2-blue)
+![Version](https://img.shields.io/badge/version-2.11.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.10.2
+## What's New in v2.11.0
+
+- **Selectable Themes** - The new public Settings panel offers `Klasik Gece` and `Beyaz Forma` designs without requiring sign-in; notification preferences remain a separate authenticated flow
+- **Device-Local PWA Preference** - The selected theme is stored under `fenerbahce-fan-hub.theme.v1` in browser storage, survives reloads, PWA restarts, offline launches, and service-worker updates on the same device, and is never synced to an account or server
+- **Flash-Free Startup** - A guarded bootstrap script validates the stored `ThemeId` (`classic | white-kit`) and applies the theme plus browser chrome color before React renders, falling back safely to the classic design
+- **120th Anniversary Identity** - The White Kit theme carries the warm ivory, navy, and gold shirt-inspired print style across the full frontend and replaces Fenerbahçe crests with the transparent 120th anniversary artwork
+
+<details>
+<summary>Previous: v2.10.2</summary>
 
 - **Failure-Safe Cache Refresh** - Scheduled and protected refreshes now preserve the last known-good match, squad, and finished-match cache when SofaScore fails; the frontend also keeps its local match fallback instead of replacing it with an empty error state
 - **Frontend Maintenance Cleanup** - Removed unused legacy squad components, mock assets, dead API exports, stale types, and an unused dependency without changing the notification or Firebase Functions code
 - **Regression Coverage** - Added backend cache-safety and frontend bootstrap fallback tests; the full quality gate now passes 297 tests before the production build
+
+</details>
 
 <details>
 <summary>Previous: v2.10.1</summary>
@@ -127,7 +137,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions. Requires Google sign-in to configure
 - **Upcoming Matches**: Display next 3 fixtures with dates and opponents
 - **Automatic Data Cleanup**: Old polls and notification records cleaned up daily
-- **Premium UI**: Glassmorphic design with smooth animations
+- **Selectable Visual System**: `Klasik Gece` preserves the original glassmorphic UI, while `Beyaz Forma` applies the 120th anniversary ivory, navy, and gold print style across every frontend surface
+- **Local Theme Persistence**: Theme selection is available without sign-in and remains on the current browser/PWA installation; it is not stored in Firebase or synchronized between devices
 
 ### Fixture Explorer
 - **Dedicated Fixture Tab**: Separate bottom-nav screen for season fixtures
@@ -585,4 +596,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.10.2** | July 2026
+**v2.11.0** | July 2026

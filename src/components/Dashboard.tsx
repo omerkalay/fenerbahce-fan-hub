@@ -22,6 +22,8 @@ import {
     normalizeStartingXIData
 } from '../utils/dashboardHelpers';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
+import { useTheme } from '../contexts/themeContextDef';
+import { resolveTeamCrest } from '../theme/teamCrest';
 import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData, SeasonMeta, SeasonState } from '../types';
 
 interface DashboardProps {
@@ -49,12 +51,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     liveMatchData = null,
     onCountdownEnd
 }) => {
+    const { theme } = useTheme();
     const [showLiveMatchModal, setShowLiveMatchModal] = useState<boolean>(false);
     const [showStandingsModal, setShowStandingsModal] = useState<boolean>(false);
     const [standingsLeague, setStandingsLeague] = useState<string>('');
     const [standingsSeasonStartYear, setStandingsSeasonStartYear] = useState<number>(() => getCurrentSeasonStartYear());
     const [showStartingXIModal, setShowStartingXIModal] = useState<boolean>(false);
     const [startingXI, setStartingXI] = useState<StartingXIData | null>(null);
+    const offseasonCrest = resolveTeamCrest({
+        theme,
+        defaultSrc: 'https://media.api-sports.io/football/teams/611.png',
+        isFenerbahce: true,
+    });
 
     useEffect(() => {
         const startingXIRef = ref(database, 'admin/startingXI');
@@ -100,7 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="glass-panel rounded-2xl p-6 text-center border border-yellow-400/15 w-full">
                         <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 p-0.5 shadow-lg shadow-yellow-500/20">
                             <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
-                                <img src="https://media.api-sports.io/football/teams/611.png" alt="Fenerbahçe" className="w-11 h-11 object-contain" />
+                                <img src={offseasonCrest || undefined} alt="Fenerbahçe" className="w-11 h-11 object-contain" />
                             </div>
                         </div>
                         <p className="text-lg font-black text-white">

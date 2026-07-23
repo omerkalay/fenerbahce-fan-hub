@@ -8,6 +8,25 @@
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <meta name="theme-color" content="#0f172a" />
+  <script>
+    (() => {
+      const key = 'fenerbahce-fan-hub.theme.v1';
+      const allowedThemes = new Set(['classic', 'white-kit']);
+      let theme = 'classic';
+
+      try {
+        const savedTheme = window.localStorage.getItem(key);
+        if (allowedThemes.has(savedTheme)) theme = savedTheme;
+      } catch {
+        // Storage can be unavailable in private or restricted browser contexts.
+      }
+
+      document.documentElement.dataset.theme = theme;
+      document.documentElement.style.colorScheme = theme === 'white-kit' ? 'light' : 'dark';
+      document.querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', theme === 'white-kit' ? '#F5F0E1' : '#0f172a');
+    })();
+  </script>
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

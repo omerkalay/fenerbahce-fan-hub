@@ -11,12 +11,22 @@ import { AuthProvider } from './contexts/AuthContext';
 import { useMatchBootstrap } from './hooks/useMatchBootstrap';
 import { useLiveMatchState } from './hooks/useLiveMatchState';
 import { useForegroundMessaging } from './hooks/useForegroundMessaging';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { useTheme } from './contexts/themeContextDef';
+import { resolveTeamCrest } from './theme/teamCrest';
 
 type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
 
 function AppContent() {
   const [fontsReady, setFontsReady] = useState(typeof window === 'undefined');
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const { theme } = useTheme();
+  const isWhiteKit = theme === 'white-kit';
+  const headerCrest = resolveTeamCrest({
+    theme,
+    defaultSrc: 'https://media.api-sports.io/football/teams/611.png',
+    isFenerbahce: true,
+  });
 
   const {
     cachedData,
@@ -69,10 +79,10 @@ function AppContent() {
 
   if (!fontsReady) {
     return (
-      <div className="min-h-dvh w-full bg-slate-950 text-white pb-24 relative overflow-hidden">
-        <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-          <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-500/10 rounded-full blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[100px]"></div>
+      <div className="app-shell min-h-dvh w-full pb-24 relative overflow-hidden">
+        <div className="app-ambient fixed top-0 left-0 w-full h-full pointer-events-none z-0">
+          <div className="app-ambient-gold absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full blur-[100px]"></div>
+          <div className="app-ambient-navy absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full blur-[100px]"></div>
         </div>
         <div className="relative z-10 max-w-md mx-auto h-full min-h-screen flex flex-col px-4 pt-6">
           <div className="h-10 w-52 rounded-xl bg-white/10 animate-pulse mb-2"></div>
@@ -94,28 +104,34 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-dvh w-full bg-slate-950 text-white pb-24 relative overflow-hidden">
+    <div className="app-shell min-h-dvh w-full pb-24 relative overflow-hidden">
       {/* Background Effects */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-yellow-500/10 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[100px]"></div>
+      <div className="app-ambient fixed top-0 left-0 w-full h-full pointer-events-none z-0">
+        <div className="app-ambient-gold absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full blur-[100px]"></div>
+        <div className="app-ambient-navy absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full blur-[100px]"></div>
       </div>
 
       <div className="relative z-10 max-w-md mx-auto h-full min-h-screen flex flex-col">
         {/* Header */}
-        <header className="p-6 flex items-center justify-between">
+        <header className="app-header p-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 to-yellow-200">
+            <h1 className="app-brand text-2xl font-bold">
               Fenerbahçe Hub
             </h1>
-            <p className="text-slate-400 text-xs">Taraftarın Sesi</p>
+            <p className="app-tagline text-xs">
+              {isWhiteKit ? '120. Yıla Özel' : 'Taraftarın Sesi'}
+            </p>
           </div>
           <div className="flex items-center gap-3">
             <NotificationSettings />
             <UserAvatar />
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 p-0.5 shadow-lg shadow-yellow-500/20">
-              <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-                <img src="https://media.api-sports.io/football/teams/611.png" alt="FB Logo" className="w-8 h-8 object-contain" />
+            <div className="brand-medallion w-10 h-10 rounded-full p-0.5">
+              <div className="brand-medallion-inner w-full h-full rounded-full flex items-center justify-center overflow-hidden">
+                <img
+                  src={headerCrest || undefined}
+                  alt={isWhiteKit ? 'Fenerbahçe 120. yıl logosu' : 'Fenerbahçe logosu'}
+                  className={isWhiteKit ? 'anniversary-logo' : 'w-8 h-8 object-contain'}
+                />
               </div>
             </div>
           </div>
@@ -157,10 +173,11 @@ function AppContent() {
         </main>
 
         {/* Bottom Navigation */}
-        <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[88%] max-w-sm glass-panel rounded-2xl p-2 flex justify-around items-center z-50">
+        <nav className="app-bottom-nav fixed bottom-6 left-1/2 -translate-x-1/2 w-[88%] max-w-sm glass-panel rounded-2xl p-2 flex justify-around items-center z-50" aria-label="Ana navigasyon">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-slate-400 hover:text-white'}`}
+            className={`app-nav-button flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'dashboard' ? 'is-active' : ''}`}
+            aria-current={activeTab === 'dashboard' ? 'page' : undefined}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -170,7 +187,8 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('fixtures')}
-            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'fixtures' ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-slate-400 hover:text-white'}`}
+            className={`app-nav-button flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'fixtures' ? 'is-active' : ''}`}
+            aria-current={activeTab === 'fixtures' ? 'page' : undefined}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10m-11 9h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v11a2 2 0 002 2z" />
@@ -180,7 +198,8 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('statistics')}
-            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'statistics' ? 'bg-white/10 text-yellow-400 shadow-[0_0_15px_rgba(234,179,8,0.3)]' : 'text-slate-400 hover:text-white'}`}
+            className={`app-nav-button flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'statistics' ? 'is-active' : ''}`}
+            aria-current={activeTab === 'statistics' ? 'page' : undefined}
           >
             <BarChart2 className="h-7 w-7" />
             <span className="text-[10px] mt-1 font-medium">İstatistikler</span>
@@ -188,7 +207,8 @@ function AppContent() {
 
           <button
             onClick={() => setActiveTab('builder')}
-            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'builder' ? 'bg-yellow-500 text-white shadow-[0_0_20px_rgba(234,179,8,0.5)] scale-110' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
+            className={`app-nav-button app-nav-button-builder flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 ${activeTab === 'builder' ? 'is-active' : ''}`}
+            aria-current={activeTab === 'builder' ? 'page' : undefined}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
@@ -203,9 +223,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -3,6 +3,8 @@ import { getEventVisualType } from '../utils/eventVisualType';
 import MatchLineups from './MatchLineups';
 import { formatMatchClock } from '../utils/matchClock';
 import { localizePlayerName } from '../utils/playerDisplay';
+import { useTheme } from '../contexts/themeContextDef';
+import { resolveTeamCrest } from '../theme/teamCrest';
 import type { LiveMatchData, MatchStat } from '../types';
 
 interface StatGroup {
@@ -63,6 +65,7 @@ interface LiveMatchScoreProps {
 }
 
 const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
+    const { theme } = useTheme();
 
     const orderedStats: (MatchStat & { label: string })[] = STAT_GROUPS
         .map((group) => {
@@ -89,6 +92,16 @@ const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
         const teamId = String(event.team || '');
         return teamId !== homeTeamId && teamId !== awayTeamId;
     });
+    const homeTeamCrest = resolveTeamCrest({
+        theme,
+        defaultSrc: liveData.homeTeam?.logo,
+        teamName: liveData.homeTeam?.name,
+    });
+    const awayTeamCrest = resolveTeamCrest({
+        theme,
+        defaultSrc: liveData.awayTeam?.logo,
+        teamName: liveData.awayTeam?.name,
+    });
 
     return (
         <div className="w-full space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
@@ -114,14 +127,14 @@ const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
                 <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
                         <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                            {liveData.homeTeam?.logo && (
+                            {homeTeamCrest && (
                                 <img
-                                    src={liveData.homeTeam.logo}
-                                    alt={liveData.homeTeam.name}
+                                    src={homeTeamCrest}
+                                    alt={liveData.homeTeam?.name || 'Ev sahibi'}
                                     className="w-full h-full object-contain p-1"
                                 />
                             )}
-                            {!liveData.homeTeam?.logo && (
+                            {!homeTeamCrest && (
                                 <span className="text-[10px] text-slate-300 font-bold">
                                     {String(liveData.homeTeam?.name || '').slice(0, 2).toUpperCase()}
                                 </span>
@@ -137,14 +150,14 @@ const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
                     <div className="flex items-center justify-end gap-2.5 min-w-0">
                         <p className="hidden sm:block text-base font-bold text-white text-right truncate">{liveData.awayTeam?.name}</p>
                         <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                            {liveData.awayTeam?.logo && (
+                            {awayTeamCrest && (
                                 <img
-                                    src={liveData.awayTeam.logo}
-                                    alt={liveData.awayTeam.name}
+                                    src={awayTeamCrest}
+                                    alt={liveData.awayTeam?.name || 'Deplasman takımı'}
                                     className="w-full h-full object-contain p-1"
                                 />
                             )}
-                            {!liveData.awayTeam?.logo && (
+                            {!awayTeamCrest && (
                                 <span className="text-[10px] text-slate-300 font-bold">
                                     {String(liveData.awayTeam?.name || '').slice(0, 2).toUpperCase()}
                                 </span>
@@ -315,5 +328,3 @@ const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
 };
 
 export default LiveMatchScore;
-
-

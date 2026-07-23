@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NotificationOptions } from '../types';
 import { useAuth } from '../contexts/authContextDef';
+import { useTheme } from '../contexts/themeContextDef';
+import type { ThemeId } from '../theme/theme';
 import { getSignInErrorMessage } from '../utils/authHelpers';
 import useNotificationPreferences from '../hooks/useNotificationPreferences';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
@@ -8,8 +10,14 @@ import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
 const NotificationSettings = () => {
   const { user, signInWithGoogle } = useAuth();
-  const [showModal, setShowModal] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotificationAuth, setShowNotificationAuth] = useState(false);
+  const [openNotificationsAfterAuth, setOpenNotificationsAfterAuth] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const settingsCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsDialogRef = useRef<HTMLDivElement>(null);
 
   const {
     currentDraftOptions,
@@ -24,24 +32,113 @@ const NotificationSettings = () => {
     saveNotifications
   } = useNotificationPreferences(user);
 
-  useBodyScrollLock(showModal);
+  useBodyScrollLock(showSettings || showNotifications || showNotificationAuth);
 
-  const handleOpenModal = () => {
+  const handleOpenSettings = () => {
     setAuthError(null);
-    openDraft();
-    setShowModal(true);
+    setShowSettings(true);
   };
 
-  const handleCloseModal = () => {
+  const handleCloseSettings = () => {
+    setShowSettings(false);
+  };
+
+  const handleOpenNotifications = () => {
+    setShowSettings(false);
     setAuthError(null);
+
+    if (!user) {
+      setShowNotificationAuth(true);
+      return;
+    }
+
+    openDraft();
+    setShowNotifications(true);
+  };
+
+  const handleCloseNotifications = () => {
     closeDraft();
-    setShowModal(false);
+    setShowNotifications(false);
+  };
+
+  const handleCloseNotificationAuth = () => {
+    setShowNotificationAuth(false);
+    setOpenNotificationsAfterAuth(false);
+    setAuthError(null);
+  };
+
+  const handleSettingsDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== 'Tab' || !settingsDialogRef.current) return;
+
+    const focusableElements = Array.from(
+      settingsDialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ),
+    );
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    } else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
   };
 
   const handleSave = async () => {
     const saved = await saveNotifications();
-    if (saved) setShowModal(false);
+    if (saved) setShowNotifications(false);
   };
+
+  useEffect(() => {
+    if (showSettings) settingsCloseButtonRef.current?.focus();
+  }, [showSettings]);
+
+  useEffect(() => {
+    if (!user || !openNotificationsAfterAuth) return;
+    setShowNotificationAuth(false);
+    setOpenNotificationsAfterAuth(false);
+    openDraft();
+    setShowNotifications(true);
+  }, [openDraft, openNotificationsAfterAuth, user]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      if (showNotifications) {
+        handleCloseNotifications();
+      } else if (showNotificationAuth) {
+        handleCloseNotificationAuth();
+      } else if (showSettings) {
+        handleCloseSettings();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  });
+
+  const themeOptions: Array<{
+    id: ThemeId;
+    label: string;
+    description: string;
+  }> = [
+    {
+      id: 'classic',
+      label: 'Klasik Gece',
+      description: 'Mevcut koyu, cam yüzeyli tasarım',
+    },
+    {
+      id: 'white-kit',
+      label: 'Beyaz Forma',
+      description: 'Krem, altın ve lacivert baskı stili',
+    },
+  ];
 
   const notificationOptions: Array<{ id: keyof NotificationOptions; label: string; description: string }> = [
     {
@@ -70,10 +167,10 @@ const NotificationSettings = () => {
     <>
       <button
         type="button"
-        onClick={handleOpenModal}
+        onClick={handleOpenSettings}
         className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110 ${hasActiveNotifications ? 'ring-2 ring-yellow-400/60 text-yellow-400/80' : ''}`}
-        title="Bildirim ayarları"
-        aria-label="Bildirim ayarları"
+        title="Ayarlar"
+        aria-label="Ayarlar"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={hasActiveNotifications ? 2 : 1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -81,8 +178,99 @@ const NotificationSettings = () => {
         </svg>
       </button>
 
+      {showSettings && (
+        <div
+          className="settings-backdrop fixed inset-0 flex items-center justify-center z-[100] p-4 animate-fadeIn"
+          onMouseDown={handleCloseSettings}
+        >
+          <div
+            ref={settingsDialogRef}
+            className="settings-dialog w-full max-w-md max-h-[88vh] overflow-y-auto animate-slideUp"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+            onKeyDown={handleSettingsDialogKeyDown}
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="settings-header">
+              <div>
+                <p className="settings-kicker">Fenerbahçe Hub</p>
+                <h2 id="settings-title">Ayarlar</h2>
+              </div>
+              <button
+                ref={settingsCloseButtonRef}
+                type="button"
+                onClick={handleCloseSettings}
+                className="settings-close"
+                aria-label="Ayarları kapat"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <fieldset className="settings-section">
+              <legend>Tasarım</legend>
+              <p className="settings-description">
+                Görünüm bu cihazda saklanır ve uygulamayı tekrar açtığında korunur.
+              </p>
+              <div className="theme-options" role="radiogroup" aria-label="Tasarım teması">
+                {themeOptions.map((option) => {
+                  const selected = theme === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      className={`theme-option ${selected ? 'is-selected' : ''}`}
+                      onClick={() => setTheme(option.id)}
+                    >
+                      <span className={`theme-preview theme-preview-${option.id}`} aria-hidden="true">
+                        <span className="theme-preview-nav" />
+                        <span className="theme-preview-card">
+                          <span />
+                          <span />
+                        </span>
+                      </span>
+                      <span className="theme-option-copy">
+                        <strong>{option.label}</strong>
+                        <small>{option.description}</small>
+                      </span>
+                      <span className="theme-option-check" aria-hidden="true">
+                        {selected ? '✓' : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <div className="settings-section settings-notification-section">
+              <div>
+                <span className="settings-section-label">Bildirimler</span>
+                <p className="settings-description">
+                  {hasActiveNotifications
+                    ? 'Bildirim tercihlerin etkin.'
+                    : 'Maç ve önemli duyuru bildirimlerini yönet.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="settings-notification-button"
+                onClick={handleOpenNotifications}
+              >
+                <span>{user ? 'Bildirim ayarlarını aç' : 'Giriş yap ve ayarla'}</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <GoogleSignInModal
-        open={showModal && !user}
+        open={showNotificationAuth}
         title="Bildirim Ayarları"
         heading="Bildirim almak için giriş yap"
         description="Google hesabınla giriş yap, bildirim ayarların tüm cihazlarda senkronize kalsın."
@@ -92,7 +280,7 @@ const NotificationSettings = () => {
           </svg>
         }
         authError={authError}
-        onClose={handleCloseModal}
+        onClose={handleCloseNotificationAuth}
         footer={<p className="text-xs text-slate-500 mt-4">Giriş yaparak bildirim tercihlerini kaydedebilirsin.</p>}
       >
         <GoogleSignInButton
@@ -101,6 +289,7 @@ const NotificationSettings = () => {
               const outcome = await signInWithGoogle();
               if (outcome !== 'cancelled') {
                 setAuthError(null);
+                setOpenNotificationsAfterAuth(true);
               }
             } catch (signInError) {
               setAuthError(getSignInErrorMessage(signInError));
@@ -110,10 +299,10 @@ const NotificationSettings = () => {
         />
       </GoogleSignInModal>
 
-      {showModal && user && (
+      {showNotifications && user && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
-          onClick={handleCloseModal}
+          onClick={handleCloseNotifications}
         >
           <div
             className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp shadow-2xl"
@@ -126,7 +315,7 @@ const NotificationSettings = () => {
               </div>
               <button
                 type="button"
-                onClick={handleCloseModal}
+                onClick={handleCloseNotifications}
                 className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
                 aria-label="Kapat"
               >
@@ -225,7 +414,7 @@ const NotificationSettings = () => {
             <div className="flex gap-3">
               <button
                 type="button"
-                onClick={handleCloseModal}
+                onClick={handleCloseNotifications}
                 className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 font-medium border border-white/10 hover:border-white/20"
               >
                 İptal
