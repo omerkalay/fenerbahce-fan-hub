@@ -35,8 +35,16 @@ export interface SquadPhotoMaps {
 }
 
 export function buildSquadPhotoMaps(squad: Player[]): SquadPhotoMaps {
-    const byJersey = squad.reduce<Record<string, string>>((acc, player) => {
+    const jerseyCounts = squad.reduce<Record<string, number>>((acc, player) => {
         if (player.number != null && player.photo) {
+            const jersey = String(player.number);
+            acc[jersey] = (acc[jersey] || 0) + 1;
+        }
+        return acc;
+    }, {});
+
+    const byJersey = squad.reduce<Record<string, string>>((acc, player) => {
+        if (player.number != null && player.photo && jerseyCounts[String(player.number)] === 1) {
             acc[String(player.number)] = player.photo;
         }
         return acc;
@@ -79,10 +87,6 @@ export function findPlayerPhoto(
     jersey: string | number | null | undefined,
     maps: SquadPhotoMaps
 ): string | null {
-    if (jersey != null && maps.byJersey[String(jersey)]) {
-        return maps.byJersey[String(jersey)];
-    }
-
     const exactKey = normalizeLookupKey(name);
     if (exactKey && maps.byName[exactKey]) {
         return maps.byName[exactKey];
@@ -101,6 +105,10 @@ export function findPlayerPhoto(
     const rawTokens = getRawLookupTokens(name).sort((a, b) => b.length - a.length);
     for (const token of rawTokens) {
         if (maps.byAlias[token]) return maps.byAlias[token];
+    }
+
+    if (jersey != null && maps.byJersey[String(jersey)]) {
+        return maps.byJersey[String(jersey)];
     }
 
     return null;

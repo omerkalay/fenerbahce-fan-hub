@@ -40,6 +40,15 @@ describe('buildSquadPhotoMaps', () => {
         expect(maps.byJersey['99']).toBeUndefined();
     });
 
+    it('excludes duplicate jersey numbers from byJersey', () => {
+        const maps = buildSquadPhotoMaps([
+            { name: 'Vedat Muriqi', number: 19, photo: '/photos/muriqi.jpg', position: 'FW' },
+            { name: 'Yagiz Fikri Sen', number: 19, photo: '/photos/sen.jpg', position: 'FW' },
+        ] as Player[]);
+
+        expect(maps.byJersey['19']).toBeUndefined();
+    });
+
     it('builds byName map with normalized keys', () => {
         const maps = buildSquadPhotoMaps(squad);
         expect(maps.byName['edin dzeko']).toBe('/photos/dzeko.jpg');
@@ -71,7 +80,7 @@ describe('findPlayerPhoto', () => {
 
     const maps = buildSquadPhotoMaps(squad);
 
-    it('finds by jersey number (highest priority)', () => {
+    it('falls back to jersey number when the name is not found', () => {
         expect(findPlayerPhoto('Wrong Name', 17, maps)).toBe('/photos/dzeko.jpg');
     });
 
@@ -87,8 +96,20 @@ describe('findPlayerPhoto', () => {
         expect(findPlayerPhoto('Unknown Player', null, maps)).toBeNull();
     });
 
-    it('prefers jersey over name', () => {
+    it('prefers an exact name over the jersey number', () => {
         // Jersey 17 = Dzeko, but name says Livakovic
-        expect(findPlayerPhoto('Dominik Livakovic', 17, maps)).toBe('/photos/dzeko.jpg');
+        expect(findPlayerPhoto('Dominik Livakovic', 17, maps)).toBe('/photos/livakovic.jpg');
+    });
+
+    it('matches duplicate jersey holders by name', () => {
+        const duplicateJerseyMaps = buildSquadPhotoMaps([
+            { name: 'Vedat Muriqi', number: 19, photo: '/photos/muriqi.jpg', position: 'FW' },
+            { name: 'Yagiz Fikri Sen', number: 19, photo: '/photos/sen.jpg', position: 'FW' },
+            { name: 'Archie Brown', number: 3, photo: '/photos/brown.jpg', position: 'DF' },
+            { name: 'Diego Carlos', number: 3, photo: '/photos/carlos.jpg', position: 'DF' },
+        ] as Player[]);
+
+        expect(findPlayerPhoto('Vedat Muriqi', 19, duplicateJerseyMaps)).toBe('/photos/muriqi.jpg');
+        expect(findPlayerPhoto('Archie Brown', 3, duplicateJerseyMaps)).toBe('/photos/brown.jpg');
     });
 });
