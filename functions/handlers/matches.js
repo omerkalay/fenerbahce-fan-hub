@@ -1,6 +1,7 @@
 const { db } = require('../config');
 const { fetchEspnSummaryForMatch } = require('../services/espn');
 const { buildSeasonMeta, resolveLegacySeasonState } = require('../utils/seasonState');
+const { isSameMatch } = require('../utils/matchIdentity');
 
 async function handleNextMatch(req, res) {
     const snapshot = await db.ref('cache/nextMatch').once('value');
@@ -46,15 +47,24 @@ async function handleStandings(req, res) {
 
 async function handleLiveMatch(req, res) {
     try {
-        const liveSnapshot = await db.ref('cache/liveMatch').once('value');
+        const currentMatchSnapshot = await db.ref('cache/nextMatch').once('value');
+        const currentMatch = currentMatchSnapshot.val();
+        if (!currentMatch) {
+            return res.json({ matchState: 'no-match' });
+        }
+
+        const [liveSnapshot, lastFinishedSnapshot] = await Promise.all([
+            db.ref('cache/liveMatch').once('value'),
+            db.ref('cache/lastFinishedMatch').once('value')
+        ]);
         const liveData = liveSnapshot.val();
-        if (liveData) {
+
+        if (liveData && isSameMatch(liveData, currentMatch)) {
             return res.json(liveData);
         }
 
-        const lastFinishedSnapshot = await db.ref('cache/lastFinishedMatch').once('value');
         const lastFinished = lastFinishedSnapshot.val();
-        if (lastFinished) {
+        if (lastFinished && isSameMatch(lastFinished, currentMatch)) {
             return res.json(lastFinished);
         }
 

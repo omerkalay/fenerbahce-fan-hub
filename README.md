@@ -144,7 +144,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Dedicated Fixture Tab**: Separate bottom-nav screen for season fixtures
 - **Recent Season Picker**: Switch between the current season and the previous two seasons
 - **Season-Safe Timeline**: Current seasons prioritize remaining matches; historical seasons open on completed matches and exclude cross-season ESPN results
-- **Competition Filtering**: Filter by **Süper Lig** or **UEFA Europa League**
+- **Competition Filtering**: Filter by **Süper Lig** or European competitions (**Champions League**, **Europa League**, and **Conference League**, including qualifying/play-off rounds)
 - **Home/Away Filter**: Quickly narrow down to home or away fixtures
 - **Always-Visible Team Search**: Search by opponent directly beside the season picker without opening advanced filters
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
@@ -508,7 +508,7 @@ firebase deploy --only functions
 |----------|----------|-------------|
 | `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache and record the failed attempt without blanking the dashboard. |
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
-| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches (Süper Lig + Europa League) during match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
+| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches across Süper Lig and all UEFA club competitions during the match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
 | `reconcileTopicSync` | Every 5 minutes | Retries pending `all_fans` topic subscribe/unsubscribe intents until FCM confirms. |
 | `onStartingXIPushRequested` | RTDB trigger | Fires when `admin/startingXI/push/requested` transitions to `true`. Validates payload, dedupes by `publishedAt`, sends one-shot push to `all_fans`. |
 
@@ -525,7 +525,8 @@ firebase deploy --only functions
 - **Flow**: ESPN → `updateLiveMatch` (1/min) → DB `cache/liveMatch` + `cache/lastFinishedMatch` → Users read from DB
 - **Match Window**: Starts 30min before kickoff, ends 3 hours after
 - **Frontend State Flow**: Countdown → Checking → Live/Post (no misleading pre fallback after kickoff)
-- **Leagues**: Süper Lig (`tur.1`) + Europa League (`uefa.europa`)
+- **Leagues**: Süper Lig plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
+- **Match Identity Guard**: Live/final cache is shown only when its home team, away team, and available kickoff time match the dashboard's current fixture
 - **Cleanup**: Live cache deleted 5min after match ends
 - **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` fallback
 
@@ -539,7 +540,7 @@ firebase deploy --only functions
 
 ### Fixture System
 - **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints (free, client-side fetch)
-- **Coverage**: Süper Lig (`tur.1`) + UEFA Europa League (`uefa.europa`)
+- **Coverage**: Süper Lig plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
 - **Seasons**: Current season plus the previous two seasons, with July 1 boundaries
 - **Data Merge**: Results (`schedule`) + upcoming fixtures (`schedule?fixture=true`)
 - **Historical Safety**: Past seasons default to played matches and reject events outside the selected season

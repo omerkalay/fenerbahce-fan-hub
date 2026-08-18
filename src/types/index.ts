@@ -109,6 +109,7 @@ export interface MatchStat {
 
 export interface LiveMatchData {
   matchId?: string;
+  startTimestamp?: number;
   matchState: 'pre' | 'in' | 'post' | 'no-match';
   displayClock?: string;
   statusDetail?: string;

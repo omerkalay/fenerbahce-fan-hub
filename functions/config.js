@@ -1,5 +1,6 @@
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+const { ESPN_LEAGUES } = require('./constants/espnCompetitions');
 
 // Define secrets (stored in Google Secret Manager)
 const rapidApiKey = defineSecret("RAPIDAPI_KEY");
@@ -22,7 +23,6 @@ const SOFASCORE_IMAGE_BASE = 'http://img.sofascore.com/api/v1'; // SofaScore ima
 const IMAGE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36';
 const DEFAULT_API_HOST = 'sofascore.p.rapidapi.com';
 const ISTANBUL_TIMEZONE = 'Europe/Istanbul';
-const ESPN_LEAGUES = ['tur.1', 'uefa.europa'];
 const SUMMARY_STAT_GROUPS = [
     { label: 'Toplam Şut', keys: ['totalShots'] },
     { label: 'İsabetli Şut', keys: ['shotsOnTarget'] },

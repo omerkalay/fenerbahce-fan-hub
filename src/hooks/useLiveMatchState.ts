@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { BACKEND_URL } from '../services/api';
+import { isLiveMatchForScheduledMatch } from '../utils/matchIdentity';
 import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from '../types';
 
 const shouldCheckLiveImmediately = (match: MatchData | null | undefined): boolean => {
@@ -16,6 +17,11 @@ export function useLiveMatchState(
   );
   const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null);
   const livePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentMatchRef = useRef<MatchData | null>(currentMatch);
+
+  useEffect(() => {
+    currentMatchRef.current = currentMatch;
+  }, [currentMatch]);
 
   const fetchLiveMatch = useCallback(async (): Promise<string | null> => {
     try {
@@ -26,6 +32,11 @@ export function useLiveMatchState(
       }
       const data: LiveMatchData = await response.json();
       if (data.matchState === 'no-match') {
+        setLiveMatchData(null);
+        return 'no-match';
+      }
+      if (!isLiveMatchForScheduledMatch(data, currentMatchRef.current)) {
+        console.warn('Ignoring live cache from a different fixture');
         setLiveMatchData(null);
         return 'no-match';
       }

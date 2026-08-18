@@ -16,9 +16,14 @@ interface EspnFixtureCompetition {
   label: string;
 }
 
-const ESPN_FIXTURE_COMPETITIONS: EspnFixtureCompetition[] = [
+export const ESPN_FIXTURE_COMPETITIONS: EspnFixtureCompetition[] = [
     { slug: 'tur.1', group: 'superlig', label: 'Süper Lig' },
-    { slug: 'uefa.europa', group: 'europe', label: 'Avrupa' }
+    { slug: 'uefa.champions_qual', group: 'europe', label: 'UEFA Şampiyonlar Ligi Elemeleri' },
+    { slug: 'uefa.champions', group: 'europe', label: 'UEFA Şampiyonlar Ligi' },
+    { slug: 'uefa.europa_qual', group: 'europe', label: 'UEFA Avrupa Ligi Elemeleri' },
+    { slug: 'uefa.europa', group: 'europe', label: 'UEFA Avrupa Ligi' },
+    { slug: 'uefa.europa.conf_qual', group: 'europe', label: 'UEFA Konferans Ligi Elemeleri' },
+    { slug: 'uefa.europa.conf', group: 'europe', label: 'UEFA Konferans Ligi' }
 ];
 
 const buildEspnTeamScheduleUrl = (leagueSlug: string, params: Record<string, string> = {}): string => {

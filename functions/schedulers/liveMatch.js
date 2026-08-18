@@ -1,5 +1,6 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db } = require('../config');
+const { getEspnLeaguesForMatch } = require('../constants/espnCompetitions');
 const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, buildSummaryPayloadFromLiveData } = require('../services/espn');
 const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 
@@ -37,14 +38,14 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
 
         console.log('⚽ Checking live match from ESPN...');
 
-        // 2. ESPN'den Fenerbahçe maçını ara (Süper Lig + Europa League)
+        // 2. ESPN'den Fenerbahçe maçını ara (Süper Lig + UEFA kulvarları)
         const nowDate = new Date();
         const formatEspnDate = (date) => date.toISOString().split('T')[0].replace(/-/g, '');
         const dateCandidates = [
             formatEspnDate(nowDate),
             formatEspnDate(new Date(nowDate.getTime() - 24 * 60 * 60 * 1000))
         ];
-        const leagues = ['tur.1', 'uefa.europa'];
+        const leagues = getEspnLeaguesForMatch(nextMatch);
         let fenerbahceMatch = null;
         let matchLeague = null;
 
@@ -91,6 +92,10 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         const awayTeam = competition?.competitors?.find(c => c.homeAway === 'away');
         const homeTeamId = String(homeTeam?.team?.id || '');
         const awayTeamId = String(awayTeam?.team?.id || '');
+        const parsedStartTimestamp = Math.floor(new Date(fenerbahceMatch.date || competition?.date).getTime() / 1000);
+        const startTimestamp = Number.isFinite(parsedStartTimestamp)
+            ? parsedStartTimestamp
+            : nextMatch.startTimestamp;
         const rawDetails = competition?.details || [];
         const summaryUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${matchLeague}/summary?event=${fenerbahceMatch.id}`;
         let summaryGoalAssistLookup = new Map();
@@ -245,6 +250,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             matchState: matchState,
             matchId: fenerbahceMatch.id,
             league: matchLeague,
+            startTimestamp,
             displayClock: fenerbahceMatch.status?.displayClock || '',
             period: fenerbahceMatch.status?.period || 0,
             statusDetail: fenerbahceMatch.status?.type?.detail || '',
