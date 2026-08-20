@@ -1,12 +1,17 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db, rapidApiKey, rapidApiHost, sleep, formatDateKey } = require('../config');
-const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
+const { fetchNextMatches, fetchLastMatches, fetchSquad } = require('../services/sofascore');
 const { refreshCachedImagesForCache } = require('../services/imageCache');
 const {
     createRefreshCache,
     applyMatchFetchSuccess,
     applyMatchFetchFailure
 } = require('../utils/cacheRefresh');
+const {
+    mergeCupFixturesIntoCache,
+    shouldFetchCupResults
+} = require('../utils/cupFixtures');
+const { refreshUefaJourneyCache } = require('../services/uefaJourney');
 
 /**
  * Daily Data Refresh - Günde 1 kez çalışır
@@ -31,6 +36,10 @@ const dailyDataRefresh = onSchedule({
         try {
             const events = await fetchNextMatches();
             cache = applyMatchFetchSuccess(cache, events, { now, referenceDate });
+            cache = mergeCupFixturesIntoCache(cache, events, {
+                seasonStartYear: cache.season.startYear,
+                now
+            });
             if (events.length > 0) {
                 console.log(`✅ Fetched ${events.length} matches`);
             } else {
@@ -43,6 +52,22 @@ const dailyDataRefresh = onSchedule({
 
         await sleep(2000); // Rate limit protection
 
+        const currentCupPayload = cache.cupFixtures?.[cache.season.startYear];
+        if (shouldFetchCupResults(currentCupPayload?.matches, now)) {
+            console.log('1️⃣ Updating completed Türkiye Kupası fixtures from SofaScore...');
+            try {
+                const lastEvents = await fetchLastMatches();
+                cache = mergeCupFixturesIntoCache(cache, lastEvents, {
+                    seasonStartYear: cache.season.startYear,
+                    now
+                });
+                console.log('✅ Türkiye Kupası fixture results updated');
+            } catch (error) {
+                console.error(`❌ Türkiye Kupası result refresh failed: ${error.message}`);
+            }
+            await sleep(1000);
+        }
+
         // 2. Fetch squad from SofaScore
         console.log('2️⃣ Fetching squad from SofaScore...');
         try {
@@ -54,7 +79,15 @@ const dailyDataRefresh = onSchedule({
 
         // 3. Save to Firebase
         console.log('3️⃣ Saving to Firebase cache...');
-        await db.ref('cache').update(cache);
+        const cacheUpdates = { ...cache };
+        delete cacheUpdates.uefaJourney;
+        await db.ref('cache').update(cacheUpdates);
+        try {
+            await refreshUefaJourneyCache(cache.season.startYear, { now });
+            console.log('✅ UEFA journey cache updated');
+        } catch (error) {
+            console.error(`❌ UEFA journey refresh failed: ${error.message}`);
+        }
         try {
             const imageStats = await refreshCachedImagesForCache(cache);
             console.log('Image cache refresh complete:', imageStats);

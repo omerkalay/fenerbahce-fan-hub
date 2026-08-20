@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { fetchEspnFenerbahceFixtures, fetchMatchSummary } from '../services/api';
+import { fetchFenerbahceFixtures, fetchMatchSummary } from '../services/api';
 import { useCooldown } from './useCooldown';
 import useBodyScrollLock from './useBodyScrollLock';
-import type { EspnFixtureMatch, EspnFixtureData, MatchSummaryData } from '../types';
+import type { FixtureMatch, FixtureData, MatchSummaryData } from '../types';
 import { getCurrentSeasonStartYear, getRecentSeasonOptions, isHistoricalSeason } from '../utils/seasons';
 
 import { localizeTeamName } from '../utils/localize';
 
-const getMatchTimestamp = (match: EspnFixtureMatch): number => {
+const getMatchTimestamp = (match: FixtureMatch): number => {
     const value = new Date(match?.date).getTime();
     return Number.isFinite(value) ? value : 0;
 };
@@ -15,11 +15,12 @@ const getMatchTimestamp = (match: EspnFixtureMatch): number => {
 // ─── Hook ────────────────────────────────────────────────
 
 export function useFixtureData() {
-    const [fixtureData, setFixtureData] = useState<EspnFixtureData | null>(null);
+    const [fixtureData, setFixtureData] = useState<FixtureData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [warning, setWarning] = useState<string | null>(null);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-    const [activeSummaryMatch, setActiveSummaryMatch] = useState<EspnFixtureMatch | null>(null);
+    const [activeSummaryMatch, setActiveSummaryMatch] = useState<FixtureMatch | null>(null);
     const [activeSummaryData, setActiveSummaryData] = useState<MatchSummaryData | null>(null);
     const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -51,13 +52,15 @@ export function useFixtureData() {
         const loadFixtures = async () => {
             setLoading(true);
             setError(null);
+            setWarning(null);
 
-            const data = await fetchEspnFenerbahceFixtures(selectedSeasonStartYear);
+            const data = await fetchFenerbahceFixtures(selectedSeasonStartYear);
             if (!isMounted) return;
 
             if (data?.error) {
                 setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
             }
+            setWarning(data?.warning ?? null);
 
             setFixtureData(data);
             setLoading(false);
@@ -72,11 +75,13 @@ export function useFixtureData() {
 
     const refreshAction = async () => {
         setError(null);
+        setWarning(null);
         setIsRefreshing(true);
-        const data = await fetchEspnFenerbahceFixtures(selectedSeasonStartYear);
+        const data = await fetchFenerbahceFixtures(selectedSeasonStartYear);
         if (data?.error) {
             setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
         }
+        setWarning(data?.warning ?? null);
         setFixtureData(data);
         setIsRefreshing(false);
     };
@@ -180,7 +185,8 @@ export function useFixtureData() {
         setSummaryError(null);
     };
 
-    const openSummaryModal = async (match: EspnFixtureMatch) => {
+    const openSummaryModal = async (match: FixtureMatch) => {
+        if (!match.summaryAvailable) return;
         setActiveSummaryMatch(match);
         setActiveSummaryData(null);
         setSummaryError(null);
@@ -203,6 +209,7 @@ export function useFixtureData() {
         // Core data / loading
         loading,
         error,
+        warning,
         isRefreshing,
         handleRefresh,
         isRefreshCoolingDown,

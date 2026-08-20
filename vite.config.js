@@ -65,7 +65,7 @@ export default defineConfig(({ mode }) => {
           globIgnores: ['**/firebase-messaging-sw.js', '**/firebase-messaging-sw-template.js'],
           runtimeCaching: [
             {
-              urlPattern: new RegExp(`${backendPattern}/api/(match-status|next-match|next-3-matches|squad)`),
+              urlPattern: new RegExp(`${backendPattern}/api/(match-status|next-match|next-3-matches|squad|uefa-journey)`),
               handler: 'NetworkFirst',
               options: {
                 cacheName: 'fb-api-cache',

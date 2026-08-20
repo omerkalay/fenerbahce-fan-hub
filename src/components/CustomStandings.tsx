@@ -3,12 +3,13 @@ import { fetchEspnStandings } from '../services/api';
 import { localizeTeamName } from '../utils/localize';
 import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
-import type { StandingsRow } from '../types';
+import type { StandingsData, StandingsRow } from '../types';
 
 interface CustomStandingsProps {
     league: string;
     seasonStartYear: number;
     showLegend?: boolean;
+    standingsData?: StandingsData | null;
 }
 
 /* ── Zone configs ───────────────────────────────────────── */
@@ -43,13 +44,20 @@ const getZoneColor = (rank: number, league: string): string | null => {
     return zone?.color ?? null;
 };
 
-const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomStandingsProps) => {
+const CustomStandings = ({
+    league,
+    seasonStartYear,
+    showLegend = true,
+    standingsData
+}: CustomStandingsProps) => {
     const { theme } = useTheme();
     const [standings, setStandings] = useState<StandingsRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const externallyManaged = standingsData !== undefined;
 
     useEffect(() => {
+        if (externallyManaged) return;
         let cancelled = false;
         const load = async () => {
             setLoading(true);
@@ -70,9 +78,12 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
 
         load();
         return () => { cancelled = true; };
-    }, [league, seasonStartYear]);
+    }, [externallyManaged, league, seasonStartYear]);
 
-    if (loading) {
+    const displayedStandings = externallyManaged ? standingsData?.rows ?? [] : standings;
+    const displayedLoading = externallyManaged ? false : loading;
+
+    if (displayedLoading) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
@@ -80,7 +91,7 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
         );
     }
 
-    if (error) {
+    if (!externallyManaged && error) {
         return (
             <div className="text-center text-red-400 py-8">
                 <p>{error}</p>
@@ -89,6 +100,14 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
     }
 
     const zones = getZones(league);
+
+    if (displayedStandings.length === 0) {
+        return (
+            <div className="px-5 py-12 text-center text-sm text-slate-400">
+                Puan durumu henüz yayınlanmadı.
+            </div>
+        );
+    }
 
     return (
         <div className="w-full">
@@ -120,7 +139,7 @@ const CustomStandings = ({ league, seasonStartYear, showLegend = true }: CustomS
                     </tr>
                 </thead>
                 <tbody className="text-xs sm:text-sm">
-                    {standings.map((row) => {
+                    {displayedStandings.map((row) => {
                         const isFener = row.team.name.toLowerCase().includes('fenerbahce') ||
                             row.team.name.toLowerCase().includes('fener');
                         const zoneColor = getZoneColor(row.rank, league);

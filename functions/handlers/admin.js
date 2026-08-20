@@ -1,11 +1,16 @@
 const { db, adminRefreshKey, sleep } = require('../config');
-const { fetchNextMatches, fetchSquad } = require('../services/sofascore');
+const { fetchNextMatches, fetchLastMatches, fetchSquad } = require('../services/sofascore');
 const { refreshCachedImagesForCache } = require('../services/imageCache');
 const {
     createRefreshCache,
     applyMatchFetchSuccess,
     applyMatchFetchFailure
 } = require('../utils/cacheRefresh');
+const {
+    mergeCupFixturesIntoCache,
+    shouldFetchCupResults
+} = require('../utils/cupFixtures');
+const { refreshUefaJourneyCache } = require('../services/uefaJourney');
 
 async function handleHealth(req, res) {
     const cacheSnapshot = await db.ref('cache/lastUpdate').once('value');
@@ -43,12 +48,30 @@ async function handleRefresh(req, res) {
         try {
             const events = await fetchNextMatches();
             cache = applyMatchFetchSuccess(cache, events, { now, referenceDate });
+            cache = mergeCupFixturesIntoCache(cache, events, {
+                seasonStartYear: cache.season.startYear,
+                now
+            });
         } catch (error) {
             cache = applyMatchFetchFailure(cache);
             console.error('Match fetch failed:', error.message);
         }
 
         await sleep(1000);
+
+        const currentCupPayload = cache.cupFixtures?.[cache.season.startYear];
+        if (shouldFetchCupResults(currentCupPayload?.matches, now)) {
+            try {
+                const lastEvents = await fetchLastMatches();
+                cache = mergeCupFixturesIntoCache(cache, lastEvents, {
+                    seasonStartYear: cache.season.startYear,
+                    now
+                });
+            } catch (error) {
+                console.error(`Türkiye Kupası result refresh failed: ${error.message}`);
+            }
+            await sleep(1000);
+        }
 
         // Fetch squad
         try {
@@ -59,7 +82,15 @@ async function handleRefresh(req, res) {
             console.error('Squad fetch failed:', error.message);
         }
 
-        await db.ref('cache').update(cache);
+        const cacheUpdates = { ...cache };
+        delete cacheUpdates.uefaJourney;
+        await db.ref('cache').update(cacheUpdates);
+        let uefaJourney = null;
+        try {
+            uefaJourney = await refreshUefaJourneyCache(cache.season.startYear, { now });
+        } catch (error) {
+            console.error(`UEFA journey refresh failed: ${error.message}`);
+        }
         const imageStats = await refreshCachedImagesForCache(cache);
 
         return res.json({
@@ -69,6 +100,7 @@ async function handleRefresh(req, res) {
             stats: {
                 matches: cache.next3Matches.length,
                 squad: cache.squad.length,
+                uefaJourney: uefaJourney?.participation?.state || null,
                 images: imageStats
             }
         });

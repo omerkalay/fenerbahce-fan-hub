@@ -10,4 +10,7 @@ export type { PollVoteOption, PollVoteResponse } from './api/poll';
 export { fetchMatchStatus, fetchSquad, fetchMatchSummary } from './api/fixtures';
 export { fetchEspnStandings } from './api/standings';
 export { fetchEspnFenerbahceFixtures } from './api/espn-fixtures';
+export { fetchCupFixtures, normalizeCupFixtureMatch } from './api/cup-fixtures';
+export { fetchUefaJourney, fetchUefaJourneySummary } from './api/uefa-journey';
+export { fetchFenerbahceFixtures } from './api/combined-fixtures';
 export { fetchPlayerStats, fetchFormResults, fetchPlayerStatus } from './api/statistics';

@@ -35,6 +35,10 @@ export function useLiveMatchState(
         setLiveMatchData(null);
         return 'no-match';
       }
+      if (data.matchState === 'unsupported') {
+        setLiveMatchData(null);
+        return 'unsupported';
+      }
       if (!isLiveMatchForScheduledMatch(data, currentMatchRef.current)) {
         console.warn('Ignoring live cache from a different fixture');
         setLiveMatchData(null);
@@ -90,7 +94,7 @@ export function useLiveMatchState(
       return;
     }
 
-    if (!started && (liveMatchState === 'pre' || liveMatchState === 'checking') && !liveMatchData) {
+    if (!started && (liveMatchState === 'pre' || liveMatchState === 'checking' || liveMatchState === 'unsupported') && !liveMatchData) {
       stopLivePolling();
       setLiveMatchState('countdown');
     }
@@ -105,7 +109,7 @@ export function useLiveMatchState(
 
   // Post state is stable (no auto-transition). Stop polling to avoid unnecessary requests.
   useEffect(() => {
-    if (liveMatchState === 'post') {
+    if (liveMatchState === 'post' || liveMatchState === 'unsupported') {
       stopLivePolling();
     }
   }, [liveMatchState, stopLivePolling]);

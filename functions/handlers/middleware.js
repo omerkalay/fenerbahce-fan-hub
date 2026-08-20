@@ -109,7 +109,12 @@ const enforceRateLimit = (req, res, profile = 'default') => {
 };
 
 const resolveRateLimitProfile = (endpoint, method) => {
-    if (endpoint === 'match-summary' || endpoint === 'matchSummary') {
+    if (
+        endpoint === 'match-summary'
+        || endpoint === 'matchSummary'
+        || endpoint === 'uefa-journey'
+        || endpoint === 'uefaJourney'
+    ) {
         return 'expensive';
     }
 

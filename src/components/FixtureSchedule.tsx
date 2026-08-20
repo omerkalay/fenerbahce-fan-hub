@@ -1,11 +1,12 @@
 import { useFixtureData } from '../hooks/useFixtureData';
 import MatchSummaryModal from './MatchSummaryModal';
 import { localizeTeamName } from '../utils/localize';
-import type { EspnFixtureMatch, EspnTeam } from '../types';
+import type { FixtureMatch, FixtureTeam } from '../types';
 import SeasonSelector from './SeasonSelector';
 import { Search } from 'lucide-react';
 import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
+import { COMPETITION_FILTERS } from './fixtureFilters';
 
 // ─── Filter types ────────────────────────────────────────
 
@@ -17,16 +18,16 @@ interface FilterItem {
 // ─── Component prop types ────────────────────────────────
 
 interface TeamInlineProps {
-    team: EspnTeam;
+    team: FixtureTeam;
     isFenerbahce?: boolean;
     align?: 'left' | 'right';
 }
 
 interface FixtureMatchCardProps {
-    match: EspnFixtureMatch;
+    match: FixtureMatch;
     featured?: boolean;
     cardRef?: React.Ref<HTMLElement> | null;
-    onOpenSummary?: ((match: EspnFixtureMatch) => void) | null;
+    onOpenSummary?: ((match: FixtureMatch) => void) | null;
 }
 
 // ─── Filter constants ────────────────────────────────────
@@ -43,25 +44,20 @@ const VENUE_FILTERS: FilterItem[] = [
     { id: 'away', label: 'Deplasman' }
 ];
 
-const COMPETITION_FILTERS: FilterItem[] = [
-    { id: 'all', label: 'Tümü' },
-    { id: 'superlig', label: 'Süper Lig' },
-    { id: 'europe', label: 'Avrupa' }
-];
-
 // ─── Helpers ─────────────────────────────────────────────
 
 
-const formatMatchDate = (date: string): { full: string; time: string } => {
+const formatMatchDate = (date: string): { full: string; compact: string; time: string } => {
     const value = new Date(date);
 
     return {
         full: value.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }),
+        compact: value.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
         time: value.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
     };
 };
 
-const getDisplayVenueName = (match: EspnFixtureMatch): string | null => {
+const getDisplayVenueName = (match: FixtureMatch): string | null => {
     const venueName = match?.venueName;
     if (!venueName) return null;
 
@@ -75,7 +71,7 @@ const getDisplayVenueName = (match: EspnFixtureMatch): string | null => {
     return venueName;
 };
 
-const isScoredMatch = (match: EspnFixtureMatch): boolean => match.status.completed || match.status.state === 'in';
+const isScoredMatch = (match: FixtureMatch): boolean => match.status.completed || match.status.state === 'in';
 
 // ─── Sub-components ──────────────────────────────────────
 
@@ -115,7 +111,7 @@ const TeamInline = ({ team, isFenerbahce = false, align = 'left' }: TeamInlinePr
     );
 };
 
-const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSummary = null }: FixtureMatchCardProps) => {
+export const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSummary = null }: FixtureMatchCardProps) => {
     const dateInfo = formatMatchDate(match.date);
     const scored = isScoredMatch(match);
     const isFinished = match.status.completed || match.status.state === 'post';
@@ -129,9 +125,28 @@ const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSumma
                 : 'border-white/5 hover:border-yellow-400/10'
                 }`}
         >
-            <p className={`text-[12px] mb-3 ${featured ? 'text-slate-300' : 'text-slate-400'}`}>
-                {dateInfo.full} • {match.timeValid ? dateInfo.time : <span className="text-slate-500 italic">Saat belirlenmedi</span>}
-            </p>
+            <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                <div className="min-w-0 text-left">
+                    <span
+                        className={`block truncate text-[10px] font-semibold sm:text-[11px] ${match.competitionGroup === 'cup'
+                        ? 'text-yellow-200'
+                        : 'text-white'
+                        }`}
+                        title={match.competitionLabel || match.competitionName}
+                    >
+                        {match.competitionLabel || match.competitionName}
+                    </span>
+                    {match.roundLabel && (
+                        <span className="block truncate text-[9px] text-slate-500">{match.roundLabel}</span>
+                    )}
+                </div>
+                <p className={`shrink-0 whitespace-nowrap text-right text-[10px] sm:text-[12px] ${featured ? 'text-slate-300' : 'text-slate-400'}`}>
+                    <span className="hidden min-[400px]:inline">{dateInfo.full}</span>
+                    <span className="min-[400px]:hidden">{dateInfo.compact}</span>
+                    {' • '}
+                    {match.timeValid ? dateInfo.time : <span className="text-slate-500 italic">Saat belirlenmedi</span>}
+                </p>
+            </div>
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                 <TeamInline
@@ -157,13 +172,13 @@ const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOpenSumma
                 />
             </div>
 
-            {(venueName || (isFinished && onOpenSummary)) && (
+            {(venueName || (isFinished && onOpenSummary && match.summaryAvailable)) && (
                 <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-3">
                     <p className="text-[11px] text-slate-500 truncate min-w-0 flex-1">
                         {venueName || '\u00A0'}
                     </p>
 
-                    {isFinished && onOpenSummary && (
+                    {isFinished && onOpenSummary && match.summaryAvailable && (
                         <button
                             onClick={() => onOpenSummary(match)}
                             className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.04] text-slate-200 hover:text-yellow-200 hover:border-yellow-400/35 hover:bg-yellow-400/10 transition-all duration-300 text-[11px] font-semibold whitespace-nowrap"
@@ -186,6 +201,7 @@ function FixtureSchedule() {
     const {
         loading,
         error,
+        warning,
         isRefreshing,
         handleRefresh,
         isRefreshCoolingDown,
@@ -390,6 +406,12 @@ function FixtureSchedule() {
                         </div>
                     )}
 
+                    {warning && (
+                        <div className="glass-panel rounded-2xl p-4 border border-amber-400/20">
+                            <p className="text-sm text-amber-100">{warning}</p>
+                        </div>
+                    )}
+
                     {!error && filteredMatches.length === 0 && (
                         <div className="glass-panel rounded-2xl p-5 text-center">
                             <p className="text-sm text-slate-300">Bu filtre için maç bulunamadı.</p>
@@ -399,7 +421,7 @@ function FixtureSchedule() {
                     {!error && filteredMatches.length > 0 && statusFilter !== 'all' && (
                         <div className="space-y-2.5">
                             {filteredMatches.map((match) => (
-                                <FixtureMatchCard key={match.id} match={match} onOpenSummary={openSummaryModal} />
+                                <FixtureMatchCard key={`${match.source}-${match.id}`} match={match} onOpenSummary={openSummaryModal} />
                             ))}
                         </div>
                     )}
@@ -414,7 +436,7 @@ function FixtureSchedule() {
                                         <div className="h-px bg-white/10 flex-1" />
                                     </div>
                                     {allFilterPlayedMatches.map((match) => (
-                                        <FixtureMatchCard key={match.id} match={match} onOpenSummary={openSummaryModal} />
+                                        <FixtureMatchCard key={`${match.source}-${match.id}`} match={match} onOpenSummary={openSummaryModal} />
                                     ))}
                                 </section>
                             )}
@@ -464,7 +486,7 @@ function FixtureSchedule() {
                                         <div className="h-px bg-white/10 flex-1" />
                                     </div>
                                     {allFilterLaterMatches.map((match) => (
-                                        <FixtureMatchCard key={match.id} match={match} onOpenSummary={openSummaryModal} />
+                                        <FixtureMatchCard key={`${match.source}-${match.id}`} match={match} onOpenSummary={openSummaryModal} />
                                     ))}
                                 </section>
                             )}

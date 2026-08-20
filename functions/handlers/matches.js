@@ -1,7 +1,19 @@
 const { db } = require('../config');
 const { fetchEspnSummaryForMatch } = require('../services/espn');
-const { buildSeasonMeta, resolveLegacySeasonState } = require('../utils/seasonState');
+const { buildSeasonMeta, getSeasonStartYear, resolveLegacySeasonState } = require('../utils/seasonState');
 const { isSameMatch } = require('../utils/matchIdentity');
+const {
+    TURKEY_CUP_COVERAGE_START_YEAR,
+    isTurkeyCupMatch
+} = require('../utils/cupFixtures');
+const {
+    refreshUefaJourneyCache,
+    readUefaJourneyCache,
+    buildUefaSummary
+} = require('../services/uefaJourney');
+
+const UEFA_CACHE_MAX_AGE_MS = 36 * 60 * 60 * 1000;
+const uefaRefreshes = new Map();
 
 async function handleNextMatch(req, res) {
     const snapshot = await db.ref('cache/nextMatch').once('value');
@@ -19,25 +31,123 @@ async function handleNext3Matches(req, res) {
 }
 
 async function handleMatchStatus(req, res) {
-    const snapshot = await db.ref('cache').once('value');
-    const cache = snapshot.val() || {};
-    const next3Matches = Array.isArray(cache.next3Matches) ? cache.next3Matches : [];
+    const [
+        nextMatchSnapshot,
+        next3MatchesSnapshot,
+        seasonStateSnapshot,
+        seasonSnapshot,
+        matchFetchStatusSnapshot,
+        lastUpdateSnapshot
+    ] = await Promise.all([
+        db.ref('cache/nextMatch').once('value'),
+        db.ref('cache/next3Matches').once('value'),
+        db.ref('cache/seasonState').once('value'),
+        db.ref('cache/season').once('value'),
+        db.ref('cache/matchFetchStatus').once('value'),
+        db.ref('cache/lastUpdate').once('value')
+    ]);
+    const nextMatch = nextMatchSnapshot.val() || null;
+    const next3MatchesValue = next3MatchesSnapshot.val();
+    const next3Matches = Array.isArray(next3MatchesValue) ? next3MatchesValue : [];
     const referenceDate = new Date();
-    const seasonState = cache.seasonState || resolveLegacySeasonState({
-        nextMatch: cache.nextMatch || null,
+    const seasonState = seasonStateSnapshot.val() || resolveLegacySeasonState({
+        nextMatch,
         nextMatches: next3Matches,
         referenceDate
     });
 
     return res.json({
-        nextMatch: cache.nextMatch || null,
+        nextMatch,
         next3Matches,
         seasonState,
-        season: cache.season || buildSeasonMeta(referenceDate),
-        matchFetchStatus: cache.matchFetchStatus || null,
-        lastUpdate: cache.lastUpdate || null
+        season: seasonSnapshot.val() || buildSeasonMeta(referenceDate),
+        matchFetchStatus: matchFetchStatusSnapshot.val() || null,
+        lastUpdate: lastUpdateSnapshot.val() || null
     });
 }
+
+async function handleCupFixtures(req, res) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const seasonStartYear = Number(req.query?.seasonStartYear);
+    if (!Number.isInteger(seasonStartYear) || seasonStartYear < 2000 || seasonStartYear > 2100) {
+        return res.status(400).json({ error: 'Valid seasonStartYear required' });
+    }
+
+    if (seasonStartYear < TURKEY_CUP_COVERAGE_START_YEAR) {
+        return res.json({
+            source: 'SofaScore',
+            seasonStartYear,
+            lastUpdate: null,
+            matches: []
+        });
+    }
+
+    const snapshot = await db.ref(`cache/cupFixtures/${seasonStartYear}`).once('value');
+    const payload = snapshot.val() || {};
+    return res.json({
+        source: 'SofaScore',
+        seasonStartYear,
+        lastUpdate: typeof payload.lastUpdate === 'number' ? payload.lastUpdate : null,
+        matches: Array.isArray(payload.matches) ? payload.matches : []
+    });
+}
+
+const refreshUefaJourneyOnce = (seasonStartYear) => {
+    const key = String(seasonStartYear);
+    if (!uefaRefreshes.has(key)) {
+        const refresh = refreshUefaJourneyCache(seasonStartYear)
+            .finally(() => uefaRefreshes.delete(key));
+        uefaRefreshes.set(key, refresh);
+    }
+    return uefaRefreshes.get(key);
+};
+
+const createUefaJourneyHandler = ({
+    readCache = readUefaJourneyCache,
+    refreshCache = refreshUefaJourneyOnce,
+    summarize = buildUefaSummary,
+    now = () => Date.now()
+} = {}) => async function uefaJourneyHandler(req, res) {
+    if (req.method !== 'GET') {
+        return res.status(405).json({ error: 'Method not allowed' });
+    }
+
+    const seasonStartYear = Number(req.query?.seasonStartYear);
+    if (!Number.isInteger(seasonStartYear) || seasonStartYear < 2000 || seasonStartYear > 2100) {
+        return res.status(400).json({ error: 'Valid seasonStartYear required' });
+    }
+
+    const summaryOnly = String(req.query?.summary || '').toLowerCase() === 'true';
+    const requestTime = now();
+    const currentSeasonStartYear = getSeasonStartYear(new Date(requestTime));
+    let cached = await readCache(seasonStartYear);
+    const cacheAge = cached?.lastUpdate ? requestTime - Number(cached.lastUpdate) : Infinity;
+    const shouldRefresh = !cached
+        || (seasonStartYear === currentSeasonStartYear && cacheAge > UEFA_CACHE_MAX_AGE_MS);
+
+    if (shouldRefresh) {
+        try {
+            cached = await refreshCache(seasonStartYear);
+        } catch (error) {
+            console.error(`UEFA journey refresh failed for ${seasonStartYear}:`, error.message);
+            if (!cached) {
+                return res.status(502).json({ error: 'UEFA journey data unavailable' });
+            }
+            cached = { ...cached, stale: true };
+        }
+    }
+
+    if (summaryOnly) {
+        return res.json(summarize(cached));
+    }
+
+    return res.json(cached);
+};
+
+const handleUefaJourney = createUefaJourneyHandler();
 
 async function handleStandings(req, res) {
     const snapshot = await db.ref('cache/standings').once('value');
@@ -51,6 +161,10 @@ async function handleLiveMatch(req, res) {
         const currentMatch = currentMatchSnapshot.val();
         if (!currentMatch) {
             return res.json({ matchState: 'no-match' });
+        }
+
+        if (isTurkeyCupMatch(currentMatch)) {
+            return res.json({ matchState: 'unsupported' });
         }
 
         const [liveSnapshot, lastFinishedSnapshot] = await Promise.all([
@@ -130,4 +244,14 @@ async function handleMatchSummary(req, res, matchId) {
     }
 }
 
-module.exports = { handleNextMatch, handleNext3Matches, handleMatchStatus, handleLiveMatch, handleMatchSummary, handleStandings };
+module.exports = {
+    handleNextMatch,
+    handleNext3Matches,
+    handleMatchStatus,
+    handleCupFixtures,
+    handleUefaJourney,
+    createUefaJourneyHandler,
+    handleLiveMatch,
+    handleMatchSummary,
+    handleStandings
+};

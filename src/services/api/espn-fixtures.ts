@@ -2,6 +2,7 @@ import type {
     EspnFixtureMatch,
     EspnFixtureData,
     EspnTeam,
+    FixtureCompetitionGroup,
 } from '../../types';
 import { localizeCompetitionName } from '../../utils/localize';
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
@@ -12,7 +13,7 @@ const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer
 
 interface EspnFixtureCompetition {
   slug: string;
-  group: string;
+  group: FixtureCompetitionGroup;
   label: string;
 }
 
@@ -115,6 +116,8 @@ const normalizeEspnMatch = (event: EspnEventRaw, sourceCompetition: EspnFixtureC
 
     return {
         id: String(event.id ?? competition.id ?? `${event.date}-${homeTeam.id}-${awayTeam.id}`),
+        source: 'espn',
+        summaryAvailable: true,
         date: (event.date ?? competition.date) as string,
         timeValid: competition?.timeValid !== false,
         competitionName: localizeCompetitionName((event?.season?.displayName ?? event?.seasonType?.name ?? 'Süper Lig') as string),

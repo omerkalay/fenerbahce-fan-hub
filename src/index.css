@@ -20,6 +20,9 @@ html[data-theme='classic'] {
     --app-wash-strong: rgba(255, 255, 255, 0.1);
     --panel-bg: rgba(15, 23, 42, 0.6);
     --card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    --standings-dialog-bg: #0f172a;
+    --standings-dialog-border: rgba(255, 255, 255, 0.12);
+    --standings-dialog-shadow: 0 24px 64px rgba(0, 0, 0, 0.48);
     --surface-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
     --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
     --card-radius: 1.5rem;
@@ -47,6 +50,9 @@ html[data-theme='white-kit'] {
     --app-wash-strong: rgba(199, 166, 75, 0.18);
     --panel-bg: rgba(255, 253, 247, 0.96);
     --card-bg: #fffdf7;
+    --standings-dialog-bg: #fffdf7;
+    --standings-dialog-border: #191b1f;
+    --standings-dialog-shadow: 3px 3px 0 #191b1f;
     --surface-shadow: 4px 4px 0 #191b1f;
     --card-shadow: 3px 3px 0 #191b1f;
     --card-radius: 0.5rem;
@@ -121,6 +127,12 @@ html[data-theme='white-kit'] {
         background: var(--card-bg);
         box-shadow: var(--card-shadow);
         backdrop-filter: var(--app-backdrop);
+    }
+
+    .standings-dialog-surface {
+        border-color: var(--standings-dialog-border);
+        background: var(--standings-dialog-bg);
+        box-shadow: var(--standings-dialog-shadow);
     }
 
     .premium-gradient {

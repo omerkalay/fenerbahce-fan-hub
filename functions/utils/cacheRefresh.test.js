@@ -64,8 +64,8 @@ describe('cacheRefresh', () => {
 
     it('replaces cached matches only after a successful provider response', () => {
         const newMatches = [
-            { id: 20, startTimestamp: 1_900_000_000 },
             { id: 21, startTimestamp: 1_900_100_000 },
+            { id: 20, startTimestamp: 1_900_000_000 },
             { id: 22, startTimestamp: 1_900_200_000 },
             { id: 23, startTimestamp: 1_900_300_000 }
         ];
@@ -76,11 +76,21 @@ describe('cacheRefresh', () => {
         });
 
         expect(refreshed).toMatchObject({
-            nextMatch: newMatches[0],
-            next3Matches: newMatches.slice(0, 3),
+            nextMatch: newMatches[1],
+            next3Matches: [newMatches[1], newMatches[0], newMatches[2]],
             lastUpdate: 789,
             matchFetchStatus: 'ok',
             seasonState: 'active'
         });
+    });
+
+    it('places a cup fixture between league fixtures by kickoff time', () => {
+        const leagueOne = { id: 30, startTimestamp: 1_900_000_000, tournament: { name: 'Süper Lig' } };
+        const cup = { id: 31, startTimestamp: 1_900_050_000, tournament: { name: 'Türkiye Kupası' } };
+        const leagueTwo = { id: 32, startTimestamp: 1_900_100_000, tournament: { name: 'Süper Lig' } };
+
+        const refreshed = applyMatchFetchSuccess({}, [leagueTwo, leagueOne, cup]);
+
+        expect(refreshed.next3Matches.map(({ id }) => id)).toEqual([30, 31, 32]);
     });
 });

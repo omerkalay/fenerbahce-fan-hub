@@ -5,6 +5,7 @@ export interface Team {
   name: string;
   shortName?: string;
   slug?: string;
+  nameCode?: string;
 }
 
 // ─── SofaScore / Backend cached data ─────────────────────
@@ -34,6 +35,27 @@ export interface MatchData {
   tournament: Tournament;
   roundInfo?: RoundInfo;
   slug?: string;
+  timeValid?: boolean;
+  winnerCode?: number;
+  homeScore?: {
+    current?: number;
+    display?: number | string;
+    normaltime?: number;
+    overtime?: number;
+    penalties?: number;
+  };
+  awayScore?: {
+    current?: number;
+    display?: number | string;
+    normaltime?: number;
+    overtime?: number;
+    penalties?: number;
+  };
+  venue?: {
+    name?: string;
+    stadium?: { name?: string };
+    city?: { name?: string };
+  };
   status?: {
     code?: number;
     description?: string;
@@ -110,7 +132,7 @@ export interface MatchStat {
 export interface LiveMatchData {
   matchId?: string;
   startTimestamp?: number;
-  matchState: 'pre' | 'in' | 'post' | 'no-match';
+  matchState: 'pre' | 'in' | 'post' | 'no-match' | 'unsupported';
   displayClock?: string;
   statusDetail?: string;
   homeTeam?: LiveMatchTeam;
@@ -120,11 +142,14 @@ export interface LiveMatchData {
   lineups?: MatchLineups | null;
 }
 
-export type LiveMatchState = 'countdown' | 'checking' | 'pre' | 'in' | 'post' | 'idle';
+export type LiveMatchState = 'countdown' | 'checking' | 'pre' | 'in' | 'post' | 'unsupported' | 'idle';
 
-// ─── ESPN Fixtures ───────────────────────────────────────
+// ─── Multi-provider Fixtures ─────────────────────────────
 
-export interface EspnTeam {
+export type FixtureSource = 'espn' | 'sofascore';
+export type FixtureCompetitionGroup = 'superlig' | 'europe' | 'cup';
+
+export interface FixtureTeam {
   id: string | null;
   name: string;
   shortName: string;
@@ -134,7 +159,7 @@ export interface EspnTeam {
   winner: boolean;
 }
 
-export interface EspnMatchStatus {
+export interface FixtureMatchStatus {
   state: string;
   completed: boolean;
   description: string | null;
@@ -142,34 +167,49 @@ export interface EspnMatchStatus {
   shortDetail: string | null;
 }
 
-export interface EspnFixtureMatch {
+export interface FixtureMatch {
   id: string;
+  source: FixtureSource;
+  summaryAvailable: boolean;
   date: string;
   timeValid: boolean;
   competitionName: string;
   competitionKey: string | null;
-  competitionGroup: string | null;
+  competitionGroup: FixtureCompetitionGroup | null;
   competitionLabel: string | null;
   roundLabel: string | null;
   venueName: string | null;
   venueCity: string | null;
-  status: EspnMatchStatus;
-  homeTeam: EspnTeam;
-  awayTeam: EspnTeam;
+  status: FixtureMatchStatus;
+  homeTeam: FixtureTeam;
+  awayTeam: FixtureTeam;
   isFbHome: boolean;
-  fbTeam: EspnTeam;
-  opponentTeam: EspnTeam;
+  fbTeam: FixtureTeam;
+  opponentTeam: FixtureTeam;
   resultCode: 'G' | 'M' | 'B' | null;
   resultLabel: string | null;
 }
 
-export interface EspnFixtureData {
+export interface FixtureData {
   source: string;
   seasonStartYear: number;
   season: unknown;
   team: unknown;
-  matches: EspnFixtureMatch[];
+  matches: FixtureMatch[];
   error?: boolean;
+  warning?: string | null;
+}
+
+export type EspnTeam = FixtureTeam;
+export type EspnMatchStatus = FixtureMatchStatus;
+export type EspnFixtureMatch = FixtureMatch;
+export type EspnFixtureData = FixtureData;
+
+export interface CupFixturePayload {
+  source: 'SofaScore';
+  seasonStartYear: number;
+  lastUpdate: number | null;
+  matches: MatchData[];
 }
 
 // ─── ESPN Standings ──────────────────────────────────────
@@ -197,6 +237,133 @@ export interface StandingsData {
   id: string;
   name: string;
   rows: StandingsRow[];
+}
+
+// UEFA Journey
+
+export type UefaCompetitionKey = 'champions' | 'europa' | 'conference';
+export type UefaParticipationState =
+  | 'qualifying'
+  | 'league_phase'
+  | 'knockout'
+  | 'eliminated'
+  | 'awaiting_transition'
+  | 'not_participating'
+  | 'unknown';
+export type UefaPathStageStatus =
+  | 'completed'
+  | 'active'
+  | 'upcoming'
+  | 'awaiting'
+  | 'bypassed'
+  | 'transferred'
+  | 'eliminated'
+  | 'locked';
+
+export interface UefaCompetition {
+  key: UefaCompetitionKey;
+  name: string;
+  shortName: string;
+  mainSlug: string;
+  qualifierSlug: string;
+  qualifierName: string;
+}
+
+export interface UefaJourneyTeam {
+  id: string;
+  name: string;
+  shortName: string;
+  abbreviation: string | null;
+  logo: string | null;
+  score?: string | null;
+  aggregateScore?: number | null;
+  shootoutScore?: number | null;
+  winner?: boolean;
+}
+
+export interface UefaJourneyMatch {
+  id: string;
+  date: string | null;
+  seasonYear: number | null;
+  competitionKey: UefaCompetitionKey;
+  competitionName: string;
+  competitionSlug: string;
+  qualifying: boolean;
+  stageKey: string;
+  stageLabel: string;
+  status: {
+    state: string;
+    completed: boolean;
+    detail: string | null;
+  };
+  homeTeam: UefaJourneyTeam;
+  awayTeam: UefaJourneyTeam;
+  notes: string[];
+}
+
+export interface UefaPathStage {
+  key: string;
+  label: string;
+  competitionKey: UefaCompetitionKey | null;
+  competitionName: string | null;
+  status: UefaPathStageStatus;
+  matches: UefaJourneyMatch[];
+  aggregate: Record<string, number> | null;
+  winnerTeamId: string | null;
+  position: number | null;
+  points: number | null;
+}
+
+export interface UefaBracketTie {
+  id: string;
+  stageKey: string;
+  stageLabel: string;
+  teams: UefaJourneyTeam[];
+  legs: UefaJourneyMatch[];
+  aggregate: Record<string, number> | null;
+  winnerTeamId: string | null;
+  status: 'live' | 'upcoming' | 'completed';
+  nextTieId: string | null;
+}
+
+export interface UefaBracketStage {
+  key: string;
+  label: string;
+  ties: UefaBracketTie[];
+}
+
+export interface UefaBracket {
+  competition: UefaCompetition;
+  stages: UefaBracketStage[];
+}
+
+export interface UefaJourneyPayload {
+  source: 'ESPN';
+  seasonStartYear: number;
+  lastUpdate: number | null;
+  stale: boolean;
+  participation: {
+    state: UefaParticipationState;
+    competition: UefaCompetition | null;
+    qualifier: UefaCompetition | null;
+    phaseLabel: string | null;
+  };
+  standings: StandingsData | null;
+  fenerPath: UefaPathStage[];
+  bracket: UefaBracket | null;
+}
+
+export interface UefaJourneySummary {
+  source: 'ESPN';
+  seasonStartYear: number | null;
+  lastUpdate: number | null;
+  stale: boolean;
+  state: UefaParticipationState;
+  title: string;
+  competitionKey: UefaCompetitionKey | null;
+  competitionName: string | null;
+  qualifierName: string | null;
+  phaseLabel: string | null;
 }
 
 // ─── Match Summary (backend cached) ─────────────────────

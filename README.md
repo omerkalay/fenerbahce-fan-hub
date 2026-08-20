@@ -6,18 +6,30 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.11.0-blue)
+![Version](https://img.shields.io/badge/version-2.12.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.11.0
+## What's New in v2.12.0
+
+- **Türkiye Kupası Coverage** - Fenerbahçe cup matches published by SofaScore are cached from 2026/27 onward, merged with ESPN league and European fixtures, and exposed through competition-aware filters
+- **Chronological Match Flow** - Dashboard fixtures, the next-three list, and match reminders are ordered by kickoff time across every supported competition, while unsupported cup summary requests are skipped
+- **Dynamic European Journey** - Qualifying begins under a neutral European label before confirmed league-phase participation resolves automatically to the Champions League, Europa League, or Conference League
+- **Fenerbahçe's Route** - Competition transfers, aggregate scores, league position, qualification, and elimination are tracked throughout the European season
+- **Connected Tournament Bracket** - Published ties from the knockout play-off through the final use team crests, verified progression lines, winner highlighting, and draw-pending placeholders without predicting future opponents
+- **Mobile PWA Refinement** - The compact bracket keeps every knockout round in one horizontally scrollable canvas, while the league and Europe modal receives clearer dark-theme surfaces and responsive controls
+
+<details>
+<summary>Previous: v2.11.0</summary>
 
 - **Selectable Themes** - The new public Settings panel offers `Klasik Gece` and `Beyaz Forma` designs without requiring sign-in; notification preferences remain a separate authenticated flow
 - **Device-Local PWA Preference** - The selected theme is stored under `fenerbahce-fan-hub.theme.v1` in browser storage, survives reloads, PWA restarts, offline launches, and service-worker updates on the same device, and is never synced to an account or server
 - **Flash-Free Startup** - A guarded bootstrap script validates the stored `ThemeId` (`classic | white-kit`) and applies the theme plus browser chrome color before React renders, falling back safely to the classic design
 - **120th Anniversary Identity** - The White Kit theme carries the warm ivory, navy, and gold shirt-inspired print style across the full frontend and replaces Fenerbahçe crests with the transparent 120th anniversary artwork
+
+</details>
 
 <details>
 <summary>Previous: v2.10.2</summary>
@@ -132,10 +144,10 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
 - **Post-Match Actual Lineups**: After a match ends, the detail modal shows ESPN-sourced formation, starting XI on a mini pitch, bench list, and substitution timeline. If lineup data is unavailable the section is silently hidden
 - **Starting XI Banner & Modal**: When `admin/startingXI` is published, users get an instant matchday lineup entry point with shirt-number photo matching and bench coverage
-- **Custom Standings**: Detailed standings for **Trendyol Süper Lig** and **UEFA Europa League**
+- **League & Europe Center**: Süper Lig standings plus a season-aware UEFA journey that resolves Champions League, Europa League, or Conference League automatically and exposes Fener’s route, league-phase standings, and the published knockout bracket
 - **Match Poll**: Interactive "Who will win?" poll with real-time results. Votes are validated server-side via `POST /api/poll-vote` and stored atomically in Firebase Realtime Database
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions. Requires Google sign-in to configure
-- **Upcoming Matches**: Display next 3 fixtures with dates and opponents
+- **Upcoming Matches**: Display the next 3 fixtures in kickoff order with competition labels, including Türkiye Kupası when scheduled
 - **Automatic Data Cleanup**: Old polls and notification records cleaned up daily
 - **Selectable Visual System**: `Klasik Gece` preserves the original glassmorphic UI, while `Beyaz Forma` applies the 120th anniversary ivory, navy, and gold print style across every frontend surface
 - **Local Theme Persistence**: Theme selection is available without sign-in and remains on the current browser/PWA installation; it is not stored in Firebase or synchronized between devices
@@ -144,7 +156,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Dedicated Fixture Tab**: Separate bottom-nav screen for season fixtures
 - **Recent Season Picker**: Switch between the current season and the previous two seasons
 - **Season-Safe Timeline**: Current seasons prioritize remaining matches; historical seasons open on completed matches and exclude cross-season ESPN results
-- **Competition Filtering**: Filter by **Süper Lig** or European competitions (**Champions League**, **Europa League**, and **Conference League**, including qualifying/play-off rounds)
+- **Competition Filtering**: Filter by **Süper Lig**, **Türkiye Kupası**, or European competitions (**Champions League**, **Europa League**, and **Conference League**, including qualifying/play-off rounds)
 - **Home/Away Filter**: Quickly narrow down to home or away fixtures
 - **Always-Visible Team Search**: Search by opponent directly beside the season picker without opening advanced filters
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
@@ -317,6 +329,8 @@ CI runs the same four steps. If all pass locally, the pipeline will pass.
 └─────────────────┘     │  /api/poll-vote      (vote write)    │
                         │  /api/refresh        (admin-key)     │
                         │  /api/live-match     (from DB cache) │
+                        │  /api/cup-fixtures   (from DB cache) │
+                        │  /api/uefa-journey   (cache-first)   │
                         │  /api/match-summary  (cache-first)   │
                         │  /api/player-image   (proxy)         │
                         │  /api/team-image     (proxy)         │
@@ -327,11 +341,13 @@ CI runs the same four steps. If all pass locally, the pipeline will pass.
                 ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
                 │   Firebase   │ │   SofaScore  │ │     ESPN     │
                 │   Realtime   │ │   (RapidAPI) │ │   (Free)     │
-                │   Database   │ │  2 calls/day │ │  ~120/match  │
+                │   Database   │ │  2-3 calls/day│ │  ~120/match  │
                 │              │ └──────────────┘ └──────────────┘
                 │ cache/       │        ▲
                 │   liveMatch  │────────┘ updateLiveMatch (1/min)
                 │   lastFinishedMatch
+                │   cupFixtures/
+                │   uefaJourney/
                 │   squad          ← Statistics tab reads directly
                 │   matchSummaries/
                 │ admin/       │
@@ -342,7 +358,7 @@ CI runs the same four steps. If all pass locally, the pipeline will pass.
                 └──────────────┘
 ```
 
-Note: The fixture tab fetches ESPN fixture schedules directly from the frontend (CORS-enabled ESPN endpoints) for the selected recent season and discards events outside that season window. Finished fixture detail summaries are served by `/api/match-summary/:matchId` with cache-first backend behavior.
+Note: The fixture tab merges client-side ESPN schedules with the cached `GET /api/cup-fixtures?seasonStartYear=YYYY` SofaScore supplement. Türkiye Kupası coverage starts with 2026/27; older selectable seasons remain ESPN-only. The Europe modal reads the cache-first `GET /api/uefa-journey?seasonStartYear=YYYY` endpoint; add `summary=true` for the compact dashboard label. Finished ESPN fixture summaries are served by `/api/match-summary/:matchId`, while SofaScore cup cards intentionally omit the unsupported summary action.
 
 ## Project Structure
 
@@ -354,6 +370,7 @@ fenerbahce-fan-hub/
 │   ├── services/
 │   │   ├── espn.js            # ESPN data fetching & event parsing
 │   │   ├── espn-helpers.js    # Pure ESPN helpers (zero side effects, no Firebase)
+│   │   ├── uefaJourney.js     # UEFA schedules, standings, bracket and cache
 │   │   └── sofascore.js       # SofaScore API calls (matches, squad, images)
 │   ├── handlers/
 │   │   └── api.js             # HTTP endpoint routing & handler functions
@@ -379,6 +396,7 @@ fenerbahce-fan-hub/
 │   │   ├── NextMatchesPanel.tsx       # Upcoming 3 matches panel
 │   │   ├── LiveMatchModal.tsx         # Live match detail modal
 │   │   ├── StandingsModal.tsx         # Standings modal wrapper
+│   │   ├── UefaJourneyContent.tsx      # Fener path and responsive bracket views
 │   │   ├── SeasonSelector.tsx          # Shared recent-season picker
 │   │   ├── FixtureSchedule.tsx        # Fixture tab with ESPN-backed filters
 │   │   ├── MatchSummaryModal.tsx      # Match statistics modal
@@ -406,6 +424,7 @@ fenerbahce-fan-hub/
 │   │       ├── fixtures.ts           # fetchMatchStatus, fetchSquad, fetchMatchSummary
 │   │       ├── standings.ts          # fetchEspnStandings
 │   │       ├── espn-fixtures.ts      # fetchEspnFenerbahceFixtures
+│   │       ├── uefa-journey.ts       # cached UEFA journey and summary requests
 │   │       └── statistics.ts         # fetchPlayerStats, fetchFormResults, fetchPlayerStatus
 │   ├── data/
 │   │   └── formations.ts             # Formation position definitions
@@ -506,7 +525,7 @@ firebase deploy --only functions
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache and record the failed attempt without blanking the dashboard. |
+| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
 | `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
 | `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches across Süper Lig and all UEFA club competitions during the match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
 | `reconcileTopicSync` | Every 5 minutes | Retries pending `all_fans` topic subscribe/unsubscribe intents until FCM confirms. |
@@ -539,19 +558,26 @@ firebase deploy --only functions
 6. When the lineup is no longer relevant, overwrite `admin/startingXI` for the next match or delete/set it to `null` to hide the banner again
 
 ### Fixture System
-- **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints (free, client-side fetch)
-- **Coverage**: Süper Lig plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
+- **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints + cached SofaScore `cup-fixtures` supplement
+- **Coverage**: Süper Lig, Türkiye Kupası from 2026/27 onward, plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
 - **Seasons**: Current season plus the previous two seasons, with July 1 boundaries
-- **Data Merge**: Results (`schedule`) + upcoming fixtures (`schedule?fixture=true`)
+- **Data Merge**: ESPN results (`schedule`) + ESPN upcoming fixtures (`schedule?fixture=true`) + persisted SofaScore cup events
 - **Historical Safety**: Past seasons default to played matches and reject events outside the selected season
 - **Filtering**: Status (All/Played/Remaining), always-visible team search, home/away, competition
-- **Summary Details**: Finished-match modal uses `GET /api/match-summary/:matchId` (cache-first, ESPN fallback on cache miss)
+- **Summary Details**: Finished ESPN matches use `GET /api/match-summary/:matchId`; Türkiye Kupası summaries remain disabled until a live/detail provider is added
+
+### Europe Journey
+- **Flow**: ESPN team schedules + league-phase standings + competition scoreboards → `cache/uefaJourney/{seasonStartYear}` → dashboard summary and full modal
+- **Automatic Competition Resolution**: Qualifying stays under the generic `Avrupa Yolculuğu` label; confirmed league-phase participation switches to Champions League, Europa League, or Conference League
+- **Route Tracking**: Keeps same-numbered qualifier rounds separate across competition transfers, resolves two-leg aggregate outcomes, and marks direct top-eight qualification, elimination, or a move to a lower competition
+- **Knockout Bracket**: Shows only ESPN-published ties; missing future draws are never predicted
+- **Mobile PWA Layout**: Uses a full-height modal, plain underline tabs, and a compact horizontally scrollable canvas that keeps every knockout round accessible without vertical page scrolling
 
 ### API Cost Optimization
 | | Before (v2.1) | After (v2.2) |
 |---|---|---|
-| SofaScore calls/day | ~1,440 | **2** |
-| SofaScore calls/month | ~43,200 | **~60** |
+| SofaScore calls/day | ~1,440 | **2 normally, 3 after a cup match** |
+| SofaScore calls/month | ~43,200 | **~60-70** |
 | Savings | - | **99.9%** |
 
 ## Deployment
@@ -597,4 +623,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.11.0** | July 2026
+**v2.12.0** | August 2026

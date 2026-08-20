@@ -46,6 +46,14 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             formatEspnDate(new Date(nowDate.getTime() - 24 * 60 * 60 * 1000))
         ];
         const leagues = getEspnLeaguesForMatch(nextMatch);
+        if (leagues.length === 0) {
+            const liveSnapshot = await db.ref('cache/liveMatch').once('value');
+            if (liveSnapshot.val()) {
+                await db.ref('cache/liveMatch').remove();
+            }
+            console.log('ℹ️ ESPN live lookup skipped for unsupported competition');
+            return;
+        }
         let fenerbahceMatch = null;
         let matchLeague = null;
 

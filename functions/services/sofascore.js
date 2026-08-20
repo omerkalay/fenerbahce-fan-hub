@@ -12,6 +12,18 @@ const fetchNextMatches = async () => {
     return data.events || [];
 };
 
+const fetchLastMatches = async (pageIndex = 0) => {
+    const response = await fetch(
+        `https://${getApiHost()}/teams/get-last-matches?teamId=${FENERBAHCE_ID}&pageIndex=${pageIndex}`,
+        { headers: getSofascoreHeaders() }
+    );
+    if (!response.ok) {
+        throw new Error(`Last match fetch failed: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.events || [];
+};
+
 const fetchSquad = async () => {
     const response = await fetch(
         `https://${getApiHost()}/teams/get-squad?teamId=${FENERBAHCE_ID}`,
@@ -109,6 +121,7 @@ const fetchImage = async (type, id) => {
 
 module.exports = {
     fetchNextMatches,
+    fetchLastMatches,
     fetchSquad,
     fetchImage
 };

@@ -85,7 +85,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     useBodyScrollLock(showLiveMatchModal || showStandingsModal || showStartingXIModal);
 
-    const openStandingsModal = (league: 'superlig' | 'europa', seasonStartYear?: number) => {
+    const openStandingsModal = (league: 'superlig' | 'uefa', seasonStartYear?: number) => {
         setStandingsLeague(league);
         setStandingsSeasonStartYear(seasonStartYear ?? season?.startYear ?? getCurrentSeasonStartYear());
         setShowStandingsModal(true);
@@ -121,6 +121,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                     <DashboardStandingsPanel
                         onOpen={openStandingsModal}
+                        seasonStartYear={season?.startYear ?? getCurrentSeasonStartYear()}
                         className="mb-0"
                     />
                     {standingsModal}
@@ -251,6 +252,16 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <span className="text-sm font-bold text-yellow-400 uppercase">Maç Durumu Kontrol Ediliyor</span>
                             </div>
                             <p className="text-xs text-slate-400">Son durum senkronize ediliyor...</p>
+                        </div>
+                    )}
+
+                    {/* STATE: UNSUPPORTED COMPETITION */}
+                    {liveMatchState === 'unsupported' && (
+                        <div className="text-center py-4">
+                            <p className="text-sm font-bold text-yellow-300">Canlı Detay Sunulmuyor</p>
+                            <p className="mt-1 text-xs text-slate-400">
+                                Bu kulvar için canlı skor ve maç istatistikleri henüz desteklenmiyor.
+                            </p>
                         </div>
                     )}
 
@@ -473,7 +484,10 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* Next 3 Matches */}
             <NextMatchesPanel next3Matches={next3Matches} />
 
-            <DashboardStandingsPanel onOpen={openStandingsModal} />
+            <DashboardStandingsPanel
+                onOpen={openStandingsModal}
+                seasonStartYear={season?.startYear ?? getCurrentSeasonStartYear()}
+            />
 
             {/* Poll */}
             <div className="mb-6">

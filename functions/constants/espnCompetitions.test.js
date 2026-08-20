@@ -33,4 +33,12 @@ describe('ESPN competitions', () => {
         const match = { tournament: { name: 'Trendyol Süper Lig' } };
         expect(getEspnLeaguesForMatch(match)).toEqual(['tur.1']);
     });
+
+    it('does not scan ESPN leagues for a Türkiye Kupası match', () => {
+        const match = { tournament: { uniqueTournament: { name: 'Türkiye Kupası' } } };
+        expect(getEspnLeaguesForMatch(match)).toEqual([]);
+
+        const idOnlyMatch = { tournament: { uniqueTournament: { id: 96, name: 'Domestic Cup' } } };
+        expect(getEspnLeaguesForMatch(idOnlyMatch)).toEqual([]);
+    });
 });

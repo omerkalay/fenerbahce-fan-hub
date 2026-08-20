@@ -1,7 +1,16 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { rapidApiKey, rapidApiHost, adminRefreshKey, corsOptions } = require('../config');
 const { enforceRateLimit, resolveRateLimitProfile } = require('./middleware');
-const { handleNextMatch, handleNext3Matches, handleMatchStatus, handleLiveMatch, handleMatchSummary, handleStandings } = require('./matches');
+const {
+    handleNextMatch,
+    handleNext3Matches,
+    handleMatchStatus,
+    handleCupFixtures,
+    handleUefaJourney,
+    handleLiveMatch,
+    handleMatchSummary,
+    handleStandings
+} = require('./matches');
 const { handleSquad } = require('./squad');
 const { handlePlayerImage, handleTeamImage } = require('./assets');
 const { handlePollVote } = require('./polls');
@@ -38,6 +47,14 @@ const api = onRequest({
             case 'match-status':
             case 'matchStatus':
                 return await handleMatchStatus(req, res);
+
+            case 'cup-fixtures':
+            case 'cupFixtures':
+                return await handleCupFixtures(req, res);
+
+            case 'uefa-journey':
+            case 'uefaJourney':
+                return await handleUefaJourney(req, res);
 
             case 'squad':
                 return await handleSquad(req, res);
@@ -86,11 +103,13 @@ const api = onRequest({
             default:
                 return res.json({
                     message: 'Fenerbahce Fan Hub API (Firebase)',
-                    version: '2.10.2',
+                    version: '2.12.0',
                     endpoints: [
                         '/next-match',
                         '/next-3-matches',
                         '/match-status',
+                        '/cup-fixtures?seasonStartYear=YYYY',
+                        '/uefa-journey?seasonStartYear=YYYY',
                         '/squad',
                         '/standings',
                         '/live-match',

@@ -1,5 +1,6 @@
 import TeamLogo from './TeamLogo';
 import type { MatchData } from '../types';
+import { localizeTeamName } from '../utils/localize';
 
 interface NextMatchesPanelProps {
     next3Matches: MatchData[];
@@ -21,22 +22,22 @@ const NextMatchesPanel: React.FC<NextMatchesPanelProps> = ({ next3Matches }) => 
                     const isFbHome = homeTeam.id === FENERBAHCE_ID;
 
                     return (
-                        <div key={idx} className="glass-panel rounded-xl p-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2 flex-1">
+                        <div key={match.id || idx} className="glass-panel rounded-xl p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <TeamLogo
                                     teamId={isFbHome ? FENERBAHCE_ID : homeTeam.id}
                                     name={homeTeam.name}
                                     wrapperClassName="w-8 h-8 rounded-full bg-white/5 p-1 flex-shrink-0 border border-white/10"
                                     imageClassName="object-contain"
                                 />
-                                <span className="text-xs font-medium truncate">{homeTeam.name}</span>
+                                <span className="text-xs font-medium truncate">{localizeTeamName(homeTeam.name)}</span>
                             </div>
-                            <div className="flex flex-col items-center px-3">
+                            <div className="flex flex-col items-center px-3 shrink-0">
                                 <span className="text-[10px] text-slate-400">{date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })}</span>
                                 <span className="text-xs font-bold">{date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
-                            <div className="flex items-center gap-2 flex-1 justify-end">
-                                <span className="text-xs font-medium truncate text-right">{awayTeam.name}</span>
+                            <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+                                <span className="text-xs font-medium truncate text-right">{localizeTeamName(awayTeam.name)}</span>
                                 <TeamLogo
                                     teamId={!isFbHome ? FENERBAHCE_ID : awayTeam.id}
                                     name={awayTeam.name}

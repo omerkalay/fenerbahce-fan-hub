@@ -9,13 +9,31 @@ const ESPN_COMPETITIONS = Object.freeze([
 ]);
 
 const ESPN_LEAGUES = Object.freeze(ESPN_COMPETITIONS.map(({ slug }) => slug));
+const TURKEY_CUP_UNIQUE_TOURNAMENT_ID = 96;
+
+const isDomesticCupTournamentName = (value) => {
+    const normalized = String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/ı/g, 'i')
+        .toLowerCase();
+    return /turkiye kupasi|turkish cup|turkey cup/.test(normalized);
+};
 
 const getEspnLeaguesForMatch = (match) => {
+    const uniqueTournamentId = Number(match?.tournament?.uniqueTournament?.id);
     const tournamentName = String(
         match?.tournament?.uniqueTournament?.name
         || match?.tournament?.name
         || ''
     ).toLowerCase();
+
+    if (
+        uniqueTournamentId === TURKEY_CUP_UNIQUE_TOURNAMENT_ID
+        || isDomesticCupTournamentName(tournamentName)
+    ) {
+        return [];
+    }
 
     if (/champions|şampiyonlar/.test(tournamentName)) {
         return ['uefa.champions_qual', 'uefa.champions'];
