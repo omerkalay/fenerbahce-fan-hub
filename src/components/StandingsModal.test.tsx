@@ -76,7 +76,10 @@ describe('StandingsModal UEFA journey', () => {
         );
 
         expect(await screen.findByText('Avrupa Yolculuğu')).toBeInTheDocument();
-        expect(screen.getByTestId('standings-modal-surface')).toHaveAttribute('data-mobile-layout', 'fullscreen');
+        const surface = screen.getByTestId('standings-modal-surface');
+        expect(surface).toHaveAttribute('data-mobile-layout', 'fullscreen');
+        expect(surface).toHaveClass('h-[100dvh]', 'sm:h-[90vh]');
+        expect(surface).not.toHaveClass('sm:h-auto');
         expect(screen.getByText('UEFA Şampiyonlar Ligi Elemeleri · Eleme Play-off Turu')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: "Fener’in Yolu" })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Puan Durumu' })).not.toBeInTheDocument();

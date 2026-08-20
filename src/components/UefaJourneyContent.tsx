@@ -113,12 +113,19 @@ export const UefaPathView = ({ stages }: { stages: UefaPathStage[] }) => {
         return <EmptyState text="Avrupa yolu henüz açıklanmadı." />;
     }
 
+    const eliminatedStageIndex = stages.findIndex((stage) => stage.status === 'eliminated');
+
     return (
         <div className="px-4 py-5 sm:px-6">
             <div className="relative ml-1 border-l border-white/10">
                 {stages.map((stage, index) => {
                     const style = STATUS_STYLES[stage.status];
                     const summary = getStageSummary(stage);
+                    const statusLabel = eliminatedStageIndex >= 0
+                        && index > eliminatedStageIndex
+                        && stage.status === 'locked'
+                        ? '-'
+                        : STATUS_LABELS[stage.status];
                     const showCompetition = Boolean(
                         stage.competitionName
                         && stage.competitionName !== stages[index - 1]?.competitionName
@@ -136,7 +143,7 @@ export const UefaPathView = ({ stages }: { stages: UefaPathStage[] }) => {
                                     )}
                                 </div>
                                 <span className={`shrink-0 pt-0.5 text-[10px] font-semibold ${style.text}`}>
-                                    {STATUS_LABELS[stage.status]}
+                                    {statusLabel}
                                 </span>
                             </div>
                             {summary && <p className="mt-1 text-xs font-semibold text-slate-300">{summary}</p>}

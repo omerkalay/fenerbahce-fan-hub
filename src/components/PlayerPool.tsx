@@ -12,7 +12,7 @@ const PlayerPool = ({ squad, loading, isTouchDevice, onDragStart }: PlayerPoolPr
     return (
         <div className="flex-1 overflow-hidden flex flex-col">
             <h3 className="text-sm font-bold text-slate-400 mb-2 px-2 uppercase tracking-wider">Oyuncular</h3>
-            <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-20 touch-pan-y overscroll-contain [-webkit-overflow-scrolling:touch]">
+            <div className="flex-1 overflow-y-auto no-scrollbar px-2 pb-20 touch-pan-y overscroll-contain sm:overscroll-auto [-webkit-overflow-scrolling:touch]">
                 <div className="grid grid-cols-4 gap-2">
                     {loading ? (
                         <div className="col-span-4 text-center text-slate-500 py-4">Yükleniyor...</div>

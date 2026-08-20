@@ -79,6 +79,41 @@ describe('UefaPathView', () => {
 
         expect(screen.getByText('Toplam skor 6–4')).toBeInTheDocument();
     });
+
+    it('uses a dash for locked stages after elimination', () => {
+        const stages: UefaPathStage[] = [
+            {
+                key: 'round-of-16',
+                label: 'Son 16',
+                competitionKey: 'europa',
+                competitionName: 'UEFA Avrupa Ligi',
+                status: 'eliminated',
+                matches: [],
+                aggregate: { '436': 3, '999': 3 },
+                winnerTeamId: '999',
+                position: null,
+                points: null,
+            },
+            {
+                key: 'quarterfinals',
+                label: 'Çeyrek Final',
+                competitionKey: 'europa',
+                competitionName: 'UEFA Avrupa Ligi',
+                status: 'locked',
+                matches: [],
+                aggregate: null,
+                winnerTeamId: null,
+                position: null,
+                points: null,
+            },
+        ];
+
+        render(<UefaPathView stages={stages} />);
+
+        expect(screen.getByText('Elendi')).toBeInTheDocument();
+        expect(screen.getByText('-')).toBeInTheDocument();
+        expect(screen.queryByText('Henüz belli değil')).not.toBeInTheDocument();
+    });
 });
 
 describe('UefaBracketView', () => {

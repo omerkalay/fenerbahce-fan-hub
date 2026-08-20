@@ -83,7 +83,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
         >
             <div
                 className={`standings-dialog-surface relative flex w-full flex-col overflow-hidden border animate-slideUp ${isUefa
-                    ? 'h-[100dvh] sm:h-auto sm:max-h-[90vh] sm:max-w-7xl sm:rounded-2xl'
+                    ? 'h-[100dvh] sm:h-[90vh] sm:max-w-7xl sm:rounded-2xl'
                     : 'max-h-[88vh] max-w-2xl rounded-2xl'
                 }`}
                 data-testid="standings-modal-surface"

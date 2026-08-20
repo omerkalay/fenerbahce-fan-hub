@@ -6,13 +6,20 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.12.0-blue)
+![Version](https://img.shields.io/badge/version-2.12.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.12.0
+## What's New in v2.12.1
+
+- **Desktop Scroll Recovery** - The UEFA bracket now keeps a constrained desktop viewport with working vertical scrolling, while the squad builder releases desktop wheel scrolling without changing its contained mobile touch behavior
+- **Historical Route Clarity** - Stages after a confirmed European elimination now display a simple `-` instead of suggesting that their outcome is still pending
+- **Mobile Behavior Preserved** - The full-screen compact PWA bracket and mobile player-list scrolling continue to work as before
+
+<details>
+<summary>Previous: v2.12.0</summary>
 
 - **Türkiye Kupası Coverage** - Fenerbahçe cup matches published by SofaScore are cached from 2026/27 onward, merged with ESPN league and European fixtures, and exposed through competition-aware filters
 - **Chronological Match Flow** - Dashboard fixtures, the next-three list, and match reminders are ordered by kickoff time across every supported competition, while unsupported cup summary requests are skipped
@@ -20,6 +27,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Fenerbahçe's Route** - Competition transfers, aggregate scores, league position, qualification, and elimination are tracked throughout the European season
 - **Connected Tournament Bracket** - Published ties from the knockout play-off through the final use team crests, verified progression lines, winner highlighting, and draw-pending placeholders without predicting future opponents
 - **Mobile PWA Refinement** - The compact bracket keeps every knockout round in one horizontally scrollable canvas, while the league and Europe modal receives clearer dark-theme surfaces and responsive controls
+
+</details>
 
 <details>
 <summary>Previous: v2.11.0</summary>
@@ -32,32 +41,12 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 </details>
 
 <details>
-<summary>Previous: v2.10.2</summary>
+<summary>Previous: v2.10.x (v2.10.0 - v2.10.2)</summary>
 
-- **Failure-Safe Cache Refresh** - Scheduled and protected refreshes now preserve the last known-good match, squad, and finished-match cache when SofaScore fails; the frontend also keeps its local match fallback instead of replacing it with an empty error state
-- **Frontend Maintenance Cleanup** - Removed unused legacy squad components, mock assets, dead API exports, stale types, and an unused dependency without changing the notification or Firebase Functions code
-- **Regression Coverage** - Added backend cache-safety and frontend bootstrap fallback tests; the full quality gate now passes 297 tests before the production build
-
-</details>
-
-<details>
-<summary>Previous: v2.10.1</summary>
-
-- **Season-Safe Fixture History** - Historical fixture selections now open on completed matches, disable the invalid remaining-matches view, and reject ESPN events outside the selected July-to-June season window
-- **Visible Opponent Search** - Team search moved beside the compact season picker, stays visible without opening advanced filters, and stacks cleanly on screens narrower than 360px
-- **Season-Aware Goal & Assist Rankings** - The scorer and assister tables share a recent-three-season picker, and every Super Lig/Europa roster request now includes the selected season instead of mixing in ESPN's previous-season fallback
-- **Turkish & Mobile UI Polish** - Club friendly labels render as `Hazırlık Maçı`; the app root now covers the dynamic viewport consistently and prevents horizontal background gaps on mobile/PWA surfaces
-
-</details>
-
-<details>
-<summary>Previous: v2.10.0</summary>
-
-- **Season-End Dashboard State** - The dashboard now distinguishes a true offseason from fixture API failures, showing the season-complete panel only after a successful no-next-match fetch during the conservative May-July break window
-- **Automatic New-Season Recovery** - Scheduled and protected refreshes now cache match fetch status plus season metadata, so the dashboard can return to the normal next-match flow when the new season fixtures arrive without another code push
-- **Historical Standings Selection** - The standings modal supports recent season selection while the dashboard keeps the original clean two-button entry for Super Lig and Europa League tables
-- **Fixture Season Picker** - The fixture screen can switch between recent seasons and resets filters cleanly when the selected season changes
-- **Historical Lineup Photo Guard** - Older match details no longer match players against the current squad photo map, preventing wrong photos when historical player images are unavailable
+- **Season & Offseason Reliability** - Added explicit offseason and fetch-failure states, automatic new-season recovery, recent-season standings and fixture selection, and season-window validation for historical ESPN data
+- **Historical Data Safety** - Prevented current-player photos and provider fallbacks from contaminating old lineups, scorers, assisters, and completed-match timelines
+- **Fixture & Mobile Refinement** - Added always-visible opponent search, historical played-match defaults, localized friendly labels, narrow-screen controls, and viewport fixes for mobile PWA use
+- **Failure-Safe Maintenance** - Preserved last known-good match, squad, finished-match, and local fallback data during provider failures while removing unused frontend code and expanding regression coverage
 
 </details>
 
@@ -623,4 +612,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.12.0** | August 2026
+**v2.12.1** | August 2026
