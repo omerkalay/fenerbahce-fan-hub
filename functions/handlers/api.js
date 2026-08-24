@@ -107,7 +107,7 @@ const api = onRequest({
             default:
                 return res.json({
                     message: 'Fenerbahce Fan Hub API (Firebase)',
-                    version: '2.13.0',
+                    version: '2.13.1',
                     endpoints: [
                         '/next-match',
                         '/next-3-matches',

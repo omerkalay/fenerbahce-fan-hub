@@ -319,7 +319,7 @@ const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChang
                     </div>
                 </div>}
                 {adminMode && (
-                    <div className="glass-panel rounded-xl p-3 border border-yellow-400/15">
+                    <div className="glass-panel rounded-xl p-3 border border-white/10">
                         <p className="text-sm font-semibold text-white">Manuel Fenerbahçe kadrosu</p>
                         <p className="text-[11px] text-slate-400 mt-1">Taslak durum: {filledSpots}/{totalSpots} oyuncu</p>
                     </div>
@@ -351,13 +351,13 @@ const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChang
                             {player ? (
                                 <div
                                     className="relative w-full h-full flex flex-col items-center group"
-                                    draggable={!isExporting && !isTouchDevice}
+                                    draggable={!adminMode && !isExporting && !isTouchDevice}
                                     onDragStart={(e) => {
                                         e.dataTransfer.setData('player', JSON.stringify(player));
                                         e.dataTransfer.setData('sourcePosition', posKey);
                                     }}
                                 >
-                                    <div className="w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative cursor-move z-10 group-hover:scale-110 transition-transform">
+                                    <div className={`w-12 h-12 rounded-full border-2 border-yellow-400 overflow-hidden bg-slate-800 shadow-lg relative z-10 group-hover:scale-110 transition-transform ${adminMode ? 'cursor-default' : 'cursor-move'}`}>
                                         <PlayerImage
                                             src={player.photo}
                                             alt={player.name}
@@ -397,12 +397,14 @@ const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChang
             </div>
 
             {/* Player Pool */}
-            <PlayerPool
-                squad={squad}
-                loading={loading}
-                isTouchDevice={isTouchDevice}
-                onDragStart={handleDragStart}
-            />
+            {!adminMode && (
+                <PlayerPool
+                    squad={squad}
+                    loading={loading}
+                    isTouchDevice={isTouchDevice}
+                    onDragStart={handleDragStart}
+                />
+            )}
 
             {/* Player Selection Modal */}
             <PlayerSelectionModal

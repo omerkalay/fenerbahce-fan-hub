@@ -12,6 +12,8 @@ const { isFenerbahceName } = require('../utils/lineupAutomation');
 const MATCH_ID_PATTERN = /^\d{5,20}$/;
 const ALLOWED_FORMATIONS = new Set(['4-3-3', '4-4-2', '4-2-3-1', '4-1-4-1', '3-5-2', '4-1-2-1-2 Diamond']);
 const ALLOWED_PLAYER_KEYS = new Set(['slot', 'id', 'name', 'position', 'number']);
+const APP_URL = 'https://omerkalay.com/fenerbahce-fan-hub/';
+const NOTIFICATION_TEST_TTL_MS = 10 * 60 * 1000;
 
 const hasOnlyKeys = (value, allowedKeys) => (
     value && typeof value === 'object' && !Array.isArray(value)
@@ -127,6 +129,40 @@ const sanitizeLineupState = ({ detection, published, draft, settings, manualLock
     } : null
 });
 
+const normalizeNotification = (body) => {
+    if (!hasOnlyKeys(body, new Set(['title', 'body', 'url', 'testId']))) return null;
+    if (
+        typeof body.title !== 'string'
+        || typeof body.body !== 'string'
+        || (body.url !== undefined && typeof body.url !== 'string')
+        || (body.testId !== undefined && typeof body.testId !== 'string')
+    ) return null;
+    const title = body.title.trim();
+    const messageBody = body.body.trim();
+    if (!title || title.length > 60 || !messageBody || messageBody.length > 180) return null;
+
+    let url;
+    try {
+        if ((body.url || APP_URL).length > 240) return null;
+        url = new URL(body.url || APP_URL, APP_URL);
+    } catch {
+        return null;
+    }
+    if (url.origin !== 'https://omerkalay.com' || !url.pathname.startsWith('/fenerbahce-fan-hub/')) return null;
+
+    return {
+        title,
+        body: messageBody,
+        url: url.toString(),
+        ...(body.testId ? { testId: String(body.testId) } : {})
+    };
+};
+
+const notificationHash = (payload) => crypto
+    .createHash('sha256')
+    .update(JSON.stringify({ title: payload.title, body: payload.body, url: payload.url }))
+    .digest('hex');
+
 const writeAudit = (uid, action, details = {}, database = db) => database.ref('ops/adminAudit').push({
     uid,
     action,
@@ -140,15 +176,53 @@ const handleSession = async (_req, res, claims) => res.json({
     uid: claims.uid
 });
 
+const summarizeUefaJourney = (value) => {
+    if (!value || typeof value !== 'object') return null;
+    const entries = Object.entries(value)
+        .map(([seasonStartYear, payload]) => ({
+            seasonStartYear: Number(seasonStartYear),
+            lastUpdate: Number(payload?.lastUpdate || 0),
+            stale: payload?.stale === true,
+            participationState: String(payload?.participation?.state || 'unknown')
+        }))
+        .filter((entry) => Number.isInteger(entry.seasonStartYear) && entry.lastUpdate > 0)
+        .sort((first, second) => second.lastUpdate - first.lastUpdate);
+    return entries[0] || null;
+};
+
 const handleOverview = async (_req, res, _claims, database = db) => {
-    const [nextMatch, settings] = await Promise.all([
+    const [lastUpdate, nextMatch, uefaJourney, health, settings, pending, cleanup] = await Promise.all([
+        database.ref('cache/lastUpdate').once('value'),
         database.ref('cache/nextMatch').once('value'),
-        getLineupSettings(database)
+        database.ref('cache/uefaJourney').once('value'),
+        database.ref('ops/health').once('value'),
+        getLineupSettings(database),
+        database.ref('notifications').orderByChild('topicSync/allFans/pending').equalTo(true).once('value'),
+        database.ref('notifications').orderByChild('topicSync/allFans/oldTokenToCleanup').startAt('').once('value')
     ]);
+    const nextMatchValue = nextMatch.val() || null;
+    const nextMatchId = validateMatchId(nextMatchValue?.id);
+    const startingLineupPushSnapshot = nextMatchId
+        ? await database.ref(`ops/lineups/${nextMatchId}/notification`).once('value')
+        : null;
+    const startingLineupPush = startingLineupPushSnapshot?.val() || null;
     return res.json({
-        version: '2.13.0',
-        nextMatch: nextMatch.val() || null,
-        settings
+        version: '2.13.1',
+        lastCacheUpdate: lastUpdate.val() || null,
+        nextMatch: nextMatchValue,
+        uefaJourney: summarizeUefaJourney(uefaJourney.val()),
+        health: health.val() || {},
+        settings,
+        topicSync: {
+            pending: pending.numChildren(),
+            cleanupPending: cleanup.numChildren()
+        },
+        startingLineupPush: startingLineupPush ? {
+            status: startingLineupPush.status || null,
+            acceptedAt: startingLineupPush.acceptedAt || null,
+            failedAt: startingLineupPush.failedAt || null,
+            errorCode: startingLineupPush.errorCode || null
+        } : null
     });
 };
 
@@ -317,6 +391,63 @@ const handleSettings = async (req, res, claims, database = db) => {
     return res.json({ success: true, settings });
 };
 
+const handleNotificationTest = async (req, res, claims, database = db, messaging = admin.messaging()) => {
+    const payload = normalizeNotification(req.body);
+    if (!payload || payload.testId) return res.status(400).json({ error: 'Invalid notification payload' });
+    const tokenSnapshot = await database.ref(`notifications/${claims.uid}/fcmToken`).once('value');
+    const token = tokenSnapshot.val();
+    if (!token) return res.status(409).json({ error: 'No notification token is registered for this admin device' });
+
+    const messageId = await messaging.send({ token, data: { ...payload, type: 'adminTest' } });
+    const testId = crypto.randomUUID();
+    const testedAt = Date.now();
+    await database.ref(`ops/adminNotificationTests/${claims.uid}/${testId}`).set({
+        hash: notificationHash(payload),
+        payload,
+        testedAt,
+        expiresAt: testedAt + NOTIFICATION_TEST_TTL_MS,
+        messageId
+    });
+    await writeAudit(claims.uid, 'notification.test.accepted', { testId }, database);
+    return res.json({ success: true, status: 'accepted', testId, expiresAt: testedAt + NOTIFICATION_TEST_TTL_MS });
+};
+
+const handleNotificationSend = async (req, res, claims, database = db, messaging = admin.messaging()) => {
+    const payload = normalizeNotification(req.body);
+    if (!payload?.testId || !/^[0-9a-f-]{36}$/i.test(payload.testId)) {
+        return res.status(400).json({ error: 'A valid testId is required' });
+    }
+    const testSnapshot = await database.ref(`ops/adminNotificationTests/${claims.uid}/${payload.testId}`).once('value');
+    const test = testSnapshot.val();
+    const now = Date.now();
+    if (!test || test.expiresAt < now || test.hash !== notificationHash(payload)) {
+        return res.status(409).json({ error: 'The tested notification expired or its content changed' });
+    }
+
+    const sendRef = database.ref(`ops/adminNotificationSends/${payload.testId}`);
+    const lock = await sendRef.transaction((current) => current ? undefined : {
+        status: 'sending',
+        uid: claims.uid,
+        startedAt: now,
+        payload: { title: payload.title, body: payload.body, url: payload.url }
+    });
+    if (!lock.committed) return res.status(409).json({ error: 'This notification was already submitted' });
+
+    try {
+        const messageId = await messaging.send({
+            topic: 'all_fans',
+            data: { title: payload.title, body: payload.body, url: payload.url, type: 'adminBroadcast' }
+        });
+        await sendRef.update({ status: 'accepted', acceptedAt: Date.now(), messageId });
+        await writeAudit(claims.uid, 'notification.broadcast.accepted', { testId: payload.testId }, database);
+        return res.json({ success: true, status: 'accepted' });
+    } catch (error) {
+        await sendRef.update({ status: 'failed', failedAt: Date.now(), errorCode: error?.code || 'messaging/unknown' });
+        await writeAudit(claims.uid, 'notification.broadcast.failed', { testId: payload.testId }, database);
+        return res.status(502).json({ success: false, status: 'failed', error: 'Firebase rejected the notification' });
+    }
+};
+
 async function handleAdminRoute(req, res, segments, dependencies = {}) {
     const database = dependencies.database || db;
     const messaging = dependencies.messaging || admin.messaging();
@@ -329,6 +460,14 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
         if (resource === 'session' && segments.length === 1 && req.method === 'GET') return handleSession(req, res, claims);
         if (resource === 'overview' && segments.length === 1 && req.method === 'GET') return handleOverview(req, res, claims, database);
         if (resource === 'settings' && segments.length === 1 && req.method === 'PUT') return handleSettings(req, res, claims, database);
+        if (resource === 'notifications' && rawMatchId === 'test' && req.method === 'POST') {
+            if (segments.length !== 2) return res.status(404).json({ error: 'Admin endpoint not found' });
+            return handleNotificationTest(req, res, claims, database, messaging);
+        }
+        if (resource === 'notifications' && rawMatchId === 'send' && req.method === 'POST') {
+            if (segments.length !== 2) return res.status(404).json({ error: 'Admin endpoint not found' });
+            return handleNotificationSend(req, res, claims, database, messaging);
+        }
         if (resource !== 'lineups') return res.status(404).json({ error: 'Admin endpoint not found' });
 
         const matchId = validateMatchId(rawMatchId);
@@ -351,5 +490,8 @@ module.exports = {
     MATCH_ID_PATTERN,
     validateMatchId,
     normalizeDraft,
+    normalizeNotification,
+    notificationHash,
+    summarizeUefaJourney,
     handleAdminRoute
 };

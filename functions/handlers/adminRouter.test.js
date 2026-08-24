@@ -9,6 +9,8 @@ process.env.GCLOUD_PROJECT = 'test-dummy';
 const {
     validateMatchId,
     normalizeDraft,
+    normalizeNotification,
+    notificationHash,
     handleAdminRoute
 } = await import('./adminRouter.js');
 
@@ -50,6 +52,17 @@ describe('admin route validation', () => {
         expect(normalizeDraft('{"formation":"4-2-3-1"}')).toBeNull();
     });
 
+    it('restricts notification content and internal URLs', () => {
+        const valid = normalizeNotification({ title: 'Test', body: 'Message', url: '/fenerbahce-fan-hub/' });
+        expect(valid?.url).toBe('https://omerkalay.com/fenerbahce-fan-hub/');
+        expect(normalizeNotification({ title: 'Test', body: 'Message', url: 'https://attacker.example/' })).toBeNull();
+        expect(normalizeNotification({ title: 'x'.repeat(61), body: 'Message' })).toBeNull();
+        expect(normalizeNotification({ title: 'Test', body: 'x'.repeat(181) })).toBeNull();
+        expect(normalizeNotification({ title: 'Test', body: 'Message', url: `/fenerbahce-fan-hub/${'x'.repeat(250)}` })).toBeNull();
+        expect(normalizeNotification({ title: 'Test', body: 'Message', uid: 'fake-admin' })).toBeNull();
+        expect(notificationHash(valid)).toHaveLength(64);
+    });
+
     it('stops every admin route when authentication fails', async () => {
         const authenticate = vi.fn(async (_req, res) => {
             res.status(403).json({ error: 'Administrator access required' });
@@ -63,6 +76,8 @@ describe('admin route validation', () => {
             { method: 'PUT', segments: ['lineups', '401888314', 'draft'] },
             { method: 'POST', segments: ['lineups', '401888314', 'publish'] },
             { method: 'POST', segments: ['lineups', '401888314', 'release'] },
+            { method: 'POST', segments: ['notifications', 'test'] },
+            { method: 'POST', segments: ['notifications', 'send'] }
         ];
 
         for (const route of routes) {

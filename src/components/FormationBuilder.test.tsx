@@ -21,11 +21,11 @@ describe('FormationBuilder touch editing', () => {
         const onDraftChange = vi.fn();
         render(<FormationBuilder adminMode onDraftChange={onDraftChange} />);
 
-        await screen.findAllByText('Goalkeeper');
         fireEvent.click(screen.getAllByText('+')[0]);
         expect(screen.getByRole('dialog', { name: 'Oyuncu Seç' })).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Oyuncular' })).not.toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: /1 Goalkeeper Goalkeeper/i }));
+        fireEvent.click(await screen.findByRole('button', { name: /1 Goalkeeper Goalkeeper/i }));
 
         await waitFor(() => {
             expect(onDraftChange).toHaveBeenLastCalledWith(expect.objectContaining({

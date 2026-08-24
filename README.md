@@ -6,18 +6,27 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.13.0-blue)
+![Version](https://img.shields.io/badge/version-2.13.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.13.0
+## What's New in v2.13.1
 
-- **Verified Automatic Starting XIs** - The existing minute scheduler now begins ESPN lineup discovery 90 minutes before kickoff, verifies the SofaScore fixture by teams, kickoff time, and supported competition, requires two identical complete 11+11 observations, and publishes only validated lineups
+- **Controlled Notification Center** - Broadcast content must be previewed and sent to the administrator's own registered device before the identical payload can be submitted once to the server-fixed `all_fans` topic; transaction locks prevent duplicate submissions
+- **Private System Status** - The administration panel now reports scheduler health, cache and UEFA freshness, ESPN lineup state, Starting XI push status, pending topic work, and the live backend version without exposing private operations data to clients
+- **Honest FCM Results** - Topic sends report only whether Firebase accepted or failed the request; the interface never invents an unverifiable delivery count
+
+<details>
+<summary>Previous: v2.13.0</summary>
+
+- **Verified Automatic Starting XIs** - The existing minute scheduler begins ESPN lineup discovery 90 minutes before kickoff, verifies the SofaScore fixture by teams, kickoff time, and supported competition, requires two identical complete 11+11 observations, and publishes only validated lineups
 - **Shared Visual Lineup Experience** - Matchday, live, and post-match views use the same dual-team pitch component with Fenerbahçe first, formations, shirt numbers, squad photos, benches, and live substitutions; inferred formations are labeled clearly
 - **Claim-Protected Administration** - A profile-only administration panel is backed by one server-side `/api/admin/*` authorization gate using revoked-token checks and the Firebase `admin` custom claim; private drafts, detection state, locks, settings, audit records, and health data never become client-readable
 - **Safe Manual Fallback and Rollout** - Administrators can review ESPN detection, build and publish a manual Fenerbahçe lineup without overwriting an ESPN opponent lineup, release the manual lock, and enable automatic publishing/push only after observation; both automation switches default to off
+
+</details>
 
 <details>
 <summary>Previous: v2.12.3</summary>
@@ -296,7 +305,7 @@ This node is managed manually via the Firebase Console. Each entry:
 | Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
 | Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
 | Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
-| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, draft constraints |
+| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, draft constraints, and notification URLs |
 | Shared lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away tabs, incomplete provider sides, and mobile touch editing |
 | Realtime Database rules | `rules/database.rules.spec.mjs` | Public read-only sports cache, private operations state, owner isolation, and denied direct lineup writes |
 | Admin authorization | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin denial, shared route gating, path and schema manipulation, field limits, and internal notification links |
@@ -403,7 +412,7 @@ fenerbahce-fan-hub/
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.tsx              # Main dashboard (orchestrator, helpers in utils/)
-│   │   ├── AdminPanel.tsx             # Claim-protected lineup operations UI
+│   │   ├── AdminPanel.tsx             # Private operations, lineup and notification UI
 │   │   ├── match-lineups/             # Post-match lineup viewer (split module)
 │   │   │   ├── formation-engine.ts    # Pure formation/row-building logic
 │   │   │   ├── MiniPitch.tsx          # SVG pitch visualization
@@ -600,6 +609,15 @@ firebase deploy --only database
 5. After one verified match, enable automatic publishing. Enable automatic Starting XI push only after a later verified match confirms publication behavior
 6. Published lineup data is never written by a browser directly. Cloud Functions writes the public cache, while private detection, draft, lock, settings, and audit data remain under `ops`
 
+### Administration Notification Center
+
+1. Prepare and preview an immediate notification in **Yönetim → Bildirim**
+2. Send it to the administrator's own registered device
+3. If any content changes, repeat the device test
+4. Confirm the identical payload once for the server-fixed `all_fans` topic
+
+The panel reports only whether Firebase accepted or failed the topic submission; it does not invent a delivery count. User-entered tokens, topics, and scheduled custom broadcasts are intentionally unsupported.
+
 ### Fixture System
 - **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints + cached SofaScore `cup-fixtures` supplement
 - **Coverage**: Süper Lig, Türkiye Kupası from 2026/27 onward, plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
@@ -663,4 +681,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.13.0** | August 2026
+**v2.13.1** | August 2026

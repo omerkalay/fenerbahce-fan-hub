@@ -3,14 +3,15 @@ const { admin, db, ISTANBUL_TIMEZONE } = require('../config');
 const { buildNotificationSchedule } = require('../utils/notificationSchedule');
 
 /**
- * Check Match Notifications - Her dakika çalışır
- * ARTIK API CALL YAPMIYOR! Cache'den okuyor.
+ * Checks cached match notification windows every minute without calling a sports API.
  */
 const checkMatchNotifications = onSchedule(
     { schedule: "every 1 minutes", maxInstances: 1 },
     async (_event) => {
+    const schedulerStartedAt = Date.now();
+    let healthStatus = 'ok';
+    let healthErrorCode = null;
     try {
-        const runStartedAt = Date.now();
         const matchesSnapshot = await db.ref('cache/next3Matches').once('value');
         const nextMatches = matchesSnapshot.val();
 
@@ -214,11 +215,23 @@ const checkMatchNotifications = onSchedule(
 
         console.log(
             `[notifications] complete queued=${pendingNotifications.length} sent=${success} failed=${failed} ` +
-            `durationMs=${Date.now() - runStartedAt}`
+            `durationMs=${Date.now() - schedulerStartedAt}`
         );
 
     } catch (error) {
         console.error('❌ Notification check failed:', error);
+        healthStatus = 'error';
+        healthErrorCode = error?.code || 'notifications/unknown';
+    } finally {
+        await db.ref('ops/health/notificationScheduler').set({
+            lastRunAt: schedulerStartedAt,
+            completedAt: Date.now(),
+            durationMs: Date.now() - schedulerStartedAt,
+            status: healthStatus,
+            errorCode: healthErrorCode
+        }).catch((healthError) => {
+            console.error('Notification health update failed:', healthError?.code || 'unknown');
+        });
     }
 });
 

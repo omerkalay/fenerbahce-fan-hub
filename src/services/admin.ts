@@ -7,6 +7,27 @@ import type {
     PublishedMatchLineups
 } from '../types';
 
+export interface AdminOverview {
+    version: string;
+    lastCacheUpdate: number | null;
+    nextMatch: MatchData | null;
+    uefaJourney: {
+        seasonStartYear: number;
+        lastUpdate: number;
+        stale: boolean;
+        participationState: string;
+    } | null;
+    health: Record<string, Record<string, unknown>>;
+    settings: AdminLineupSettings;
+    topicSync: { pending: number; cleanupPending: number };
+    startingLineupPush: {
+        status: string | null;
+        acceptedAt: number | null;
+        failedAt: number | null;
+        errorCode: string | null;
+    } | null;
+}
+
 export interface AdminLineupDetail {
     match: MatchData;
     detection: {
@@ -28,6 +49,12 @@ export interface AdminLineupDetail {
     } | null;
 }
 
+export interface AdminNotificationPayload {
+    title: string;
+    body: string;
+    url: string;
+}
+
 const ADMIN_ERROR_MESSAGES: Record<number, string> = {
     400: 'Gönderilen bilgiler geçersiz.',
     401: 'Yönetici oturumu doğrulanamadı. Tekrar giriş yap.',
@@ -35,7 +62,8 @@ const ADMIN_ERROR_MESSAGES: Record<number, string> = {
     404: 'İstenen yönetim kaydı bulunamadı.',
     405: 'Bu işlem desteklenmiyor.',
     409: 'İşlem mevcut durumla çakıştı. Paneli yenileyip tekrar dene.',
-    429: 'Çok fazla istek gönderildi. Biraz bekleyip tekrar dene.'
+    429: 'Çok fazla istek gönderildi. Biraz bekleyip tekrar dene.',
+    502: 'Firebase bildirimi kabul etmedi.'
 };
 
 const adminRequest = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
@@ -58,6 +86,7 @@ const adminRequest = async <T>(path: string, init: RequestInit = {}): Promise<T>
 };
 
 export const fetchAdminSession = () => adminRequest<{ authenticated: true; admin: true; uid: string }>('session');
+export const fetchAdminOverview = () => adminRequest<AdminOverview>('overview');
 export const fetchAdminLineup = (matchId: number | string) => adminRequest<AdminLineupDetail>(`lineups/${matchId}`);
 
 export const saveAdminLineupDraft = (matchId: number | string, draft: FormationDraft) => (
@@ -85,5 +114,19 @@ export const updateAdminSettings = (settings: AdminLineupSettings) => (
     adminRequest<{ success: true; settings: AdminLineupSettings }>('settings', {
         method: 'PUT',
         body: JSON.stringify(settings)
+    })
+);
+
+export const sendAdminNotificationTest = (payload: AdminNotificationPayload) => (
+    adminRequest<{ success: true; status: 'accepted'; testId: string; expiresAt: number }>('notifications/test', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+    })
+);
+
+export const sendAdminNotificationBroadcast = (payload: AdminNotificationPayload, testId: string) => (
+    adminRequest<{ success: true; status: 'accepted' }>('notifications/send', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, testId })
     })
 );

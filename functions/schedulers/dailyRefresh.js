@@ -14,14 +14,16 @@ const {
 const { refreshUefaJourneyCache } = require('../services/uefaJourney');
 
 /**
- * Daily Data Refresh - Günde 1 kez çalışır
- * SofaScore ve ESPN'den veri çeker, Firebase'e cache'ler
- * 03:00 UTC = 06:00 TR
+ * Runs once per day, fetching SofaScore and ESPN data into the Firebase cache.
+ * The 03:00 UTC schedule is 06:00 in Istanbul.
  */
 const dailyDataRefresh = onSchedule({
     schedule: "0 3 * * *",
     secrets: [rapidApiKey, rapidApiHost]
 }, async (_event) => {
+    const runStartedAt = Date.now();
+    let runStatus = 'ok';
+    let errorCode = null;
     console.log('⏰ Daily data refresh started (03:00 UTC = 06:00 TR)');
 
     try {
@@ -96,7 +98,7 @@ const dailyDataRefresh = onSchedule({
         }
         console.log(`✨ Cache updated at ${new Date().toISOString()}`);
 
-        // 5. Eski poll verilerini temizle
+        // 5. Remove poll data that no longer belongs to the current match.
         console.log('5️⃣ Cleaning up old poll data...');
         const currentMatchId = String(cache.nextMatch?.id);
         const pollsSnapshot = await db.ref('match_polls').once('value');
@@ -109,12 +111,12 @@ const dailyDataRefresh = onSchedule({
         }
         if (Object.keys(deleteOps).length > 0) {
             await db.ref().update(deleteOps);
-            console.log(`🗑️ Silinen eski poll: ${Object.keys(deleteOps).length}`);
+            console.log(`🗑️ Removed ${Object.keys(deleteOps).length} stale poll records`);
         } else {
-            console.log('✅ Temizlenecek eski poll yok');
+            console.log('✅ No stale poll records to remove');
         }
 
-        // 6. Eski sentNotifications kayıtlarını temizle
+        // 6. Remove sent-notification records for matches outside the active window.
         console.log('6️⃣ Cleaning up old notification records...');
         const activeMatchIds = new Set(
             cache.next3Matches.map(m => String(m.id))
@@ -139,13 +141,25 @@ const dailyDataRefresh = onSchedule({
         }
         if (Object.keys(notifDeletes).length > 0) {
             await db.ref().update(notifDeletes);
-            console.log(`🗑️ Silinen eski notification kayıtları: ${Object.keys(notifDeletes).length}`);
+            console.log(`🗑️ Removed ${Object.keys(notifDeletes).length} stale notification records`);
         } else {
-            console.log('✅ Temizlenecek eski notification kaydı yok');
+            console.log('✅ No stale notification records to remove');
         }
 
     } catch (error) {
+        runStatus = 'error';
+        errorCode = error?.code || 'daily-refresh/unknown';
         console.error('❌ Daily refresh failed:', error);
+    } finally {
+        await db.ref('ops/health/dailyDataRefresh').set({
+            lastRunAt: runStartedAt,
+            completedAt: Date.now(),
+            durationMs: Date.now() - runStartedAt,
+            status: runStatus,
+            errorCode
+        }).catch((healthError) => {
+            console.error('Daily refresh health update failed:', healthError?.code || 'unknown');
+        });
     }
 });
 
