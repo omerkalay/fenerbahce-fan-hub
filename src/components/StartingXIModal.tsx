@@ -5,9 +5,17 @@ interface StartingXIModalProps {
     visible: boolean;
     data: PublishedMatchLineups;
     onClose: () => void;
+    isSimulation?: boolean;
+    useSquadPhotos?: boolean;
 }
 
-const StartingXIModal = ({ visible, data, onClose }: StartingXIModalProps) => {
+const StartingXIModal = ({
+    visible,
+    data,
+    onClose,
+    isSimulation = false,
+    useSquadPhotos = true,
+}: StartingXIModalProps) => {
     if (!visible) return null;
 
     return (
@@ -16,14 +24,18 @@ const StartingXIModal = ({ visible, data, onClose }: StartingXIModalProps) => {
             onClick={onClose}
         >
             <div
-                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-yellow-400/20 bg-slate-950 animate-slideUp"
+                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950 animate-slideUp"
                 onClick={(event) => event.stopPropagation()}
             >
                 <div className="flex items-center justify-between border-b border-white/10 p-4">
                     <div>
-                        <p className="text-base font-black text-white">İlk 11’ler Açıklandı</p>
+                        <p className="text-base font-black text-white">
+                            {isSimulation ? 'Simülasyon İlk 11’i' : 'İlk 11’ler Açıklandı'}
+                        </p>
                         <p className="mt-0.5 text-[11px] text-slate-400">
-                            Kaynak: {data.sources?.home === 'manual' || data.sources?.away === 'manual' ? 'Yönetim paneli / ESPN' : 'ESPN'}
+                            {isSimulation
+                                ? 'Kaynak: Yerel geliştirme verisi'
+                                : `Kaynak: ${data.sources?.home === 'manual' || data.sources?.away === 'manual' ? 'Yönetim paneli / ESPN' : 'ESPN'}`}
                         </p>
                     </div>
                     <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Kapat">
@@ -38,6 +50,8 @@ const StartingXIModal = ({ visible, data, onClose }: StartingXIModalProps) => {
                         homeTeamName={data.homeTeam.name}
                         awayTeamName={data.awayTeam.name}
                         matchId={data.matchId}
+                        useSquadPhotos={useSquadPhotos}
+                        embedded
                     />
                 </div>
             </div>

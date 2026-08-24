@@ -8,9 +8,13 @@ import { loadFcmToken, loadSavedOptionsRaw, persistFcmToken } from '../utils/not
  * Syncs the FCM token with the backend when active notifications exist
  * and the locally-stored token differs from the current browser token.
  */
-const useNotificationTokenSync = (hasActiveNotifications: boolean, user: User | null): void => {
+const useNotificationTokenSync = (
+    hasActiveNotifications: boolean,
+    user: User | null,
+    enabled = true,
+): void => {
     useEffect(() => {
-        if (!hasActiveNotifications) return;
+        if (!enabled || !hasActiveNotifications) return;
 
         const abortController = new AbortController();
 
@@ -62,7 +66,7 @@ const useNotificationTokenSync = (hasActiveNotifications: boolean, user: User | 
         syncToken();
 
         return () => { abortController.abort(); };
-    }, [hasActiveNotifications, user]);
+    }, [enabled, hasActiveNotifications, user]);
 };
 
 export default useNotificationTokenSync;

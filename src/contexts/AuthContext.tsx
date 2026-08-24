@@ -44,10 +44,10 @@ const hasCrossOriginAuthDomain = (): boolean => {
     return Boolean(authDomain && authDomain !== window.location.hostname);
 };
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export const AuthProvider = ({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [adminLoading, setAdminLoading] = useState(true);
+    const [loading, setLoading] = useState(enabled);
+    const [adminLoading, setAdminLoading] = useState(enabled);
     const [isAdmin, setIsAdmin] = useState(false);
 
     const markRedirectPending = useCallback(() => {
@@ -99,6 +99,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [clearRedirectPending]);
 
     useEffect(() => {
+        if (!enabled) {
+            setUser(null);
+            setLoading(false);
+            setAdminLoading(false);
+            setIsAdmin(false);
+            return;
+        }
         hasRedirectPending();
         void processRedirectResult();
         const retryTimer = window.setTimeout(() => {
@@ -156,9 +163,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             unsubscribe();
         };
-    }, [clearRedirectPending, hasRedirectPending, processRedirectResult]);
+    }, [clearRedirectPending, enabled, hasRedirectPending, processRedirectResult]);
 
     const signInWithGoogle = useCallback(async (): Promise<SignInOutcome> => {
+        if (!enabled) return 'cancelled';
         if (auth.currentUser) {
             return 'success';
         }
@@ -224,13 +232,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 DEFAULT_SIGN_IN_ERROR_MESSAGE
             );
         }
-    }, [markRedirectPending]);
+    }, [enabled, markRedirectPending]);
 
     const signOut = useCallback(async () => {
+        if (!enabled) return;
         clearRedirectPending();
         setIsAdmin(false);
         await firebaseSignOut(auth);
-    }, [clearRedirectPending]);
+    }, [clearRedirectPending, enabled]);
 
     return (
         <AuthContext.Provider value={{

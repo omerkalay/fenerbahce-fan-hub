@@ -21,7 +21,7 @@ export default function BenchList({ bench, subInByPlayer }: BenchListProps) {
                             key={index}
                             className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-white/5 py-1.5 text-[12px] last:border-b-0"
                         >
-                            <span className="w-7 text-center font-semibold text-yellow-300/80">
+                            <span className="w-7 text-center font-semibold text-slate-400">
                                 {player.jersey || '-'}
                             </span>
                             <span className="text-slate-200">

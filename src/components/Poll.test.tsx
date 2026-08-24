@@ -86,6 +86,18 @@ describe('Poll', () => {
         expect(screen.getByTestId('sign-in-modal')).toBeDefined();
     });
 
+    it('renders the existing poll shell without Firebase or vote actions in preview mode', () => {
+        render(<Poll opponentName="Galatasaray" matchId="preview" previewOnly />);
+
+        fireEvent.click(screen.getByText('Maçı Kim Kazanır?'));
+        fireEvent.click(screen.getByText('Fenerbahçe'));
+
+        expect(onValueCallback).toBeNull();
+        expect(mockSubmitPollVote).not.toHaveBeenCalled();
+        expect(screen.queryByTestId('sign-in-modal')).toBeNull();
+        expect(screen.getByText('Galatasaray')).toBeDefined();
+    });
+
     it('calls submitPollVote with correct arguments for signed-in user', async () => {
         mockUser = makeUser();
         mockSubmitPollVote.mockResolvedValue({

@@ -1,12 +1,13 @@
 {
   "name": "football",
   "private": true,
-  "version": "2.13.1",
+  "version": "2.14.0",
   "type": "module",
   "scripts": {
     "generate-sw": "node scripts/generate-sw.js",
     "dev": "npm run generate-sw && vite",
-    "build": "npm run generate-sw && vite build",
+    "build": "npm run generate-sw && vite build && npm run verify:prod-mock",
+    "verify:prod-mock": "node scripts/assert-no-dev-live-mock.mjs",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest",

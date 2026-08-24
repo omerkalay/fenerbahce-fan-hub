@@ -88,6 +88,18 @@ describe('NotificationSettings general settings flow', () => {
     expect(mockSetTheme).toHaveBeenCalledWith('white-kit');
   });
 
+  it('keeps theme selection visible while hiding notification actions in theme-only mode', () => {
+    render(<NotificationSettings themeOnly />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ayarlar' }));
+
+    expect(screen.getByRole('radio', {
+      name: 'Beyaz Forma Krem, altın ve lacivert baskı stili',
+    })).toBeDefined();
+    expect(screen.queryByText('Bildirimler')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Giriş yap ve ayarla' })).toBeNull();
+  });
+
   it('asks for sign-in only when a signed-out user opens notifications', () => {
     render(<NotificationSettings />);
 

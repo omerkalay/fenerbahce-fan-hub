@@ -13,37 +13,27 @@ export default function SubstitutionList({ substitutions }: SubstitutionListProp
     return (
         <div className="mt-4">
             <p className="mb-2 text-xs font-bold text-slate-300">{'De\u011fi\u015fiklikler'}</p>
-            <div className="space-y-1">
+            <div>
                 {substitutions.map((sub, index) => (
                     <div
                         key={index}
-                        className="flex items-center gap-2 rounded-md bg-white/[0.03] px-2 py-1.5"
+                        className="grid grid-cols-[2.25rem_1px_minmax(0,1fr)] gap-3 border-b border-white/[0.06] py-3 last:border-b-0"
                     >
-                        <span className="min-w-[2.1rem] shrink-0 rounded bg-white/[0.06] px-1 py-[1px] text-center font-mono text-[10px] font-semibold text-slate-300 tabular-nums">{formatSoccerMinute(sub.minute)}</span>
-                        <span className="flex h-4 w-4 items-center justify-center">
-                            <MatchEventIcon event={{ isSubstitution: true }} className="h-4 w-3" />
+                        <span className="pt-0.5 text-right font-mono text-[11px] font-bold text-slate-400 tabular-nums">
+                            {formatSoccerMinute(sub.minute)}
                         </span>
-                        <div className="min-w-0 flex-1 text-[12px] font-medium text-emerald-300/90">
-                            <span>{localizePlayerName(sub.playerIn)}</span>
+                        <span className="h-full min-h-8 bg-white/10" aria-hidden="true" />
+                        <div className="min-w-0 space-y-1 text-[11px] font-semibold">
+                            <div className="flex min-w-0 items-center gap-1.5 text-emerald-300">
+                                <MatchEventIcon event={{ isSubstitution: true }} className="h-4 w-4 shrink-0" />
+                                <span className="shrink-0 text-[9px] font-black uppercase tracking-wide text-emerald-400/80">Giren</span>
+                                <span className="truncate">{localizePlayerName(sub.playerIn)}</span>
+                            </div>
                             {sub.playerOut && (
-                                <span className="ml-1 inline-flex items-center gap-0.5 text-slate-500">
-                                    <svg
-                                        viewBox="0 0 16 16"
-                                        className="h-2.5 w-2.5"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.6"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M2 5h9" />
-                                        <path d="m8 2 3 3-3 3" />
-                                        <path d="M14 11H5" />
-                                        <path d="m8 8-3 3 3 3" />
-                                    </svg>
-                                    <span>{localizePlayerName(sub.playerOut)}</span>
-                                </span>
+                                <div className="flex min-w-0 items-center gap-1.5 pl-[22px] text-rose-300/85">
+                                    <span className="shrink-0 text-[9px] font-black uppercase tracking-wide text-rose-400/70">Çıkan</span>
+                                    <span className="truncate">{localizePlayerName(sub.playerOut)}</span>
+                                </div>
                             )}
                         </div>
                     </div>

@@ -12,6 +12,7 @@ const buildLogoUrl = (teamId: number): string => `${BACKEND_URL}/team-image/${te
 interface TeamLogoProps {
     teamId: number | null | undefined;
     name?: string;
+    logoUrl?: string | null;
     wrapperClassName?: string;
     imageClassName?: string;
 }
@@ -19,16 +20,22 @@ interface TeamLogoProps {
 const TeamLogo = ({
     teamId,
     name = 'Takım',
+    logoUrl,
     wrapperClassName = '',
     imageClassName = ''
 }: TeamLogoProps) => {
     const { theme } = useTheme();
-    const [src, setSrc] = useState<string | null>(() => (teamId ? buildLogoUrl(teamId) : null));
-    const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'idle'>(teamId ? 'loading' : 'idle');
+    const [src, setSrc] = useState<string | null>(() => logoUrl || (teamId ? buildLogoUrl(teamId) : null));
+    const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'idle'>(logoUrl || teamId ? 'loading' : 'idle');
     const displaySrc = resolveTeamCrest({ theme, defaultSrc: src, teamName: name });
     const usesAnniversaryCrest = displaySrc === FENERBAHCE_ANNIVERSARY_CREST_URL;
 
     useEffect(() => {
+        if (logoUrl) {
+            setSrc(logoUrl);
+            setStatus('loading');
+            return;
+        }
         if (!teamId) {
             setSrc(null);
             setStatus('idle');
@@ -36,7 +43,7 @@ const TeamLogo = ({
         }
         setSrc(buildLogoUrl(teamId));
         setStatus('loading');
-    }, [teamId]);
+    }, [logoUrl, teamId]);
 
     const handleError = () => {
         setStatus('error');

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 
-export function useForegroundMessaging() {
+export function useForegroundMessaging(enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
     let unsubscribe: (() => void) | undefined;
     const setupForegroundMessaging = async () => {
       try {
@@ -30,5 +31,5 @@ export function useForegroundMessaging() {
 
     setupForegroundMessaging();
     return () => { if (unsubscribe) unsubscribe(); };
-  }, []);
+  }, [enabled]);
 }

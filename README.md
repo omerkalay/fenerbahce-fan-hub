@@ -6,87 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.13.1-blue)
+![Version](https://img.shields.io/badge/version-2.14.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.13.1
+## What's New in v2.14.0
 
-- **Controlled Notification Center** - Broadcast content must be previewed and sent to the administrator's own registered device before the identical payload can be submitted once to the server-fixed `all_fans` topic; transaction locks prevent duplicate submissions
-- **Private System Status** - The administration panel now reports scheduler health, cache and UEFA freshness, ESPN lineup state, Starting XI push status, pending topic work, and the live backend version without exposing private operations data to clients
-- **Honest FCM Results** - Topic sends report only whether Firebase accepted or failed the request; the interface never invents an unverifiable delivery count
-
-<details>
-<summary>Previous: v2.13.0</summary>
-
-- **Verified Automatic Starting XIs** - The existing minute scheduler begins ESPN lineup discovery 90 minutes before kickoff, verifies the SofaScore fixture by teams, kickoff time, and supported competition, requires two identical complete 11+11 observations, and publishes only validated lineups
-- **Shared Visual Lineup Experience** - Matchday, live, and post-match views use the same dual-team pitch component with Fenerbahçe first, formations, shirt numbers, squad photos, benches, and live substitutions; inferred formations are labeled clearly
-- **Claim-Protected Administration** - A profile-only administration panel is backed by one server-side `/api/admin/*` authorization gate using revoked-token checks and the Firebase `admin` custom claim; private drafts, detection state, locks, settings, audit records, and health data never become client-readable
-- **Safe Manual Fallback and Rollout** - Administrators can review ESPN detection, build and publish a manual Fenerbahçe lineup without overwriting an ESPN opponent lineup, release the manual lock, and enable automatic publishing/push only after observation; both automation switches default to off
-
-</details>
+- **Mobile-First Live Match Redesign** - The existing production live-match dashboard has been redesigned to present teams, score, match state, and clock at a glance while handling countdown, starting, live, halftime, full-time, and partial-data states without changing the existing backend contract
+- **Redesigned Match Center** - The existing live detail experience now uses an accessible match-center dialog with a side-aware event timeline for goals, assists, cards, substitutions, and VAR decisions, compact hybrid comparison statistics, and the shared lineup view
+- **Dual-Theme Matchday Polish** - Live surfaces, timelines, statistics, and responsive lineup pitches now remain readable and consistent in both `Klasik Gece` and `Beyaz Forma`, from narrow phones to desktop dialogs
+- **Isolated Development Simulator** - Local Vite development can preview every match phase through `mockLive` while keeping Firebase writes, authentication, notifications, administration, and live-lineup writes disabled; production builds remove the simulator and reject leaked development markers automatically
 
 <details>
-<summary>Previous: v2.12.3</summary>
+<summary>Previous: v2.10.0 – v2.13.1</summary>
 
-- **Dependency Maintenance** - Removed the unused local `gh-pages` deployment dependency plus unused direct Functions `dotenv` and `node-fetch` dependencies
-- **Functions Runtime Update** - Upgraded `firebase-functions` within major version 7 and omitted optional Firestore/Storage transports because the backend uses Realtime Database
-- **Release Safety Preserved** - Kept the 06:00 fixture transition, durable previous-match cache, notification scheduler, and PWA delivery behavior unchanged
-- **Upgrade Scope Control** - Left Firebase Admin 14, Vite 8, and other major-version migrations for a separate maintenance cycle
-
-</details>
-
-<details>
-<summary>Previous: v2.12.2</summary>
-
-- **Notification Authorization Hardening** - Token rotation now accepts an old FCM token only when it matches the token already stored for the authenticated user, preventing one user from targeting another user's notification record or topic subscription
-- **Due-Window Scheduling** - The minute scheduler always reads the next three cached fixtures first, but scans user preferences only during the 09:00 daily window or an active 3-hour/1-hour/30-minute/15-minute reminder window
-- **Durable Final-Match Continuity** - The transient live payload is removed five minutes after full time while the final score, events, and summary remain available through `cache/lastFinishedMatch` until the next fixture replaces the dashboard context
-- **Indexed Topic Recovery** - FCM topic reconciliation now queries only pending or deferred-cleanup users instead of downloading every notification preference record every five minutes
-- **Versioned Database Security** - Realtime Database rules and owner-isolation tests now live in the repository, with CI blocking deployment unless typecheck, lint, application tests, rules tests, and the production build all pass
-
-</details>
-
-<details>
-<summary>Previous: v2.12.1</summary>
-
-- **Desktop Scroll Recovery** - The UEFA bracket now keeps a constrained desktop viewport with working vertical scrolling, while the squad builder releases desktop wheel scrolling without changing its contained mobile touch behavior
-- **Historical Route Clarity** - Stages after a confirmed European elimination now display a simple `-` instead of suggesting that their outcome is still pending
-- **Mobile Behavior Preserved** - The full-screen compact PWA bracket and mobile player-list scrolling continue to work as before
-
-</details>
-
-<details>
-<summary>Previous: v2.12.0</summary>
-
-- **Türkiye Kupası Coverage** - Fenerbahçe cup matches published by SofaScore are cached from 2026/27 onward, merged with ESPN league and European fixtures, and exposed through competition-aware filters
-- **Chronological Match Flow** - Dashboard fixtures, the next-three list, and match reminders are ordered by kickoff time across every supported competition, while unsupported cup summary requests are skipped
-- **Dynamic European Journey** - Qualifying begins under a neutral European label before confirmed league-phase participation resolves automatically to the Champions League, Europa League, or Conference League
-- **Fenerbahçe's Route** - Competition transfers, aggregate scores, league position, qualification, and elimination are tracked throughout the European season
-- **Connected Tournament Bracket** - Published ties from the knockout play-off through the final use team crests, verified progression lines, winner highlighting, and draw-pending placeholders without predicting future opponents
-- **Mobile PWA Refinement** - The compact bracket keeps every knockout round in one horizontally scrollable canvas, while the league and Europe modal receives clearer dark-theme surfaces and responsive controls
-
-</details>
-
-<details>
-<summary>Previous: v2.11.0</summary>
-
-- **Selectable Themes** - The new public Settings panel offers `Klasik Gece` and `Beyaz Forma` designs without requiring sign-in; notification preferences remain a separate authenticated flow
-- **Device-Local PWA Preference** - The selected theme is stored under `fenerbahce-fan-hub.theme.v1` in browser storage, survives reloads, PWA restarts, offline launches, and service-worker updates on the same device, and is never synced to an account or server
-- **Flash-Free Startup** - A guarded bootstrap script validates the stored `ThemeId` (`classic | white-kit`) and applies the theme plus browser chrome color before React renders, falling back safely to the classic design
-- **120th Anniversary Identity** - The White Kit theme carries the warm ivory, navy, and gold shirt-inspired print style across the full frontend and replaces Fenerbahçe crests with the transparent 120th anniversary artwork
-
-</details>
-
-<details>
-<summary>Previous: v2.10.x (v2.10.0 - v2.10.2)</summary>
-
-- **Season & Offseason Reliability** - Added explicit offseason and fetch-failure states, automatic new-season recovery, recent-season standings and fixture selection, and season-window validation for historical ESPN data
-- **Historical Data Safety** - Prevented current-player photos and provider fallbacks from contaminating old lineups, scorers, assisters, and completed-match timelines
-- **Fixture & Mobile Refinement** - Added always-visible opponent search, historical played-match defaults, localized friendly labels, narrow-screen controls, and viewport fixes for mobile PWA use
-- **Failure-Safe Maintenance** - Preserved last known-good match, squad, finished-match, and local fallback data during provider failures while removing unused frontend code and expanding regression coverage
+- **Season and Historical Reliability** - Season-aware fixtures, standings, statistics, offseason recovery, historical-data safeguards, mobile filters, and last-known-good fallbacks made provider failures safer from v2.10 onward
+- **White Kit and Anniversary Identity** - Public device-local theme selection introduced `Klasik Gece` and the ivory, navy, and gold `Beyaz Forma` visual system with flash-free startup and 120th anniversary branding
+- **Cup and European Journey** - Türkiye Kupası coverage, chronological multi-competition match flow, dynamic UEFA competition resolution, Fenerbahçe's route, and the connected knockout bracket expanded the season experience
+- **Operational and Release Hardening** - Notification authorization, due-window scheduling, durable final-match continuity, indexed recovery, versioned RTDB rules, CI release gates, dependency maintenance, and preserved runtime behavior improved reliability
+- **Verified Lineups and Protected Administration** - Two-observation ESPN verification, shared dual-team pitches, live substitutions, claim-protected administration, and safe manual publishing created a controlled Starting XI workflow
+- **Controlled Notification Operations** - Administrator self-tests, transaction-protected topic sends, private scheduler and cache health, ESPN lineup status, backend version visibility, and honest FCM acceptance results completed the operational tooling
 
 </details>
 
@@ -681,4 +622,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.13.1** | August 2026
+**v2.14.0** | August 2026

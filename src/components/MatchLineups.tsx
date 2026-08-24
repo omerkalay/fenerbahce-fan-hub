@@ -28,9 +28,10 @@ interface MatchLineupsProps {
     awayTeamName?: string;
     matchId?: string;
     useSquadPhotos?: boolean;
+    embedded?: boolean;
 }
 
-function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPhotos = true }: MatchLineupsProps) {
+function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPhotos = true, embedded = false }: MatchLineupsProps) {
     const homeName = homeTeamName || lineups.home?.teamName || 'Ev Sahibi';
     const awayName = awayTeamName || lineups.away?.teamName || 'Deplasman';
     const localizedHomeName = localizeTeamName(homeName);
@@ -97,7 +98,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
     });
 
     return (
-        <div className="glass-panel rounded-xl p-4">
+        <div className={embedded ? 'w-full' : 'glass-panel rounded-xl p-4'}>
             <h4 className="mb-3 text-sm font-bold text-white">Kadro</h4>
 
             <div className="mb-4 flex rounded-lg bg-white/5 p-0.5">

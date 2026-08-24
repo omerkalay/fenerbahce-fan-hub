@@ -27,11 +27,9 @@ const MatchEventIcon = ({ event, className = 'w-4 h-4' }: MatchEventIconProps) =
 
     if (eventType === 'substitution') {
         return (
-            <svg viewBox="0 0 16 16" className={className} fill="none" stroke="#34d399" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M2 5h9" />
-                <path d="m8 2 3 3-3 3" />
-                <path d="M14 11H5" />
-                <path d="m8 8-3 3 3 3" />
+            <svg viewBox="0 0 16 16" className={className} fill="none" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 13V3m0 0L2.5 5.5M5 3l2.5 2.5" stroke="#34d399" strokeWidth="1.6" />
+                <path d="M11 3v10m0 0 2.5-2.5M11 13l-2.5-2.5" stroke="#fb7185" strokeWidth="1.6" />
             </svg>
         );
     }

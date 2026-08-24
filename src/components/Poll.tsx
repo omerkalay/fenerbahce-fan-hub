@@ -10,6 +10,7 @@ import { submitPollVote } from '../services/api';
 interface PollProps {
   opponentName?: string;
   matchId: number | string;
+  previewOnly?: boolean;
 }
 
 type VoteOption = 'home' | 'away' | 'draw';
@@ -20,13 +21,13 @@ interface Votes {
   draw: number;
 }
 
-const Poll = ({ opponentName = 'Rakip Takım', matchId }: PollProps) => {
+const Poll = ({ opponentName = 'Rakip Takım', matchId, previewOnly = false }: PollProps) => {
   const { user, loading: authLoading, signInWithGoogle } = useAuth();
   const [votes, setVotes] = useState<Votes>({ home: 0, away: 0, draw: 0 });
   const [hasVoted, setHasVoted] = useState(false);
   const [showSignIn, setShowSignIn] = useState(false);
   const [userVote, setUserVote] = useState<VoteOption | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!previewOnly);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [signInSuccess, setSignInSuccess] = useState(false);
@@ -39,6 +40,15 @@ const Poll = ({ opponentName = 'Rakip Takım', matchId }: PollProps) => {
   };
 
   useEffect(() => {
+    if (previewOnly) {
+      setVotes({ home: 0, away: 0, draw: 0 });
+      setHasVoted(false);
+      setUserVote(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     if (!matchId) {
       setLoading(false);
       return;
@@ -89,7 +99,7 @@ const Poll = ({ opponentName = 'Rakip Takım', matchId }: PollProps) => {
     return () => {
       unsubscribeVotes();
     };
-  }, [matchId, user]);
+  }, [matchId, previewOnly, user]);
 
   const closeSignInModal = () => {
     setShowSignIn(false);
@@ -98,6 +108,7 @@ const Poll = ({ opponentName = 'Rakip Takım', matchId }: PollProps) => {
   };
 
   const handleVote = async (option: VoteOption) => {
+    if (previewOnly) return;
     if (hasVoted || !matchId) return;
     if (Date.now() < voteBlockedUntil.current) return;
 
@@ -131,11 +142,11 @@ const Poll = ({ opponentName = 'Rakip Takım', matchId }: PollProps) => {
     return Math.round(((count || 0) / totalVotes) * 100);
   };
 
-  if (loading || authLoading || error || !matchId) return null;
+  if (loading || (!previewOnly && authLoading) || error || !matchId) return null;
 
   return (
     <>
-      <GoogleSignInModal
+      {!previewOnly && <GoogleSignInModal
         open={showSignIn}
         title="Oy Kullan"
         heading="Oy vermek için giriş yap"
@@ -176,7 +187,7 @@ const Poll = ({ opponentName = 'Rakip Takım', matchId }: PollProps) => {
             }}
           />
         )}
-      </GoogleSignInModal>
+      </GoogleSignInModal>}
 
       <div className="bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-xl overflow-hidden transition-all duration-500">
         <button

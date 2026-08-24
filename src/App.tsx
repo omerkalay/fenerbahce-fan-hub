@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import Dashboard from './components/Dashboard';
 import FormationBuilder from './components/FormationBuilder';
 import NotificationSettings from './components/NotificationSettings';
@@ -15,10 +15,24 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { useTheme } from './contexts/themeContextDef';
 import { resolveTeamCrest } from './theme/teamCrest';
 import AdminPanel from './components/AdminPanel';
+import type { LiveMatchData, LiveMatchState, MatchData, PublishedMatchLineups } from './types';
 
 type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
 
-function AppContent() {
+export interface AppRuntimeOverrides {
+  safeMode: true;
+  matchData: MatchData;
+  liveMatchState: LiveMatchState;
+  liveMatchData: LiveMatchData;
+  startingXI: PublishedMatchLineups | null;
+  controls?: ReactNode;
+}
+
+interface AppProps {
+  runtimeOverrides?: AppRuntimeOverrides;
+}
+
+function AppContent({ runtimeOverrides }: AppProps) {
   const [fontsReady, setFontsReady] = useState(typeof window === 'undefined');
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [showAdminPanel, setShowAdminPanel] = useState(false);
@@ -39,11 +53,20 @@ function AppContent() {
     loading,
     errorMessage,
     loadMatchData,
-  } = useMatchBootstrap();
+  } = useMatchBootstrap({ enabled: !runtimeOverrides?.safeMode });
 
-  const { liveMatchState, liveMatchData, onCountdownEnd } = useLiveMatchState(cachedData, matchData);
+  const { liveMatchState, liveMatchData, onCountdownEnd } = useLiveMatchState(
+    cachedData,
+    matchData,
+    { enabled: !runtimeOverrides?.safeMode },
+  );
 
-  useForegroundMessaging();
+  useForegroundMessaging(!runtimeOverrides?.safeMode);
+
+  const displayMatchData = runtimeOverrides?.matchData ?? matchData;
+  const displayLiveMatchState = runtimeOverrides?.liveMatchState ?? liveMatchState;
+  const displayLiveMatchData = runtimeOverrides?.liveMatchData ?? liveMatchData;
+  const safeMode = runtimeOverrides?.safeMode === true;
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -125,8 +148,8 @@ function AppContent() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <NotificationSettings />
-            <UserAvatar onOpenAdmin={() => setShowAdminPanel(true)} />
+            <NotificationSettings themeOnly={safeMode} />
+            {!safeMode && <UserAvatar onOpenAdmin={() => setShowAdminPanel(true)} />}
             <div className="brand-medallion w-10 h-10 rounded-full p-0.5">
               <div className="brand-medallion-inner w-full h-full rounded-full flex items-center justify-center overflow-hidden">
                 <img
@@ -142,20 +165,25 @@ function AppContent() {
         {/* Main Content */}
         <main className="flex-1 px-4 overflow-y-auto no-scrollbar">
           {activeTab === 'dashboard' && (
-            <ErrorBoundary fallbackTitle="Pano">
-              <Dashboard
-                matchData={matchData}
-                next3Matches={next3Matches}
-                loading={loading && !matchData}
-                onRetry={loadMatchData}
-                errorMessage={errorMessage}
-                seasonState={seasonState}
-                season={season}
-                liveMatchState={liveMatchState}
-                liveMatchData={liveMatchData}
-                onCountdownEnd={onCountdownEnd}
-              />
-            </ErrorBoundary>
+            <>
+              {runtimeOverrides?.controls}
+              <ErrorBoundary fallbackTitle="Pano">
+                <Dashboard
+                  matchData={displayMatchData}
+                  next3Matches={next3Matches}
+                  loading={safeMode ? false : loading && !displayMatchData}
+                  onRetry={safeMode ? undefined : loadMatchData}
+                  errorMessage={safeMode ? null : errorMessage}
+                  seasonState={safeMode ? 'active' : seasonState}
+                  season={season}
+                  liveMatchState={displayLiveMatchState}
+                  liveMatchData={displayLiveMatchData}
+                  onCountdownEnd={safeMode ? () => {} : onCountdownEnd}
+                  safeMode={safeMode}
+                  startingXIOverride={runtimeOverrides?.startingXI}
+                />
+              </ErrorBoundary>
+            </>
           )}
           {activeTab === 'fixtures' && (
             <ErrorBoundary fallbackTitle="Fikstür">
@@ -218,21 +246,23 @@ function AppContent() {
             <span className="text-[10px] mt-1 font-medium">Kadro Kur</span>
           </button>
         </nav>
-        <AdminPanel
-          visible={showAdminPanel}
-          matches={[...(matchData ? [matchData] : []), ...next3Matches]}
-          onClose={() => setShowAdminPanel(false)}
-        />
+        {!safeMode && (
+          <AdminPanel
+            visible={showAdminPanel}
+            matches={[...(matchData ? [matchData] : []), ...next3Matches]}
+            onClose={() => setShowAdminPanel(false)}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-function App() {
+function App({ runtimeOverrides }: AppProps) {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppContent />
+      <AuthProvider enabled={!runtimeOverrides?.safeMode}>
+        <AppContent runtimeOverrides={runtimeOverrides} />
       </AuthProvider>
     </ThemeProvider>
   );

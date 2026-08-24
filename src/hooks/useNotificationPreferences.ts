@@ -35,7 +35,10 @@ export interface NotificationPreferencesState {
     saveNotifications: () => Promise<boolean>;
 }
 
-const useNotificationPreferences = (user: User | null): NotificationPreferencesState => {
+const useNotificationPreferences = (
+    user: User | null,
+    enabled = true,
+): NotificationPreferencesState => {
     const [isSaving, setIsSaving] = useState(false);
     const [selectedOptions, setSelectedOptions] = useState<NotificationOptions>(loadSavedOptions);
     const [draftOptions, setDraftOptions] = useState<NotificationOptions | null>(null);
@@ -43,6 +46,8 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
 
     // Load server preferences when user changes
     useEffect(() => {
+        if (!enabled) return;
+
         const abortController = new AbortController();
 
         const clearLocalState = () => {
@@ -103,10 +108,10 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
         loadServerPreferences();
 
         return () => { abortController.abort(); };
-    }, [user]);
+    }, [enabled, user]);
 
     // FCM token sync
-    useNotificationTokenSync(hasActiveNotifications, user);
+    useNotificationTokenSync(hasActiveNotifications, user, enabled);
 
     const toggleOption = (optionId: keyof NotificationOptions) => {
         setDraftOptions((previous) => {

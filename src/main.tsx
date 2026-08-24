@@ -7,14 +7,31 @@ import '@fontsource/barlow-condensed/800.css';
 import '@fontsource/barlow-condensed/900.css';
 import './index.css';
 
-if ('serviceWorker' in navigator) {
-  registerSW({
-    immediate: true
-  });
-}
+const renderApplication = async () => {
+  let application = <App />;
+  let devLiveMockActive = false;
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+  if (import.meta.env.DEV) {
+    const [{ default: DevApp }, { isDevLiveMockRequested }] = await Promise.all([
+      import('./dev/DevApp'),
+      import('./dev/runtime'),
+    ]);
+    devLiveMockActive = isDevLiveMockRequested();
+    application = <DevApp />;
+  }
+
+  if (devLiveMockActive && 'serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+  }
+
+  if (!devLiveMockActive && 'serviceWorker' in navigator) {
+    registerSW({ immediate: true });
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>{application}</React.StrictMode>,
+  );
+};
+
+void renderApplication();

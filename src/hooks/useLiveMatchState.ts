@@ -11,9 +11,10 @@ const shouldCheckLiveImmediately = (match: MatchData | null | undefined): boolea
 export function useLiveMatchState(
   cachedData: CachedMatchPayload | null,
   currentMatch: MatchData | null,
+  { enabled = true }: { enabled?: boolean } = {},
 ) {
   const [liveMatchState, setLiveMatchState] = useState<LiveMatchState>(
-    shouldCheckLiveImmediately(cachedData?.nextMatch) ? 'checking' : 'countdown'
+    enabled ? (shouldCheckLiveImmediately(cachedData?.nextMatch) ? 'checking' : 'countdown') : 'idle'
   );
   const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null);
   const livePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -24,6 +25,7 @@ export function useLiveMatchState(
   }, [currentMatch]);
 
   const fetchLiveMatch = useCallback(async (): Promise<string | null> => {
+    if (!enabled) return null;
     try {
       const response = await fetch(`${BACKEND_URL}/live-match`);
       if (!response.ok) {
@@ -50,7 +52,7 @@ export function useLiveMatchState(
       console.error('Live match fetch error:', err);
       return null;
     }
-  }, []);
+  }, [enabled]);
 
   const stopLivePolling = useCallback(() => {
     if (livePollingRef.current) {
@@ -65,7 +67,7 @@ export function useLiveMatchState(
   }, [currentMatch]);
 
   const startLivePolling = useCallback(() => {
-    if (livePollingRef.current) return;
+    if (!enabled || livePollingRef.current) return;
 
     const poll = async () => {
       const state = await fetchLiveMatch();
@@ -76,15 +78,17 @@ export function useLiveMatchState(
 
     poll();
     livePollingRef.current = setInterval(poll, 30000);
-  }, [fetchLiveMatch, resolveNoMatchState]);
+  }, [enabled, fetchLiveMatch, resolveNoMatchState]);
 
   const onCountdownEnd = useCallback(() => {
+    if (!enabled) return;
     setLiveMatchState('checking');
     startLivePolling();
-  }, [startLivePolling]);
+  }, [enabled, startLivePolling]);
 
   // If cached/current match is already started, avoid rendering stale countdown/pre flashes.
   useEffect(() => {
+    if (!enabled) return;
     if (!currentMatch?.startTimestamp) return;
 
     const started = shouldCheckLiveImmediately(currentMatch);
@@ -98,21 +102,23 @@ export function useLiveMatchState(
       stopLivePolling();
       setLiveMatchState('countdown');
     }
-  }, [currentMatch, liveMatchState, liveMatchData, stopLivePolling]);
+  }, [currentMatch, enabled, liveMatchState, liveMatchData, stopLivePolling]);
 
   // Checking state reuses existing live polling flow without adding extra calls.
   useEffect(() => {
+    if (!enabled) return;
     if (liveMatchState === 'checking') {
       startLivePolling();
     }
-  }, [liveMatchState, startLivePolling]);
+  }, [enabled, liveMatchState, startLivePolling]);
 
   // Post state is stable (no auto-transition). Stop polling to avoid unnecessary requests.
   useEffect(() => {
+    if (!enabled) return;
     if (liveMatchState === 'post' || liveMatchState === 'unsupported') {
       stopLivePolling();
     }
-  }, [liveMatchState, stopLivePolling]);
+  }, [enabled, liveMatchState, stopLivePolling]);
 
   // Cleanup on unmount
   useEffect(() => {

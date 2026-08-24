@@ -1,330 +1,160 @@
-import MatchEventIcon from './MatchEventIcon';
-import { getEventVisualType } from '../utils/eventVisualType';
+import { useMemo, useState } from 'react';
+import LiveMatchTimeline from './LiveMatchTimeline';
+import LiveMatchStats from './LiveMatchStats';
 import MatchLineups from './MatchLineups';
-import { formatMatchClock } from '../utils/matchClock';
-import { localizePlayerName } from '../utils/playerDisplay';
+import { isHalftimeDisplay } from '../utils/dashboardHelpers';
+import { localizeTeamName } from '../utils/localize';
 import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
-import type { LiveMatchData, MatchStat } from '../types';
+import type { LiveMatchData } from '../types';
 
-interface StatGroup {
-    label: string;
-    keys: string[];
+type MatchCenterSection = 'events' | 'stats' | 'lineups';
+
+interface LiveMatchScoreProps {
+    data: LiveMatchData;
+    useSquadPhotos?: boolean;
 }
-
-const STAT_GROUPS: StatGroup[] = [
-    { label: 'Toplam Şut', keys: ['totalShots'] },
-    { label: 'İsabetli Şut', keys: ['shotsOnTarget'] },
-    { label: 'Topla Oynama %', keys: ['possessionPct', 'possession'] },
-    { label: 'Korner', keys: ['wonCorners', 'corners'] },
-    { label: 'Faul', keys: ['foulsCommitted', 'fouls'] },
-    { label: 'Sarı Kart', keys: ['yellowCards', 'yellowCard'] },
-    { label: 'Kırmızı Kart', keys: ['redCards', 'redCard'] }
-];
-
-const isHalftimeDisplay = (statusDetail: string = '', displayClock: string = ''): boolean => {
-    const status = String(statusDetail || '').trim().toLowerCase();
-    const clock = String(displayClock || '').trim().toLowerCase();
-
-    return (
-        status === 'ht' ||
-        status === 'halftime' ||
-        status.includes('half time') ||
-        status.includes('devre') ||
-        clock === 'ht'
-    );
-};
 
 const localizeStatusDetail = (statusDetail: string = ''): string => {
     const status = String(statusDetail || '').trim();
     const normalized = status.toLowerCase();
 
-    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) {
-        return 'Maç Sonu';
-    }
-
-    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) {
-        return 'Devre Arası';
-    }
-
+    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) return 'Maç Sonu';
+    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) return 'Devre Arası';
+    if (normalized.includes('1st half') || normalized.includes('first half')) return '1. Yarı';
+    if (normalized.includes('2nd half') || normalized.includes('second half')) return '2. Yarı';
     return status;
 };
 
-const formatIncidentLabel = (event: NonNullable<LiveMatchData['events']>[number]): string => {
-    const playerName = localizePlayerName(event?.player || event?.type || 'Olay');
-    const suffixes: string[] = [];
+const TeamCrest = ({ src, name }: { src: string | null; name: string }) => (
+    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 bg-white/[0.05] p-2 sm:h-[72px] sm:w-[72px]">
+        {src ? (
+            <img src={src} alt={`${name} logosu`} className="h-full w-full object-contain" />
+        ) : (
+            <span className="text-xs font-black text-slate-300">{name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase()}</span>
+        )}
+    </div>
+);
 
-    if (event?.isGoal && event?.isPenalty) suffixes.push('(P)');
-    if (event?.isGoal && event?.isOwnGoal) suffixes.push('(K.K)');
-
-    return [playerName, ...suffixes].join(' ');
-};
-
-interface LiveMatchScoreProps {
-    data: LiveMatchData;
-}
-
-const LiveMatchScore: React.FC<LiveMatchScoreProps> = ({ data: liveData }) => {
+export default function LiveMatchScore({ data: liveData, useSquadPhotos = true }: LiveMatchScoreProps) {
     const { theme } = useTheme();
-
-    const orderedStats: (MatchStat & { label: string })[] = STAT_GROUPS
-        .map((group) => {
-            const stat = liveData.stats?.find((item) => group.keys.includes(item.name));
-            if (!stat) return null;
-            return {
-                ...stat,
-                label: group.label
-            };
-        })
-        .filter((s): s is MatchStat & { label: string } => s !== null);
-
+    const [activeSection, setActiveSection] = useState<MatchCenterSection>('events');
     const isHalftime = isHalftimeDisplay(liveData.statusDetail, liveData.displayClock);
-    const statusLabel = isHalftime
-        ? 'Devre Arası'
-        : (localizeStatusDetail(liveData.statusDetail) || (liveData.matchState === 'in' ? 'Canlı' : 'Maç Bitti'));
-    const centerClockLabel = isHalftime ? 'Devre Arası' : (liveData.displayClock || '');
-    const homeTeamId = String(liveData.homeTeam?.id ?? '');
-    const awayTeamId = String(liveData.awayTeam?.id ?? '');
-    const incidentEvents = (liveData.events || []).filter((event) => event.isGoal || event.isRedCard);
-    const homeIncidents = incidentEvents.filter((event) => String(event.team || '') === homeTeamId);
-    const awayIncidents = incidentEvents.filter((event) => String(event.team || '') === awayTeamId);
-    const neutralIncidents = incidentEvents.filter((event) => {
-        const teamId = String(event.team || '');
-        return teamId !== homeTeamId && teamId !== awayTeamId;
-    });
-    const homeTeamCrest = resolveTeamCrest({
-        theme,
-        defaultSrc: liveData.homeTeam?.logo,
-        teamName: liveData.homeTeam?.name,
-    });
-    const awayTeamCrest = resolveTeamCrest({
-        theme,
-        defaultSrc: liveData.awayTeam?.logo,
-        teamName: liveData.awayTeam?.name,
-    });
+    const homeName = localizeTeamName(liveData.homeTeam?.name || 'Ev Sahibi');
+    const awayName = localizeTeamName(liveData.awayTeam?.name || 'Deplasman');
+    const homeTeamCrest = resolveTeamCrest({ theme, defaultSrc: liveData.homeTeam?.logo, teamName: homeName });
+    const awayTeamCrest = resolveTeamCrest({ theme, defaultSrc: liveData.awayTeam?.logo, teamName: awayName });
+    const isLive = liveData.matchState === 'in';
+    const statusLabel = isLive
+        ? 'Canlı'
+        : localizeStatusDetail(liveData.statusDetail) || 'Maç Bitti';
+    const clockLabel = isHalftime ? 'Devre Arası' : liveData.matchState === 'post' ? 'Maç Sonu' : liveData.displayClock || '';
+    const tabs = useMemo<Array<{ id: MatchCenterSection; label: string }>>(() => [
+        { id: 'events', label: 'Olaylar' },
+        { id: 'stats', label: 'İstatistikler' },
+        { id: 'lineups', label: 'Kadrolar' },
+    ], []);
 
     return (
-        <div className="w-full space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-            {/* Score Board */}
-            <div className="glass-panel rounded-xl p-4">
-                <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-yellow-400 uppercase">
+        <div className="w-full">
+            <section className="live-match-score-card overflow-hidden rounded-2xl border border-white/10 bg-[#08172c]" aria-label="Canlı skor">
+                <div className="flex items-center justify-between gap-3 px-4 pt-4">
+                    <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Maç Merkezi</p>
+                    <div className={`inline-flex shrink-0 items-center gap-2 py-1 text-[10px] font-black uppercase tracking-wider ${isLive ? 'text-yellow-300' : 'text-emerald-300'}`}>
+                        {isLive && !isHalftime && <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 motion-safe:animate-pulse" aria-hidden="true" />}
                         {statusLabel}
-                    </span>
-                    {liveData.matchState === 'in' && (
-                        <div className="flex items-center gap-2">
-                            <span className="relative flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                            </span>
-                            <span className="text-sm font-bold text-red-400">
-                                CANLI
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                            {homeTeamCrest && (
-                                <img
-                                    src={homeTeamCrest}
-                                    alt={liveData.homeTeam?.name || 'Ev sahibi'}
-                                    className="w-full h-full object-contain p-1"
-                                />
-                            )}
-                            {!homeTeamCrest && (
-                                <span className="text-[10px] text-slate-300 font-bold">
-                                    {String(liveData.homeTeam?.name || '').slice(0, 2).toUpperCase()}
-                                </span>
-                            )}
-                        </div>
-                        <p className="hidden sm:block text-base font-bold text-white text-left truncate">{liveData.homeTeam?.name}</p>
-                    </div>
-
-                    <p className="text-3xl font-black text-white px-4">
-                        {liveData.homeTeam?.score || '0'} <span className="text-slate-500">-</span> {liveData.awayTeam?.score || '0'}
-                    </p>
-
-                    <div className="flex items-center justify-end gap-2.5 min-w-0">
-                        <p className="hidden sm:block text-base font-bold text-white text-right truncate">{liveData.awayTeam?.name}</p>
-                        <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                            {awayTeamCrest && (
-                                <img
-                                    src={awayTeamCrest}
-                                    alt={liveData.awayTeam?.name || 'Deplasman takımı'}
-                                    className="w-full h-full object-contain p-1"
-                                />
-                            )}
-                            {!awayTeamCrest && (
-                                <span className="text-[10px] text-slate-300 font-bold">
-                                    {String(liveData.awayTeam?.name || '').slice(0, 2).toUpperCase()}
-                                </span>
-                            )}
-                        </div>
                     </div>
                 </div>
 
-                <p className="text-[11px] text-slate-400 mt-2 text-center">{centerClockLabel}</p>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 px-4 py-5 sm:gap-5" aria-live="polite">
+                    <div className="flex min-w-0 flex-col items-center text-center">
+                        <TeamCrest src={homeTeamCrest} name={homeName} />
+                        <p className="mt-2 line-clamp-2 max-w-28 break-words text-xs font-black leading-tight text-white sm:max-w-44 sm:text-sm">{homeName}</p>
+                    </div>
 
-                {incidentEvents.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-                        <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
-                            <div className="space-y-1 min-w-0">
-                                {homeIncidents.map((event, idx) => (
-                                    <div key={`home-incident-${idx}`} className="flex items-center gap-1 text-[11px] min-w-0">
-                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
-                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
-                                            {formatIncidentLabel(event)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="text-slate-500 text-xs pt-1">•</div>
-                            <div className="space-y-1 min-w-0">
-                                {awayIncidents.map((event, idx) => (
-                                    <div key={`away-incident-${idx}`} className="flex items-center justify-end gap-1 text-[11px] min-w-0">
-                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate text-right' : 'text-red-300 font-medium truncate text-right'}>
-                                            {formatIncidentLabel(event)}
-                                        </span>
-                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                        <span className="text-slate-400 shrink-0 w-10 tabular-nums">{formatMatchClock(event.clock)}</span>
-                                    </div>
-                                ))}
-                            </div>
+                    <div className="min-w-[108px] pt-3 text-center sm:min-w-[150px]">
+                        <p className="whitespace-nowrap text-[42px] font-black leading-none tracking-[-0.08em] text-white sm:text-5xl">
+                            <span className="tabular-nums">{liveData.homeTeam?.score ?? '0'}</span>
+                            <span className="px-2 text-2xl text-slate-600">–</span>
+                            <span className="tabular-nums">{liveData.awayTeam?.score ?? '0'}</span>
+                        </p>
+                        <p className={`mt-2 text-sm font-black tabular-nums ${isLive ? 'text-yellow-300' : 'text-slate-400'}`}>{clockLabel}</p>
+                    </div>
+
+                    <div className="flex min-w-0 flex-col items-center text-center">
+                        <TeamCrest src={awayTeamCrest} name={awayName} />
+                        <p className="mt-2 line-clamp-2 max-w-28 break-words text-xs font-black leading-tight text-white sm:max-w-44 sm:text-sm">{awayName}</p>
+                    </div>
+                </div>
+
+                <div className="live-match-tabs grid grid-cols-3 border-t border-white/[0.08] bg-slate-950/25" role="tablist" aria-label="Maç merkezi bölümleri">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            role="tab"
+                            aria-selected={activeSection === tab.id}
+                            onClick={() => setActiveSection(tab.id)}
+                            className={`min-h-12 border-b-2 px-2 text-xs font-black outline-none transition-colors focus-visible:bg-white/[0.07] ${activeSection === tab.id ? 'border-white/70 text-white' : 'border-transparent text-slate-500 hover:text-slate-200'}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <section className={activeSection === 'lineups' ? 'mt-4' : 'live-match-detail-card mt-4 rounded-2xl border border-white/10 bg-[#09182d] p-4 sm:p-5'}>
+                {activeSection === 'events' && (
+                    <div role="tabpanel">
+                        <div className="mb-4">
+                            <h3 className="text-sm font-black text-white">Maç Akışı</h3>
                         </div>
+                        <LiveMatchTimeline
+                            events={liveData.events}
+                            homeTeamId={liveData.homeTeam?.id}
+                            awayTeamId={liveData.awayTeam?.id}
+                            homeTeamName={homeName}
+                            awayTeamName={awayName}
+                        />
+                    </div>
+                )}
 
-                        {neutralIncidents.length > 0 && (
-                            <div className="space-y-1">
-                                {neutralIncidents.map((event, idx) => (
-                                    <div key={`neutral-incident-${idx}`} className="flex items-center justify-center gap-1 text-[11px] min-w-0">
-                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
-                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
-                                            {formatIncidentLabel(event)}
-                                        </span>
-                                    </div>
-                                ))}
+                {activeSection === 'stats' && (
+                    <div role="tabpanel">
+                        <div className="mb-4">
+                            <h3 className="text-sm font-black text-white">Karşılaştırma</h3>
+                        </div>
+                        <LiveMatchStats stats={liveData.stats} />
+                    </div>
+                )}
+
+                {activeSection === 'lineups' && (
+                    <div role="tabpanel">
+                        {liveData.lineups ? (
+                            <div className="space-y-3">
+                                {(!liveData.lineups.home || !liveData.lineups.away) && (
+                                    <p className="live-data-notice rounded-lg bg-sky-400/10 px-3 py-2 text-[10px] leading-relaxed text-sky-200">
+                                        {!liveData.lineups.home ? homeName : awayName} İlk 11 verisi henüz gelmedi. Mevcut takım kadrosu gösteriliyor.
+                                    </p>
+                                )}
+                                <MatchLineups
+                                    lineups={liveData.lineups}
+                                    homeTeamName={homeName}
+                                    awayTeamName={awayName}
+                                    matchId={liveData.matchId}
+                                    useSquadPhotos={useSquadPhotos}
+                                    embedded
+                                />
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-dashed border-slate-600/70 bg-slate-950/25 px-4 py-6 text-center">
+                                <p className="text-xs font-bold text-slate-300">İlk 11 bilgisi henüz paylaşılmadı</p>
+                                <p className="mt-1 text-[10px] leading-relaxed text-slate-500">Kadro verisi geldiğinde bu bölüm otomatik güncellenecek.</p>
                             </div>
                         )}
                     </div>
                 )}
-            </div>
-
-            {/* Stats */}
-            {orderedStats.length > 0 && (
-                <div className="glass-panel rounded-2xl p-4">
-                    <h3 className="text-sm font-bold text-white mb-3">İstatistikler</h3>
-                    <div className="space-y-3">
-                        {orderedStats.map((stat, idx) => {
-                                const homeVal = parseFloat(stat.homeValue) || 0;
-                                const awayVal = parseFloat(stat.awayValue) || 0;
-                                const total = homeVal + awayVal || 1;
-                                return (
-                                    <div key={idx} className="space-y-1">
-                                        <div className="flex justify-between text-xs text-slate-400">
-                                            <span className="font-medium text-white">{stat.homeValue}</span>
-                                            <span>{stat.label}</span>
-                                            <span className="font-medium text-white">{stat.awayValue}</span>
-                                        </div>
-                                        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden flex">
-                                            <div
-                                                className="bg-yellow-400 h-full transition-all duration-500"
-                                                style={{ width: `${(homeVal / total) * 100}%` }}
-                                            />
-                                            <div className="bg-slate-600 h-full flex-1" />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                    </div>
-                </div>
-            )}
-
-            {/* Lineups (post-match only) */}
-            {liveData.matchState === 'post' && liveData.lineups && (
-                <MatchLineups
-                    lineups={liveData.lineups}
-                    homeTeamName={liveData.homeTeam?.name}
-                    awayTeamName={liveData.awayTeam?.name}
-                    matchId={liveData.matchId}
-                />
-            )}
-
-            {/* Match Events */}
-            {liveData.events && liveData.events.length > 0 && (
-                <div className="glass-panel rounded-2xl p-4">
-                    <h3 className="text-sm font-bold text-white mb-3">Maç Olayları</h3>
-                    <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                        {liveData.events.map((event, idx) => {
-                            const eventType = getEventVisualType(event);
-                            const rowClass = eventType === 'goal'
-                                ? 'bg-yellow-400/10'
-                                : eventType === 'red-card'
-                                    ? 'bg-red-500/10'
-                                    : eventType === 'substitution'
-                                        ? 'bg-emerald-400/10'
-                                        : 'bg-white/5';
-                            const textClass = eventType === 'goal'
-                                ? 'text-yellow-400 font-bold'
-                                : eventType === 'red-card'
-                                    ? 'text-red-400 font-semibold'
-                                    : eventType === 'substitution'
-                                        ? 'text-emerald-300 font-medium'
-                                        : 'text-slate-300';
-
-                            return (
-                                <div
-                                    key={idx}
-                                    className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${rowClass}`}
-                                >
-                                    <span className="text-xs text-yellow-400 font-mono w-12">{formatMatchClock(event.clock)}</span>
-                                    <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
-                                        <MatchEventIcon event={event} className={eventType === 'goal' ? 'w-4 h-4' : 'w-3.5 h-5'} />
-                                    </span>
-                                    <span className={`text-sm flex-1 ${textClass}`}>
-                                        {localizePlayerName(event.player)}
-                                        {event.isSubstitution && event.playerOut && (
-                                            <span className="text-slate-400 ml-1 inline-flex items-center gap-1">
-                                                <svg
-                                                    viewBox="0 0 16 16"
-                                                    className="w-3 h-3"
-                                                    fill="none"
-                                                    stroke="currentColor"
-                                                    strokeWidth="1.6"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    aria-hidden="true"
-                                                >
-                                                    <path d="M2 5h9" />
-                                                    <path d="m8 2 3 3-3 3" />
-                                                    <path d="M14 11H5" />
-                                                    <path d="m8 8-3 3 3 3" />
-                                                </svg>
-                                                <span>{localizePlayerName(event.playerOut)}</span>
-                                            </span>
-                                        )}
-                                        {event.isGoal && event.isPenalty && (
-                                            <span className="text-yellow-300/90 font-semibold ml-1">(P)</span>
-                                        )}
-                                        {event.isGoal && event.isOwnGoal && (
-                                            <span className="text-yellow-300/90 font-semibold ml-1">(K.K)</span>
-                                        )}
-                                        {event.type && !event.isGoal && !event.isYellowCard && !event.isRedCard && !event.isSubstitution && (
-                                            <span className="text-slate-500 ml-1">({event.type})</span>
-                                        )}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
+            </section>
         </div>
     );
-};
-
-export default LiveMatchScore;
+}

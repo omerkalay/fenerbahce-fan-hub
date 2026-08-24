@@ -14,7 +14,7 @@ const readCachedMatchData = (): CachedMatchPayload | null => {
   }
 };
 
-export function useMatchBootstrap() {
+export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}) {
   const cachedData = useMemo(() => {
     if (typeof window === 'undefined') return null;
     return readCachedMatchData();
@@ -24,7 +24,7 @@ export function useMatchBootstrap() {
   const [next3Matches, setNext3Matches] = useState<MatchData[]>(cachedData?.next3Matches ?? []);
   const [seasonState, setSeasonState] = useState<SeasonState>(cachedData?.seasonState ?? (cachedData?.nextMatch ? 'active' : 'unknown'));
   const [season, setSeason] = useState<SeasonMeta | null>(cachedData?.season ?? null);
-  const [loading, setLoading] = useState(!cachedData);
+  const [loading, setLoading] = useState(enabled && !cachedData);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
 
@@ -33,6 +33,10 @@ export function useMatchBootstrap() {
   }, [matchData]);
 
   const loadMatchData = useCallback(async () => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     const hasCached = hasDataRef.current;
     setErrorMessage(null);
     if (!hasCached) {
@@ -111,11 +115,11 @@ export function useMatchBootstrap() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
-    loadMatchData();
-  }, [loadMatchData]);
+    if (enabled) loadMatchData();
+  }, [enabled, loadMatchData]);
 
   return {
     cachedData,

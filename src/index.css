@@ -335,8 +335,8 @@ html[data-theme='white-kit'] .app-nav-button-builder:not(.is-active) {
     background: transparent;
 }
 
-/* Map the existing utility palette to the white-kit print system. This keeps
-   status colors intact while every application surface adopts the new theme. */
+/* Map the existing utility palette and live-match surfaces to the white-kit
+   print system while keeping semantic status colors intact. */
 html[data-theme='white-kit'] .text-white,
 html[data-theme='white-kit'] .text-slate-200 {
     color: var(--app-text) !important;
@@ -344,6 +344,10 @@ html[data-theme='white-kit'] .text-slate-200 {
 
 html[data-theme='white-kit'] .text-slate-300 {
     color: var(--app-text-soft) !important;
+}
+
+html[data-theme='white-kit'] .text-slate-100 {
+    color: var(--app-text) !important;
 }
 
 html[data-theme='white-kit'] .text-slate-400,
@@ -516,6 +520,25 @@ html[data-theme='white-kit'] [class*='bg-blue-'] .text-white {
     color: #fff !important;
 }
 
+html[data-theme='white-kit'] [class~='bg-[#14532d]'] .lineup-player-avatar {
+    color: #fff !important;
+    background: #0a1f44 !important;
+    border-color: rgba(255, 255, 255, 0.72) !important;
+}
+
+html[data-theme='white-kit'] [class~='bg-[#14532d]'] .lineup-player-name,
+html[data-theme='white-kit'] [class~='bg-[#14532d]'] .lineup-formation-badge {
+    color: #0a1f44 !important;
+    background: rgba(255, 250, 235, 0.96) !important;
+    border-color: rgba(10, 31, 68, 0.28) !important;
+}
+
+html[data-theme='white-kit'] [class~='bg-[#14532d]'] .lineup-sub-out-badge {
+    color: #a61b2b !important;
+    background: rgba(255, 250, 235, 0.98) !important;
+    border-color: rgba(166, 27, 43, 0.24) !important;
+}
+
 html[data-theme='white-kit'] .text-red-300,
 html[data-theme='white-kit'] .text-red-400,
 html[data-theme='white-kit'] .text-rose-200,
@@ -536,6 +559,46 @@ html[data-theme='white-kit'] .text-blue-200,
 html[data-theme='white-kit'] .text-blue-300,
 html[data-theme='white-kit'] .text-blue-400 {
     color: #174b9b !important;
+}
+
+html[data-theme='white-kit'] .text-sky-300 {
+    color: #174b9b !important;
+}
+
+html[data-theme='white-kit'] .text-rose-300\/85 {
+    color: #a61b2b !important;
+}
+
+html[data-theme='white-kit'] .dev-live-panel,
+html[data-theme='white-kit'] .live-match-dialog,
+html[data-theme='white-kit'] .live-match-dialog-header,
+html[data-theme='white-kit'] .live-match-score-card,
+html[data-theme='white-kit'] .live-match-detail-card,
+html[data-theme='white-kit'] .live-match-tabs {
+    color: var(--app-text);
+    background: var(--app-surface) !important;
+}
+
+html[data-theme='white-kit'] .live-stat-track {
+    background: rgba(10, 31, 68, 0.1) !important;
+}
+
+html[data-theme='white-kit'] .live-stat-home-bar {
+    background: #174b9b !important;
+}
+
+html[data-theme='white-kit'] .live-stat-away-bar {
+    background: #8d8674 !important;
+}
+
+html[data-theme='white-kit'] .live-stat-center-divider {
+    background: var(--app-surface) !important;
+}
+
+html[data-theme='white-kit'] .live-data-notice {
+    color: #174b9b !important;
+    background: rgba(23, 75, 155, 0.1) !important;
+    border: 1px solid rgba(23, 75, 155, 0.2);
 }
 
 .standings-table-head {

@@ -27,10 +27,10 @@ export default function MiniPitch({
             : renderedFormation;
 
     return (
-        <div className="relative w-full aspect-[68/105] rounded-xl overflow-hidden border border-white/10 bg-[#14532d] shadow-inner shadow-black/25">
+        <div className="lineup-mini-pitch relative mx-auto aspect-[68/105] w-full max-w-[560px] overflow-hidden rounded-xl border border-white/10 bg-[#14532d] shadow-inner shadow-black/25">
             <img src={PITCH_SVG} alt="" className="absolute inset-0 h-full w-full object-cover opacity-95" />
             {confident && formationLabel && (
-                <span className="absolute top-2 left-1/2 -translate-x-1/2 z-10 rounded-md border border-white/15 bg-slate-950/70 px-2.5 py-0.5 text-[10px] font-bold text-yellow-300 backdrop-blur-sm shadow-sm">
+                <span className="lineup-formation-badge absolute top-2 left-1/2 z-10 -translate-x-1/2 rounded-md border border-white/15 bg-slate-950/70 px-2.5 py-0.5 text-[10px] font-bold text-slate-100 shadow-sm backdrop-blur-sm">
                     {formationLabel}
                 </span>
             )}
@@ -49,7 +49,7 @@ export default function MiniPitch({
                                 style={{ top: `${row.y}%`, left: `${x}%` }}
                             >
                                 <div className="relative">
-                                    <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-yellow-400 bg-slate-950 text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:h-10 sm:w-10 sm:text-xs">
+                                    <span className="lineup-player-avatar flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border-2 border-white/35 bg-slate-950 text-[10px] font-bold text-white shadow-[0_8px_18px_rgba(0,0,0,0.35)] sm:h-10 sm:w-10 sm:text-xs">
                                         <PlayerImage
                                             src={photoUrl}
                                             alt={displayName}
@@ -61,7 +61,7 @@ export default function MiniPitch({
                                         />
                                     </span>
                                     {subOutMinute && (
-                                        <span className="absolute -right-3 -top-2 inline-flex items-center gap-0.5 rounded-full border border-white/15 bg-slate-950/95 px-1 py-[2px] text-[8px] font-semibold text-rose-300 shadow-lg">
+                                        <span className="lineup-sub-out-badge absolute -right-3 -top-2 inline-flex items-center gap-0.5 rounded-full border border-white/15 bg-slate-950/95 px-1 py-[2px] text-[8px] font-semibold text-rose-300 shadow-lg">
                                             <svg viewBox="0 0 16 16" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                                                 <path d="M14 5H5" />
                                                 <path d="m8 2-3 3 3 3" />
@@ -70,7 +70,7 @@ export default function MiniPitch({
                                         </span>
                                     )}
                                 </div>
-                                <span className="mt-1 max-w-[74px] truncate rounded-md border border-white/10 bg-slate-950/70 px-1.5 py-0.5 text-center text-[8px] font-medium text-white shadow-sm backdrop-blur-sm sm:max-w-[82px] sm:text-[9px]">
+                                <span className="lineup-player-name mt-1 max-w-[74px] truncate rounded-md border border-white/10 bg-slate-950/70 px-1.5 py-0.5 text-center text-[8px] font-medium text-white shadow-sm backdrop-blur-sm sm:max-w-[82px] sm:text-[9px]">
                                     {shortName}
                                 </span>
                             </div>

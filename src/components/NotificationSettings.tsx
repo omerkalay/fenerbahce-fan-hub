@@ -8,7 +8,11 @@ import useNotificationPreferences from '../hooks/useNotificationPreferences';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
-const NotificationSettings = () => {
+interface NotificationSettingsProps {
+  themeOnly?: boolean;
+}
+
+const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) => {
   const { user, signInWithGoogle } = useAuth();
   const { theme, setTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
@@ -30,9 +34,9 @@ const NotificationSettings = () => {
     openDraft,
     closeDraft,
     saveNotifications
-  } = useNotificationPreferences(user);
+  } = useNotificationPreferences(user, !themeOnly);
 
-  useBodyScrollLock(showSettings || showNotifications || showNotificationAuth);
+  useBodyScrollLock(showSettings || (!themeOnly && (showNotifications || showNotificationAuth)));
 
   const handleOpenSettings = () => {
     setAuthError(null);
@@ -168,11 +172,11 @@ const NotificationSettings = () => {
       <button
         type="button"
         onClick={handleOpenSettings}
-        className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110 ${hasActiveNotifications ? 'ring-2 ring-yellow-400/60 text-yellow-400/80' : ''}`}
+        className={`w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-yellow-400 hover:scale-110 ${!themeOnly && hasActiveNotifications ? 'ring-2 ring-yellow-400/60 text-yellow-400/80' : ''}`}
         title="Ayarlar"
         aria-label="Ayarlar"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={hasActiveNotifications ? 2 : 1.5}>
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={!themeOnly && hasActiveNotifications ? 2 : 1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
@@ -247,29 +251,31 @@ const NotificationSettings = () => {
               </div>
             </fieldset>
 
-            <div className="settings-section settings-notification-section">
-              <div>
-                <span className="settings-section-label">Bildirimler</span>
-                <p className="settings-description">
-                  {hasActiveNotifications
-                    ? 'Bildirim tercihlerin etkin.'
-                    : 'Maç ve önemli duyuru bildirimlerini yönet.'}
-                </p>
+            {!themeOnly && (
+              <div className="settings-section settings-notification-section">
+                <div>
+                  <span className="settings-section-label">Bildirimler</span>
+                  <p className="settings-description">
+                    {hasActiveNotifications
+                      ? 'Bildirim tercihlerin etkin.'
+                      : 'Maç ve önemli duyuru bildirimlerini yönet.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="settings-notification-button"
+                  onClick={handleOpenNotifications}
+                >
+                  <span>{user ? 'Bildirim ayarlarını aç' : 'Giriş yap ve ayarla'}</span>
+                  <span aria-hidden="true">→</span>
+                </button>
               </div>
-              <button
-                type="button"
-                className="settings-notification-button"
-                onClick={handleOpenNotifications}
-              >
-                <span>{user ? 'Bildirim ayarlarını aç' : 'Giriş yap ve ayarla'}</span>
-                <span aria-hidden="true">→</span>
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
 
-      <GoogleSignInModal
+      {!themeOnly && <GoogleSignInModal
         open={showNotificationAuth}
         title="Bildirim Ayarları"
         heading="Bildirim almak için giriş yap"
@@ -297,9 +303,9 @@ const NotificationSettings = () => {
             }
           }}
         />
-      </GoogleSignInModal>
+      </GoogleSignInModal>}
 
-      {showNotifications && user && (
+      {!themeOnly && showNotifications && user && (
         <div
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
           onClick={handleCloseNotifications}
