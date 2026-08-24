@@ -16,6 +16,7 @@ const { handlePlayerImage, handleTeamImage } = require('./assets');
 const { handlePollVote } = require('./polls');
 const { handleHealth, handleRefresh } = require('./admin');
 const { handleReminder, handleReminderPreferences } = require('./reminders');
+const { handleAdminRoute } = require('./adminRouter');
 
 // Main API - Express-style routing
 const api = onRequest({
@@ -100,10 +101,13 @@ const api = onRequest({
             case 'refresh':
                 return await handleRefresh(req, res);
 
+            case 'admin':
+                return await handleAdminRoute(req, res, segments.slice(1));
+
             default:
                 return res.json({
                     message: 'Fenerbahce Fan Hub API (Firebase)',
-                    version: '2.12.3',
+                    version: '2.13.0',
                     endpoints: [
                         '/next-match',
                         '/next-3-matches',
@@ -119,7 +123,8 @@ const api = onRequest({
                         '/reminder (GET, POST)',
                         '/poll-vote (POST)',
                         '/health',
-                        '/refresh'
+                        '/refresh',
+                        '/admin/*'
                     ]
                 });
         }

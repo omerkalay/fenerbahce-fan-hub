@@ -395,6 +395,7 @@ export interface TeamLineup {
   teamId: string;
   teamName: string;
   formation: string | null;
+  formationSource?: 'espn' | 'manual' | 'inferred';
   starters: LineupPlayer[];
   bench: LineupPlayer[];
   substitutions: LineupSubstitution[];
@@ -403,6 +404,21 @@ export interface TeamLineup {
 export interface MatchLineups {
   home: TeamLineup | null;
   away: TeamLineup | null;
+}
+
+export interface PublishedMatchLineups {
+  matchId: string;
+  espnEventId?: string;
+  league?: string | null;
+  homeTeam: MatchSummaryTeam;
+  awayTeam: MatchSummaryTeam;
+  lineups: MatchLineups;
+  sources?: {
+    home?: 'espn' | 'manual' | null;
+    away?: 'espn' | 'manual' | null;
+  };
+  publishedAt: number;
+  updatedAt: number;
 }
 
 export interface MatchSummaryData {
@@ -444,6 +460,25 @@ export type FormationName =
 export type FormationPositions = Record<string, PositionCoord>;
 export type Formations = Record<FormationName, FormationPositions>;
 export type PitchPlayers = Record<string, Player>;
+
+export interface FormationDraftPlayer {
+  slot: string;
+  id: number;
+  name: string;
+  position: string;
+  number: number;
+}
+
+export interface FormationDraft {
+  formation: FormationName;
+  players: FormationDraftPlayer[];
+  updatedAt?: number;
+}
+
+export interface AdminLineupSettings {
+  autoPublishLineups: boolean;
+  autoPushLineups: boolean;
+}
 
 // ─── Event Visual Type ───────────────────────────────────
 

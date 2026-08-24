@@ -18,13 +18,12 @@ import { onValue, ref } from 'firebase/database';
 import {
     isHalftimeDisplay,
     resolveGoalTeamId,
-    formatGoalSummaryText,
-    normalizeStartingXIData
+    formatGoalSummaryText
 } from '../utils/dashboardHelpers';
 import useBodyScrollLock from '../hooks/useBodyScrollLock';
 import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
-import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, StartingXIData, SeasonMeta, SeasonState } from '../types';
+import type { MatchData, LiveMatchState, LiveMatchData, MatchEvent, PublishedMatchLineups, SeasonMeta, SeasonState } from '../types';
 
 interface DashboardProps {
     matchData: MatchData | null;
@@ -57,7 +56,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     const [standingsLeague, setStandingsLeague] = useState<string>('');
     const [standingsSeasonStartYear, setStandingsSeasonStartYear] = useState<number>(() => getCurrentSeasonStartYear());
     const [showStartingXIModal, setShowStartingXIModal] = useState<boolean>(false);
-    const [startingXI, setStartingXI] = useState<StartingXIData | null>(null);
+    const [startingXI, setStartingXI] = useState<PublishedMatchLineups | null>(null);
     const offseasonCrest = resolveTeamCrest({
         theme,
         defaultSrc: 'https://media.api-sports.io/football/teams/611.png',
@@ -65,12 +64,18 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
 
     useEffect(() => {
-        const startingXIRef = ref(database, 'admin/startingXI');
+        if (!matchData?.id) {
+            setStartingXI(null);
+            return;
+        }
+        const startingXIRef = ref(database, `cache/matchLineups/${matchData.id}`);
 
         const unsubscribe = onValue(
             startingXIRef,
             (snapshot) => {
-                setStartingXI(normalizeStartingXIData(snapshot.val()));
+                const value = snapshot.val() as PublishedMatchLineups | null;
+                const hasLineup = Boolean(value?.lineups?.home || value?.lineups?.away);
+                setStartingXI(value && String(value.matchId) === String(matchData.id) && hasLineup ? value : null);
             },
             (error) => {
                 console.error('Starting XI could not be loaded from RTDB:', error);
@@ -81,7 +86,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         return () => {
             unsubscribe();
         };
-    }, []);
+    }, [matchData?.id]);
 
     useBodyScrollLock(showLiveMatchModal || showStandingsModal || showStartingXIModal);
 
@@ -467,9 +472,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                     onClick={() => setShowStartingXIModal(true)}
                     className="glass-panel rounded-2xl mb-6 w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
                 >
-                    <div className="flex items-center gap-2.5">
-                        <span className="text-base font-bold text-white">İlk 11 Açıklandı!</span>
-                        <span className="text-xs bg-green-500/20 text-green-300 px-2.5 py-0.5 rounded-full font-bold uppercase">Yeni</span>
+                    <div className="min-w-0 flex-1 text-left">
+                        <div className="mb-2 flex items-center gap-2.5">
+                            <span className="text-base font-bold text-white">İlk 11’ler Açıklandı</span>
+                            <span className="rounded-full bg-green-500/20 px-2.5 py-0.5 text-[10px] font-bold uppercase text-green-300">Yeni</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className="rounded-lg bg-white/5 px-2.5 py-2">
+                                <div className="flex items-center gap-2">
+                                    <TeamLogo teamId={matchData.homeTeam.id} name={startingXI.homeTeam.name} wrapperClassName="h-7 w-7 shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold text-slate-200">{startingXI.homeTeam.name}</p>
+                                        <p className="mt-0.5 font-black text-yellow-300">{startingXI.lineups.home?.formation || 'Diziliş hazır'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="rounded-lg bg-white/5 px-2.5 py-2">
+                                <div className="flex items-center gap-2">
+                                    <TeamLogo teamId={matchData.awayTeam.id} name={startingXI.awayTeam.name} wrapperClassName="h-7 w-7 shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold text-slate-200">{startingXI.awayTeam.name}</p>
+                                        <p className="mt-0.5 font-black text-yellow-300">{startingXI.lineups.away?.formation || 'Diziliş hazır'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"

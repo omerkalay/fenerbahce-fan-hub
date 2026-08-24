@@ -3,8 +3,12 @@ import { useAuth } from '../contexts/authContextDef';
 import { getSignInErrorMessage } from '../utils/authHelpers';
 import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
-const UserAvatar = () => {
-  const { user, signInWithGoogle, signOut } = useAuth();
+interface UserAvatarProps {
+  onOpenAdmin?: () => void;
+}
+
+const UserAvatar = ({ onOpenAdmin }: UserAvatarProps) => {
+  const { user, isAdmin, signInWithGoogle, signOut } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -82,6 +86,18 @@ const UserAvatar = () => {
           <div className="absolute right-0 top-12 bg-[#0f172a] border border-white/10 rounded-xl p-3 z-50 min-w-[180px] shadow-2xl">
             <p className="text-sm text-white font-medium truncate">{user.displayName}</p>
             <p className="text-xs text-slate-400 truncate mb-2">{user.email}</p>
+            {isAdmin && onOpenAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMenu(false);
+                  onOpenAdmin();
+                }}
+                className="mb-1 w-full rounded-lg px-2 py-1.5 text-left text-sm font-semibold text-yellow-300 hover:bg-yellow-400/10"
+              >
+                Yönetim
+              </button>
+            )}
             <button
               type="button"
               onClick={async () => {

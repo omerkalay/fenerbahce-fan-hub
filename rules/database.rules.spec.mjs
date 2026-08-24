@@ -24,7 +24,12 @@ beforeEach(async () => {
   await testEnvironment.withSecurityRulesDisabled(async (context) => {
     const database = context.database();
     await set(ref(database), {
-      cache: { nextMatch: { id: 'match-1' } },
+      cache: {
+        nextMatch: { id: 'match-1' },
+        matchLineups: {
+          '401888314': { matchId: '401888314', lineups: { home: {}, away: {} } }
+        }
+      },
       admin: {
         playerStatus: { player1: { status: 'injured' } },
         startingXI: { publishedAt: 123, starters: [] }
@@ -38,6 +43,10 @@ beforeEach(async () => {
       notifications: {
         'uid-a': { fcmToken: 'token-a' },
         'uid-b': { fcmToken: 'token-b' }
+      },
+      ops: {
+        adminSettings: { lineups: { autoPublishLineups: false, autoPushLineups: false } },
+        adminDrafts: { 'uid-admin': { '401888314': { formation: '4-2-3-1' } } }
       },
       users: {
         'uid-a': { displayName: 'A' },
@@ -54,10 +63,21 @@ after(async () => {
 test('public sports cache and published admin data are readable but not writable', async () => {
   const database = testEnvironment.unauthenticatedContext().database();
   await assertSucceeds(get(ref(database, 'cache/nextMatch')));
+  await assertSucceeds(get(ref(database, 'cache/matchLineups/401888314')));
   await assertSucceeds(get(ref(database, 'admin/playerStatus')));
   await assertSucceeds(get(ref(database, 'admin/startingXI')));
   await assertFails(set(ref(database, 'cache/nextMatch'), { id: 'attacker' }));
   await assertFails(set(ref(database, 'admin/startingXI/publishedAt'), 999));
+});
+
+test('private operations state is inaccessible even to a client with an admin claim', async () => {
+  const publicDatabase = testEnvironment.unauthenticatedContext().database();
+  const adminClientDatabase = testEnvironment.authenticatedContext('uid-admin', { admin: true }).database();
+
+  await assertFails(get(ref(publicDatabase, 'ops/adminSettings')));
+  await assertFails(get(ref(adminClientDatabase, 'ops/adminSettings')));
+  await assertFails(set(ref(adminClientDatabase, 'ops/adminSettings/lineups/autoPushLineups'), true));
+  await assertFails(set(ref(adminClientDatabase, 'cache/matchLineups/401888314'), { attacker: true }));
 });
 
 test('poll totals are public while individual votes are owner-only and server-written', async () => {

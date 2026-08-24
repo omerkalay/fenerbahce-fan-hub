@@ -6,18 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.12.3-blue)
+![Version](https://img.shields.io/badge/version-2.13.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.12.3
+## What's New in v2.13.0
+
+- **Verified Automatic Starting XIs** - The existing minute scheduler now begins ESPN lineup discovery 90 minutes before kickoff, verifies the SofaScore fixture by teams, kickoff time, and supported competition, requires two identical complete 11+11 observations, and publishes only validated lineups
+- **Shared Visual Lineup Experience** - Matchday, live, and post-match views use the same dual-team pitch component with Fenerbahçe first, formations, shirt numbers, squad photos, benches, and live substitutions; inferred formations are labeled clearly
+- **Claim-Protected Administration** - A profile-only administration panel is backed by one server-side `/api/admin/*` authorization gate using revoked-token checks and the Firebase `admin` custom claim; private drafts, detection state, locks, settings, audit records, and health data never become client-readable
+- **Safe Manual Fallback and Rollout** - Administrators can review ESPN detection, build and publish a manual Fenerbahçe lineup without overwriting an ESPN opponent lineup, release the manual lock, and enable automatic publishing/push only after observation; both automation switches default to off
+
+<details>
+<summary>Previous: v2.12.3</summary>
 
 - **Dependency Maintenance** - Removed the unused local `gh-pages` deployment dependency plus unused direct Functions `dotenv` and `node-fetch` dependencies
 - **Functions Runtime Update** - Upgraded `firebase-functions` within major version 7 and omitted optional Firestore/Storage transports because the backend uses Realtime Database
 - **Release Safety Preserved** - Kept the 06:00 fixture transition, durable previous-match cache, notification scheduler, and PWA delivery behavior unchanged
 - **Upgrade Scope Control** - Left Firebase Admin 14, Vite 8, and other major-version migrations for a separate maintenance cycle
+
+</details>
 
 <details>
 <summary>Previous: v2.12.2</summary>
@@ -153,7 +163,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Live Match State Flow**: Countdown → Checking → Live/Post (stable post-match fallback while preserving final data)
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
 - **Post-Match Actual Lineups**: After a match ends, the detail modal shows ESPN-sourced formation, starting XI on a mini pitch, bench list, and substitution timeline. If lineup data is unavailable the section is silently hidden
-- **Starting XI Banner & Modal**: When `admin/startingXI` is published, users get an instant matchday lineup entry point with shirt-number photo matching and bench coverage
+- **Verified Starting XI Banner & Modal**: Validated ESPN or administrator-published data under `cache/matchLineups/{matchId}` opens a shared two-team pitch with formations, shirt numbers, squad photos, benches, and substitutions
 - **League & Europe Center**: Süper Lig standings plus a season-aware UEFA journey that resolves Champions League, Europa League, or Conference League automatically and exposes Fener’s route, league-phase standings, and the published knockout bracket
 - **Match Poll**: Interactive "Who will win?" poll with real-time results. Votes are validated server-side via `POST /api/poll-vote` and stored atomically in Firebase Realtime Database
 - **Push Notifications**: Reliable match reminders via Firebase Cloud Functions. Requires Google sign-in to configure
@@ -216,44 +226,14 @@ This node is managed manually via the Firebase Console. Each entry:
 | `updatedAt` | `number` | Unix timestamp in milliseconds. Used to show "Last updated: X hours ago" |
 
 ### Starting XI Publishing
-- **Manual RTDB Control**: Reads from `admin/startingXI`; the banner stays hidden until a valid lineup exists
-- **Photo Matching**: Players are matched against `/api/squad` photos by jersey number first, then by display name and known aliases as fallback
-- **Safe Failure Mode**: Invalid player entries are ignored, and if no valid starters remain the lineup is hidden instead of rendering broken UI
-
-#### `admin/startingXI` Schema
-
-This node is managed manually via the Firebase Console on matchday. Recommended payload:
-
-```json
-{
-  "publishedAt": 1741282200000,
-  "starters": [
-    { "name": "Dominik Livakovic", "number": 40, "group": "GK" },
-    { "name": "Mert Muldur", "number": 16, "group": "DEF" }
-  ],
-  "bench": [
-    { "name": "Irfan Can Egribayat", "number": 1, "group": "GK" }
-  ],
-  "push": {
-    "requested": false,
-    "sentAt": 1741282500000,
-    "sentForPublishedAt": 1741282200000,
-    "lastError": null
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `publishedAt` | `number` | Unix timestamp in milliseconds. Used for release timing / audit context |
-| `starters` | `StartingXIPlayer[]` | Required. If this array has no valid entries, the banner stays hidden |
-| `bench` | `StartingXIPlayer[]` | Optional bench list rendered below the starters |
-| `group` | `"GK" \| "DEF" \| "MID" \| "FWD"` | Position family used for validation and grouping |
-| `number` | `number` | Shirt number used for squad photo matching |
-| `push.requested` | `boolean` | Set to `true` to trigger a one-shot push to `all_fans`. Automatically reset to `false` after processing |
-| `push.sentAt` | `number` | Timestamp of the last successful push send |
-| `push.sentForPublishedAt` | `number` | The `publishedAt` value for which the last push was sent. Used for dedupe |
-| `push.lastError` | `string \| null` | Error message from the last failed attempt. `null` on success |
+- **Automatic Discovery**: The existing live scheduler checks every three minutes from T-90 to T-30 and every minute afterward for supported Süper Lig and UEFA fixtures
+- **Provider Identity Guard**: ESPN data is accepted only after home team, away team, kickoff time, and competition agree with the scheduled SofaScore match
+- **Publication Gate**: Both teams must contain 11 unique, named players with unique numeric shirt numbers, and the same lineup must appear in two consecutive checks
+- **Manual Fallback**: Türkiye Kupası and incomplete ESPN data can be handled from the claim-protected administration panel; a manual Fenerbahçe lock preserves the ESPN opponent lineup and blocks automatic Fenerbahçe overwrites
+- **Safe Rollout**: `autoPublishLineups` and `autoPushLineups` default to `false`. A late lineup is displayed after validation but never sends a Starting XI push after kickoff
+- **Durable Match Binding**: Published lineups remain under `cache/matchLineups/{matchId}`. The dashboard follows only the active fixture, so the previous lineup disappears at the normal 06:00 fixture transition without deleting its stored data
+- **Public/Private Separation**: Published sports data is public read-only cache data. Detection fingerprints, drafts, manual locks, settings, health records, notification locks, and audit records live under server-only `ops`
+- **Legacy Compatibility**: The old `admin/startingXI` RTDB trigger remains temporarily available for backend compatibility but is no longer the dashboard's publication path
 
 ### Formation Builder
 - **6 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2, 4-1-2-1-2 Diamond
@@ -269,7 +249,7 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 - **Styling**: Tailwind CSS v4
 - **Auth**: Firebase Authentication (Google sign-in only for protected actions)
 - **Backend**: Firebase Cloud Functions (Serverless, JS)
-- **Database**: Firebase Realtime Database (Polls, Cache & User Preferences)
+- **Database**: Firebase Realtime Database (public read-only sports cache, owner-isolated user data, and server-only operations state)
 - **APIs**: 
   - SofaScore (via RapidAPI) - Match data, Squad
   - ESPN (Free) - Standings, Live scores, Fixture schedules
@@ -315,7 +295,13 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 | Notification timing | `functions/utils/notificationSchedule.test.js` | Istanbul daily window and next-three-match reminder windows without early full-user scans |
 | Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
 | Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
-| RTDB security rules | `rules/database.rules.spec.mjs` | Public sports data, owner isolation, and server-only writes against the Firebase emulator |
+| Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
+| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, draft constraints |
+| Shared lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away tabs, incomplete provider sides, and mobile touch editing |
+| Realtime Database rules | `rules/database.rules.spec.mjs` | Public read-only sports cache, private operations state, owner isolation, and denied direct lineup writes |
+| Admin authorization | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin denial, shared route gating, path and schema manipulation, field limits, and internal notification links |
+| Lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away navigation, provider-side fallback, and touch-based administrator drafting |
+| RTDB security rules | `rules/database.rules.spec.mjs` | Public sports data, owner isolation, direct lineup write denial, and private `ops` denial even for clients carrying an admin claim |
 
 Pure backend helpers run without Firebase side effects; the rules suite separately uses a demo-project emulator and never connects to production data.
 
@@ -348,6 +334,7 @@ CI runs the same quality command sequence with Node.js 22 and Java 21 for the Fi
 │                 │     │  /api/reminder       (save prefs)    │
 └─────────────────┘     │  /api/poll-vote      (vote write)    │
                         │  /api/refresh        (admin-key)     │
+                        │  /api/admin/*        (admin claim)   │
                         │  /api/live-match     (from DB cache) │
                         │  /api/cup-fixtures   (from DB cache) │
                         │  /api/uefa-journey   (cache-first)   │
@@ -361,7 +348,7 @@ CI runs the same quality command sequence with Node.js 22 and Java 21 for the Fi
                 ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
                 │   Firebase   │ │   SofaScore  │ │     ESPN     │
                 │   Realtime   │ │   (RapidAPI) │ │   (Free)     │
-                │   Database   │ │  2-3 calls/day│ │  ~120/match  │
+                │   Database   │ │  2-3 calls/day│ │ lineup/live  │
                 │              │ └──────────────┘ └──────────────┘
                 │ cache/       │        ▲
                 │   liveMatch  │────────┘ updateLiveMatch (1/min)
@@ -370,9 +357,11 @@ CI runs the same quality command sequence with Node.js 22 and Java 21 for the Fi
                 │   uefaJourney/
                 │   squad          ← Statistics tab reads directly
                 │   matchSummaries/
+                │   matchLineups/  ← Public, server-written
+                │ ops/             ← Private server state
                 │ admin/       │
                 │   playerStatus   ← Manual (Firebase Console)
-                │   startingXI     ← Manual matchday publish
+                │   startingXI     ← Legacy compatibility only
                 │ match_polls/ │
                 │ notifications│
                 └──────────────┘
@@ -390,14 +379,16 @@ fenerbahce-fan-hub/
 │   ├── services/
 │   │   ├── espn.js            # ESPN data fetching & event parsing
 │   │   ├── espn-helpers.js    # Pure ESPN helpers (zero side effects, no Firebase)
+│   │   ├── lineupPublishing.js # Stable detection, publication and push locking
 │   │   ├── uefaJourney.js     # UEFA schedules, standings, bracket and cache
 │   │   └── sofascore.js       # SofaScore API calls (matches, squad, images)
 │   ├── handlers/
 │   │   ├── api.js             # HTTP endpoint routing
 │   │   ├── admin.js           # Health and protected cache refresh
+│   │   ├── adminRouter.js     # Claim-protected admin API and strict schemas
 │   │   ├── assets.js          # Cache-only public image endpoints
 │   │   ├── matches.js         # Match, fixture, UEFA and summary handlers
-│   │   ├── middleware.js      # Baseline request rate limiting
+│   │   ├── middleware.js      # Authentication gates and request rate limiting
 │   │   ├── polls.js           # Authenticated atomic poll writes
 │   │   ├── reminders.js       # Authenticated FCM preference writes
 │   │   └── squad.js           # Cached squad endpoint
@@ -412,6 +403,7 @@ fenerbahce-fan-hub/
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.tsx              # Main dashboard (orchestrator, helpers in utils/)
+│   │   ├── AdminPanel.tsx             # Claim-protected lineup operations UI
 │   │   ├── match-lineups/             # Post-match lineup viewer (split module)
 │   │   │   ├── formation-engine.ts    # Pure formation/row-building logic
 │   │   │   ├── MiniPitch.tsx          # SVG pitch visualization
@@ -444,6 +436,7 @@ fenerbahce-fan-hub/
 │   ├── contexts/
 │   │   └── AuthContext.tsx            # Firebase Auth context (Google sign-in)
 │   ├── services/
+│   │   ├── admin.ts                   # Authenticated administration API client
 │   │   ├── api.ts                     # Barrel re-export (preserves import surface)
 │   │   └── api/
 │   │       ├── base.ts               # BACKEND_ORIGIN, BACKEND_URL, ensureAbsolutePhoto
@@ -539,7 +532,17 @@ firebase functions:secrets:set RAPIDAPI_HOST
 firebase functions:secrets:set ADMIN_REFRESH_KEY
 ```
 
-3. **Deploy Functions**
+3. **Grant the One-Time Administrator Claim**
+
+Run this only from a trusted Admin SDK environment with Application Default Credentials. The target must be a verified Google account protected by two-step verification. The application intentionally exposes no endpoint that can grant claims.
+
+```bash
+npm run admin:claim -- FIREBASE_AUTH_UID
+```
+
+The command revokes existing refresh tokens; sign out and back in before opening **Yönetim** from the profile menu. To remove access later, run the same trusted command with `--remove`.
+
+4. **Deploy Functions**
 
 ```bash
 firebase login
@@ -552,7 +555,7 @@ Deploy the versioned Realtime Database rules separately after reviewing them:
 firebase deploy --only database
 ```
 
-4. **Initialize Cache**
+5. **Initialize Cache**
    ```bash
    curl -H "x-admin-key: YOUR_ADMIN_REFRESH_KEY" https://us-central1-YOUR-PROJECT.cloudfunctions.net/api/refresh
    ```
@@ -565,9 +568,9 @@ firebase deploy --only database
 |----------|----------|-------------|
 | `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
 | `checkMatchNotifications` | Every minute | Reads `cache/next3Matches` first (no external API call) and scans user preferences only inside a due reminder window before sending through FCM. |
-| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches across Süper Lig and all UEFA club competitions during the match window. Keeps the final live payload for five minutes, archives it durably to `cache/lastFinishedMatch`, and stores the fixture summary. |
+| `updateLiveMatch` | Every minute | Uses the existing live task for verified ESPN lineup discovery from T-90 (three-minute cadence until T-30, then every minute) and full live tracking in Süper Lig and supported UEFA competitions. Keeps the final live payload for five minutes, archives it durably, and stores the fixture summary. |
 | `reconcileTopicSync` | Every 5 minutes | Uses indexed RTDB queries to retry only pending `all_fans` intents or deferred old-token cleanups. |
-| `onStartingXIPushRequested` | RTDB trigger | Fires when `admin/startingXI/push/requested` transitions to `true`. Validates payload, dedupes by `publishedAt`, sends one-shot push to `all_fans`. |
+| `onStartingXIPushRequested` | RTDB trigger | Legacy compatibility path for the previous Firebase Console workflow. New Starting XI publication and push delivery use the claim-protected admin API. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
@@ -582,7 +585,7 @@ firebase deploy --only database
 
 ### Live Match System
 - **Flow**: ESPN → `updateLiveMatch` (1/min) → DB `cache/liveMatch` + `cache/lastFinishedMatch` → Users read from DB
-- **Match Window**: Starts 30min before kickoff, ends 3 hours after
+- **Match Window**: Verified lineup checks start 90 minutes before kickoff; full live polling starts 30 minutes before kickoff and ends 3 hours after
 - **Frontend State Flow**: Countdown → Checking → Live/Post (no misleading pre fallback after kickoff)
 - **Leagues**: Süper Lig plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
 - **Match Identity Guard**: Live/final cache is shown only when its home team, away team, and available kickoff time match the dashboard's current fixture
@@ -590,12 +593,12 @@ firebase deploy --only database
 - **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` until the next scheduled fixture changes the dashboard identity
 
 ### How to Use Starting XI
-1. Refresh the cache if kickoff time or opponent data changed (`/api/refresh` with `ADMIN_REFRESH_KEY`)
-2. Open Firebase Realtime Database and write the lineup to `admin/startingXI`
-3. Verify the dashboard shows the "İlk 11 Açıklandı!" banner and that the modal renders the expected starters/bench
-4. To send a push notification, set `admin/startingXI/push/requested` to `true`. The trigger validates the payload (11 valid starters, valid `publishedAt`), sends a one-shot data-only push to `all_fans`, and resets `requested` to `false`. Check `push/lastError` if the push did not go through
-5. During the match, use the dashboard/live modal for the real-time view; after the match, use the fixture summary modal for the stored recap
-6. When the lineup is no longer relevant, overwrite `admin/startingXI` for the next match or delete/set it to `null` to hide the banner again
+1. Sign in with the verified Google account carrying the server-issued `admin` claim, then open **Yönetim** from the profile menu
+2. Keep both automation switches off for the first real match and confirm that ESPN detection reaches `ready` with the correct teams and formation preview
+3. Publish the detected lineup manually after review, or build exactly 11 Fenerbahçe players in the shared editor when ESPN is incomplete or the competition uses the manual fallback
+4. A manual Fenerbahçe publication creates a lock while retaining any detected opponent lineup; **ESPN'e geri dön** releases that lock
+5. After one verified match, enable automatic publishing. Enable automatic Starting XI push only after a later verified match confirms publication behavior
+6. Published lineup data is never written by a browser directly. Cloud Functions writes the public cache, while private detection, draft, lock, settings, and audit data remain under `ops`
 
 ### Fixture System
 - **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints + cached SofaScore `cup-fixtures` supplement
@@ -660,4 +663,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.12.3** | August 2026
+**v2.13.0** | August 2026

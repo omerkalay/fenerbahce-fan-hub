@@ -41,4 +41,9 @@ describe('ESPN competitions', () => {
         const idOnlyMatch = { tournament: { uniqueTournament: { id: 96, name: 'Domestic Cup' } } };
         expect(getEspnLeaguesForMatch(idOnlyMatch)).toEqual([]);
     });
+
+    it('uses the manual fallback for an unsupported tournament', () => {
+        const match = { tournament: { name: 'Friendly Match' } };
+        expect(getEspnLeaguesForMatch(match)).toEqual([]);
+    });
 });

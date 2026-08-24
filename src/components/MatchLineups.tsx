@@ -37,7 +37,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
     const localizedAwayName = localizeTeamName(awayName);
     const homeIsFb = isFenerbahce(homeName);
     const awayIsFb = isFenerbahce(awayName);
-    const defaultTab: 'home' | 'away' = homeIsFb ? 'home' : 'away';
+    const defaultTab: 'home' | 'away' = homeIsFb ? 'home' : awayIsFb ? 'away' : 'home';
     const [activeTab, setActiveTab] = useState<'home' | 'away'>(defaultTab);
     const [photoMaps, setPhotoMaps] = useState<SquadPhotoMaps>(EMPTY_PHOTO_MAPS);
     const hasPhotoMaps = Object.keys(photoMaps.byJersey).length > 0 || Object.keys(photoMaps.byName).length > 0 || Object.keys(photoMaps.byAlias).length > 0;
@@ -64,7 +64,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
         };
     }, [awayIsFb, hasPhotoMaps, homeIsFb, useSquadPhotos]);
 
-    const tabs: { key: 'home' | 'away'; label: string }[] = homeIsFb
+    const orderedTabs: { key: 'home' | 'away'; label: string }[] = homeIsFb
         ? [
             { key: 'home', label: localizedHomeName },
             { key: 'away', label: localizedAwayName }
@@ -78,16 +78,19 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
                 { key: 'home', label: localizedHomeName },
                 { key: 'away', label: localizedAwayName }
             ];
+    const tabs = orderedTabs.filter((tab) => tab.key === 'home' ? Boolean(lineups.home) : Boolean(lineups.away));
 
     const activeLineup = activeTab === 'home' ? lineups.home : lineups.away;
-    if (!activeLineup) return null;
+    const resolvedTab = activeLineup ? activeTab : tabs[0]?.key;
+    const resolvedLineup = resolvedTab === 'home' ? lineups.home : lineups.away;
+    if (!resolvedTab || !resolvedLineup) return null;
 
-    const activeTeamName = activeTab === 'home' ? homeName : awayName;
+    const activeTeamName = resolvedTab === 'home' ? homeName : awayName;
     const activeTeamIsFb = isFenerbahce(activeTeamName);
     const subOutByPlayer = new Map<string, string>();
     const subInByPlayer = new Map<string, string>();
 
-    activeLineup.substitutions.forEach((sub) => {
+    resolvedLineup.substitutions.forEach((sub) => {
         const formattedMinute = formatSoccerMinute(sub.minute);
         if (sub.playerOut) subOutByPlayer.set(normalizeLookupKey(sub.playerOut), formattedMinute);
         if (sub.playerIn) subInByPlayer.set(normalizeLookupKey(sub.playerIn), formattedMinute);
@@ -103,7 +106,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
-                            activeTab === tab.key
+                            resolvedTab === tab.key
                                 ? 'bg-yellow-400 text-black shadow-sm'
                                 : 'text-slate-400 hover:text-white'
                         }`}
@@ -114,14 +117,14 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
             </div>
 
             <MiniPitch
-                lineup={activeLineup}
+                lineup={resolvedLineup}
                 isFenerbahceTeam={activeTeamIsFb && useSquadPhotos}
                 photoMaps={photoMaps}
                 subOutByPlayer={subOutByPlayer}
             />
 
-            <BenchList bench={activeLineup.bench} subInByPlayer={subInByPlayer} />
-            <SubstitutionList substitutions={activeLineup.substitutions} />
+            <BenchList bench={resolvedLineup.bench} subInByPlayer={subInByPlayer} />
+            <SubstitutionList substitutions={resolvedLineup.substitutions} />
         </div>
     );
 }

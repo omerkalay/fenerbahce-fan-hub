@@ -48,7 +48,7 @@ const getEspnLeaguesForMatch = (match) => {
         return ['tur.1'];
     }
 
-    return ESPN_LEAGUES;
+    return [];
 };
 
 module.exports = { ESPN_COMPETITIONS, ESPN_LEAGUES, getEspnLeaguesForMatch };

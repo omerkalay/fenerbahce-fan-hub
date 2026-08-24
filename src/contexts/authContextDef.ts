@@ -6,6 +6,8 @@ type SignInOutcome = 'success' | 'redirect' | 'cancelled';
 export interface AuthContextType {
     user: User | null;
     loading: boolean;
+    adminLoading: boolean;
+    isAdmin: boolean;
     signInWithGoogle: () => Promise<SignInOutcome>;
     signOut: () => Promise<void>;
 }
@@ -13,6 +15,8 @@ export interface AuthContextType {
 export const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
+    adminLoading: true,
+    isAdmin: false,
     signInWithGoogle: async () => 'cancelled',
     signOut: async () => {}
 });

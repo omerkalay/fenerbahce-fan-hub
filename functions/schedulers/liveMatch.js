@@ -5,11 +5,12 @@ const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, bu
 const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 const { isSameMatch } = require('../utils/matchIdentity');
 const { buildFinalMatchCachePlan, shouldStopFinalPolling } = require('../utils/finalMatchCache');
+const { shouldPollLineups } = require('../utils/lineupAutomation');
+const { observeEspnLineups, mergePublishedWithLiveLineups } = require('../services/lineupPublishing');
 
 /**
- * Update Live Match - Her dakika çalışır
- * Maç günü ESPN'den canlı veri çeker, cache/liveMatch'e yazar
- * Maç yoksa veya bitmişse cache'i temizler
+ * Runs every minute. Lineup discovery starts 90 minutes before kickoff,
+ * while full live-match polling continues in the final 30 minutes.
  */
 const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
     try {
@@ -23,18 +24,23 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         const matchTime = nextMatch.startTimestamp * 1000;
         const now = Date.now();
 
-        // Maç saatine 30dk'dan fazla varsa çalışma
+        const ninetyMinBefore = matchTime - (90 * 60 * 1000);
         const thirtyMinBefore = matchTime - (30 * 60 * 1000);
-        // Maç başlangıcından 3 saat sonrasına kadar kontrol et (uzatmalar dahil)
+        const lineupOnly = now < thirtyMinBefore;
+        // Keep polling through a possible extra-time window.
         const threeHoursAfter = matchTime + (3 * 60 * 60 * 1000);
 
-        if (now < thirtyMinBefore || now > threeHoursAfter) {
-            // Maç penceresi dışında — liveMatch varsa temizle
+        if (now < ninetyMinBefore || now > threeHoursAfter) {
+            // Remove only the transient live payload outside the match window.
             const liveSnapshot = await db.ref('cache/liveMatch').once('value');
             if (liveSnapshot.val()) {
                 await db.ref('cache/liveMatch').remove();
                 console.log('🗑️ Live match cache cleaned (outside match window)');
             }
+            return;
+        }
+
+        if (lineupOnly && !shouldPollLineups({ matchTime, now })) {
             return;
         }
 
@@ -60,21 +66,31 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             }
         }
 
-        console.log('⚽ Checking live match from ESPN...');
+        console.log('⚽ Checking ESPN match and lineup data...');
+        await db.ref('ops/health/liveMatchScheduler').update({
+            lastRunAt: now,
+            status: 'running',
+            matchId: String(nextMatch.id || '')
+        });
 
-        // 2. ESPN'den Fenerbahçe maçını ara (Süper Lig + UEFA kulvarları)
-        const nowDate = new Date();
+        // Find the corresponding Fenerbahçe event across supported ESPN competitions.
         const formatEspnDate = (date) => date.toISOString().split('T')[0].replace(/-/g, '');
-        const dateCandidates = [
-            formatEspnDate(nowDate),
-            formatEspnDate(new Date(nowDate.getTime() - 24 * 60 * 60 * 1000))
-        ];
+        const dateCandidates = Array.from(new Set([-1, 0, 1].map((dayOffset) => (
+            formatEspnDate(new Date(matchTime + dayOffset * 24 * 60 * 60 * 1000))
+        ))));
         const leagues = getEspnLeaguesForMatch(nextMatch);
         if (leagues.length === 0) {
             const liveSnapshot = await db.ref('cache/liveMatch').once('value');
             if (liveSnapshot.val()) {
                 await db.ref('cache/liveMatch').remove();
             }
+            await db.ref('ops/health/liveMatchScheduler').update({
+                lastRunAt: now,
+                completedAt: Date.now(),
+                status: 'manual-fallback',
+                matchId: String(nextMatch.id || ''),
+                lineupsAvailable: false
+            });
             console.log('ℹ️ ESPN live lookup skipped for unsupported competition');
             return;
         }
@@ -92,10 +108,17 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
                     const data = await response.json();
                     const match = data.events?.find(event => {
                         const competitors = event.competitions?.[0]?.competitors || [];
-                        return competitors.some(team =>
-                            team.team.displayName.toLowerCase().includes('fenerbahce') ||
-                            team.team.displayName.toLowerCase().includes('fenerbahçe')
-                        );
+                        const candidateHome = competitors.find((team) => team.homeAway === 'home');
+                        const candidateAway = competitors.find((team) => team.homeAway === 'away');
+                        const candidateStartTime = new Date(event.date || event.competitions?.[0]?.date).getTime();
+                        const candidate = {
+                            startTimestamp: candidateStartTime,
+                            homeTeam: { name: candidateHome?.team?.displayName },
+                            awayTeam: { name: candidateAway?.team?.displayName }
+                        };
+                        return Number.isFinite(candidateStartTime)
+                            && Math.abs(candidateStartTime - matchTime) <= 3 * 60 * 60 * 1000
+                            && isSameMatch(candidate, nextMatch);
                     });
 
                     if (match) {
@@ -110,14 +133,21 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         }
 
         if (!fenerbahceMatch) {
-            // Maç bulunamadığında liveMatch'i temizle; handleLiveMatch lastFinishedMatch'e düşsün.
-            // Böylece biten maç sonrası kart "pre" ile ezilmez.
+            // Clear only transient live data when the scheduled SofaScore match cannot be verified on ESPN.
+            // The durable final-match archive remains available to the client.
             await db.ref('cache/liveMatch').remove();
-            console.log('ℹ️ No Fenerbahçe match found on ESPN today, liveMatch cache cleared');
+            await db.ref('ops/health/liveMatchScheduler').update({
+                lastRunAt: now,
+                completedAt: Date.now(),
+                status: 'not-found',
+                matchId: String(nextMatch.id || ''),
+                lineupsAvailable: false
+            });
+            console.log('ℹ️ The scheduled match was not verified on ESPN; transient live cache cleared');
             return;
         }
 
-        // 3. Maç durumunu belirle
+        // Resolve the event state and teams.
         const matchState = fenerbahceMatch.status?.type?.state; // 'pre' | 'in' | 'post'
         const competition = fenerbahceMatch.competitions?.[0];
         const homeTeam = competition?.competitors?.find(c => c.homeAway === 'home');
@@ -203,6 +233,50 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             console.warn(`⚠️ ESPN summary keyEvents unavailable for ${fenerbahceMatch.id}:`, summaryError.message);
         }
 
+        let lineupObservation = null;
+        if (summaryLineups) {
+            try {
+                lineupObservation = await observeEspnLineups({
+                    scheduledMatch: nextMatch,
+                    espnEventId: fenerbahceMatch.id,
+                    league: matchLeague,
+                    matchState,
+                    lineups: summaryLineups,
+                    homeTeam: {
+                        id: homeTeam?.team?.id,
+                        name: homeTeam?.team?.displayName,
+                        logo: homeTeam?.team?.logo
+                    },
+                    awayTeam: {
+                        id: awayTeam?.team?.id,
+                        name: awayTeam?.team?.displayName,
+                        logo: awayTeam?.team?.logo
+                    },
+                    now
+                });
+            } catch (lineupError) {
+                console.error('ESPN lineup observation failed:', lineupError?.code || lineupError?.message || 'unknown');
+            }
+        }
+
+        if (lineupOnly) {
+            await db.ref('ops/health/liveMatchScheduler').update({
+                lastRunAt: now,
+                completedAt: Date.now(),
+                status: 'ok',
+                mode: 'lineup-discovery',
+                matchId: String(nextMatch.id || ''),
+                espnEventId: String(fenerbahceMatch.id || ''),
+                lineupsAvailable: Boolean(summaryLineups),
+                detectionStatus: lineupObservation?.status || 'incomplete'
+            });
+            return;
+        }
+
+        const publishedLineupSnapshot = await db.ref(`cache/matchLineups/${String(nextMatch.id)}`).once('value');
+        const publishedLineup = publishedLineupSnapshot.val();
+        const effectiveLineups = mergePublishedWithLiveLineups(publishedLineup?.lineups, summaryLineups);
+
         const scoreboardEvents = rawDetails.map(buildScoreboardEvent);
         const summarySubstitutionEvents = summaryKeyEvents
             .filter((item) => item?.type?.type === 'substitution')
@@ -277,7 +351,7 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         upsertStat('yellowCards', countCards(homeTeamId, 'yellow'), countCards(awayTeamId, 'yellow'));
         upsertStat('redCards', countCards(homeTeamId, 'red'), countCards(awayTeamId, 'red'));
 
-        // Temel veriyi hazırla
+        // Build the shared live payload.
         const liveData = {
             matchState: matchState,
             matchId: fenerbahceMatch.id,
@@ -300,11 +374,11 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             },
             events,
             stats,
-            lineups: summaryLineups || null,
+            lineups: effectiveLineups,
             lastUpdated: now
         };
 
-        // 4. Cache'e yaz
+        // Persist transient live data and durable final-match data.
         if (matchState === 'post') {
             const finalPlan = buildFinalMatchCachePlan({
                 liveData,
@@ -329,10 +403,23 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         } else {
             await db.ref('cache/liveMatch').set(liveData);
         }
+        await db.ref('ops/health/liveMatchScheduler').update({
+            lastRunAt: now,
+            completedAt: Date.now(),
+            status: 'ok',
+            matchId: String(nextMatch.id || ''),
+            espnEventId: String(fenerbahceMatch.id || ''),
+            lineupsAvailable: Boolean(effectiveLineups)
+        });
         console.log(`✅ Live match updated: ${liveData.homeTeam.name} ${liveData.homeTeam.score} - ${liveData.awayTeam.score} ${liveData.awayTeam.name} [${matchState}]`);
 
     } catch (error) {
         console.error('❌ Live match update failed:', error);
+        await db.ref('ops/health/liveMatchScheduler').update({
+            lastRunAt: Date.now(),
+            status: 'error',
+            errorCode: error?.code || 'live-match/unknown'
+        }).catch(() => {});
     }
 });
 

@@ -27,11 +27,33 @@ async function requireAuthenticatedUid(req, res) {
     }
 }
 
+async function requireAdminClaims(req, res) {
+    const idToken = getBearerToken(req);
+    if (!idToken) {
+        res.status(401).json({ error: 'Missing bearer token' });
+        return null;
+    }
+
+    try {
+        const decoded = await admin.auth().verifyIdToken(idToken, true);
+        if (decoded.admin !== true) {
+            res.status(403).json({ error: 'Administrator access required' });
+            return null;
+        }
+        return decoded;
+    } catch (error) {
+        console.error('Admin authentication failed:', error?.code || 'unknown');
+        res.status(401).json({ error: 'Invalid or revoked auth token' });
+        return null;
+    }
+}
+
 const RATE_LIMIT_CONFIGS = {
     default: { windowMs: 60 * 1000, max: 120 },
     expensive: { windowMs: 60 * 1000, max: 20 },
     asset: { windowMs: 60 * 1000, max: 240 },
     write: { windowMs: 15 * 60 * 1000, max: 25 },
+    admin: { windowMs: 15 * 60 * 1000, max: 60 },
     health: { windowMs: 60 * 1000, max: 10 }
 };
 const rateLimitBuckets = new Map();
@@ -131,6 +153,10 @@ const resolveRateLimitProfile = (endpoint, method) => {
         return 'health';
     }
 
+    if (endpoint === 'admin') {
+        return 'admin';
+    }
+
     if (
         method === 'POST' && (
             endpoint === 'reminder' ||
@@ -162,4 +188,11 @@ const buildApiBaseUrl = (req) => {
     return origin ? `${origin}/api` : 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
 };
 
-module.exports = { getBearerToken, requireAuthenticatedUid, enforceRateLimit, resolveRateLimitProfile, buildApiBaseUrl };
+module.exports = {
+    getBearerToken,
+    requireAuthenticatedUid,
+    requireAdminClaims,
+    enforceRateLimit,
+    resolveRateLimitProfile,
+    buildApiBaseUrl
+};

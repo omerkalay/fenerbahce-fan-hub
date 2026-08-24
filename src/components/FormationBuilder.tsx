@@ -5,9 +5,15 @@ import { PITCH_SVG, formations, getPositionFamily } from '../data/formations';
 import PlayerSelectionModal from './PlayerSelectionModal';
 import PlayerImage from './PlayerImage';
 import PlayerPool from './PlayerPool';
-import type { Player, FormationName, PitchPlayers, PositionCoord } from '../types';
+import type { Player, FormationDraft, FormationName, PitchPlayers, PositionCoord } from '../types';
 
-const FormationBuilder = () => {
+interface FormationBuilderProps {
+    adminMode?: boolean;
+    initialDraft?: FormationDraft | null;
+    onDraftChange?: (draft: FormationDraft) => void;
+}
+
+const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChange }: FormationBuilderProps) => {
     const [squad, setSquad] = useState<Player[]>([]);
     const [pitchPlayers, setPitchPlayers] = useState<PitchPlayers>({});
     const [formation, setFormation] = useState<FormationName>('4-2-3-1');
@@ -17,6 +23,7 @@ const FormationBuilder = () => {
     const [isExporting, setIsExporting] = useState<boolean>(false);
     const [isTouchDevice, setIsTouchDevice] = useState<boolean>(false);
     const pitchRef = useRef<HTMLDivElement>(null);
+    const appliedDraftRef = useRef<string>('');
 
     useEffect(() => {
         const loadSquad = async () => {
@@ -156,6 +163,40 @@ const FormationBuilder = () => {
     const filledSpots = Object.keys(activePitchPlayers).length;
     const totalSpots = Object.keys(currentPositions).length;
 
+    useEffect(() => {
+        if (!initialDraft || squad.length === 0) return;
+        const draftKey = JSON.stringify(initialDraft);
+        if (appliedDraftRef.current === draftKey) return;
+
+        const restored: PitchPlayers = {};
+        initialDraft.players.forEach((draftPlayer) => {
+            const player = squad.find((candidate) => candidate.id === draftPlayer.id)
+                || squad.find((candidate) => candidate.name === draftPlayer.name);
+            if (player && formations[initialDraft.formation]?.[draftPlayer.slot]) {
+                restored[draftPlayer.slot] = player;
+            }
+        });
+        setFormation(initialDraft.formation);
+        setPitchPlayers(restored);
+        appliedDraftRef.current = draftKey;
+    }, [initialDraft, squad]);
+
+    useEffect(() => {
+        if (!onDraftChange) return;
+        onDraftChange({
+            formation,
+            players: Object.entries(pitchPlayers)
+                .filter(([slot]) => Object.prototype.hasOwnProperty.call(currentPositions, slot))
+                .map(([slot, player]) => ({
+                slot,
+                id: player.id,
+                name: player.name,
+                position: player.position,
+                number: Number(player.number || 0)
+            }))
+        });
+    }, [currentPositions, formation, onDraftChange, pitchPlayers]);
+
     const generateLineupImage = async () => {
         const date = new Date().toISOString().split('T')[0];
         const dataUrl = await toPng(pitchRef.current!, {
@@ -180,7 +221,7 @@ const FormationBuilder = () => {
             link.href = dataUrl;
             link.click();
         } catch (error) {
-            console.error('Kadro kartı indirilirken hata oluştu:', error);
+            console.error('Lineup card download failed:', error);
             window.alert(`Kart indirilirken bir hata oluştu: ${(error as Error).message}`);
         } finally {
             setIsExporting(false);
@@ -201,12 +242,12 @@ const FormationBuilder = () => {
                     files: [file]
                 });
             } else {
-                // Fallback: indirme yap
+                // Fall back to downloading when native file sharing is unavailable.
                 downloadLineupCard();
             }
         } catch (error) {
             if ((error as Error).name !== 'AbortError') {
-                console.error('Paylaşım hatası:', error);
+                console.error('Lineup card sharing failed:', error);
             }
         } finally {
             setIsExporting(false);
@@ -239,7 +280,7 @@ const FormationBuilder = () => {
                     </button>
                 </div>
 
-                <div className="glass-panel rounded-xl p-4 flex flex-col gap-3 border border-white/5">
+                {!adminMode && <div className="glass-panel rounded-xl p-4 flex flex-col gap-3 border border-white/5">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div>
                             <p className="text-sm font-semibold text-white">Kadro Paylaş</p>
@@ -276,7 +317,13 @@ const FormationBuilder = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>}
+                {adminMode && (
+                    <div className="glass-panel rounded-xl p-3 border border-yellow-400/15">
+                        <p className="text-sm font-semibold text-white">Manuel Fenerbahçe kadrosu</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Taslak durum: {filledSpots}/{totalSpots} oyuncu</p>
+                    </div>
+                )}
             </div>
 
             {/* Pitch Container */}

@@ -1,103 +1,44 @@
-import { useState, useEffect } from 'react';
-import type { StartingXIData } from '../types';
-import { fetchSquad } from '../services/api';
-import { buildSquadPhotoMaps, findPlayerPhoto, type SquadPhotoMaps } from '../utils/squadPhotoLookup';
-import PlayerImage from './PlayerImage';
+import MatchLineups from './MatchLineups';
+import type { PublishedMatchLineups } from '../types';
 
 interface StartingXIModalProps {
     visible: boolean;
-    data: StartingXIData;
+    data: PublishedMatchLineups;
     onClose: () => void;
 }
 
-const StartingXIModal: React.FC<StartingXIModalProps> = ({ visible, data, onClose }) => {
-    const [photoMaps, setPhotoMaps] = useState<SquadPhotoMaps | null>(null);
-
-    useEffect(() => {
-        if (!visible || photoMaps) return;
-        fetchSquad().then((s) => {
-            setPhotoMaps(buildSquadPhotoMaps(s));
-        });
-    }, [visible, photoMaps]);
-
+const StartingXIModal = ({ visible, data, onClose }: StartingXIModalProps) => {
     if (!visible) return null;
 
     return (
         <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm animate-fadeIn"
             onClick={onClose}
         >
             <div
-                className="relative w-full max-w-md max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20 animate-slideUp"
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                className="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-yellow-400/20 bg-slate-950 animate-slideUp"
+                onClick={(event) => event.stopPropagation()}
             >
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                    <p className="text-base font-bold text-white">İlk 11 Açıklandı!</p>
-                    <button
-                        onClick={onClose}
-                        className="p-1 text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
-                        aria-label="Kapat"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center justify-between border-b border-white/10 p-4">
+                    <div>
+                        <p className="text-base font-black text-white">İlk 11’ler Açıklandı</p>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                            Kaynak: {data.sources?.home === 'manual' || data.sources?.away === 'manual' ? 'Yönetim paneli / ESPN' : 'ESPN'}
+                        </p>
+                    </div>
+                    <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Kapat">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
-
-                <div className="w-full overflow-y-auto max-h-[calc(88vh-60px)] p-4">
-                    <div className="space-y-0">
-                        {data.starters.map((player, idx) => {
-                            const photo = photoMaps ? findPlayerPhoto(player.name, player.number, photoMaps) : null;
-                            return (
-                            <div key={`s-${idx}`} className="flex items-center gap-3 py-2.5 border-b border-white/5 last:border-0">
-                                <div className="w-8 h-8 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                                    <PlayerImage
-                                        src={photo}
-                                        alt={player.name}
-                                        className="w-full h-full object-cover"
-                                        loading="lazy"
-                                        fallback={
-                                        <div className="w-full h-full flex items-center justify-center text-xs font-bold text-slate-500">
-                                            {player.number}
-                                        </div>
-                                        }
-                                    />
-                                </div>
-                                <span className="text-sm font-bold text-yellow-400/80 w-7 text-right">{player.number}</span>
-                                <span className="text-sm text-white font-medium">{player.name}</span>
-                            </div>
-                            );
-                        })}
-                    </div>
-
-                    {data.bench && data.bench.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-white/10">
-                            <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-2">Yedekler</p>
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                                {data.bench.map((player, idx) => {
-                                    const photo = photoMaps ? findPlayerPhoto(player.name, player.number, photoMaps) : null;
-                                    return (
-                                    <div key={`b-${idx}`} className="flex items-center gap-2 py-1">
-                                        <div className="w-6 h-6 rounded-full bg-white/5 overflow-hidden flex-shrink-0">
-                                            <PlayerImage
-                                                src={photo}
-                                                alt={player.name}
-                                                className="w-full h-full object-cover"
-                                                loading="lazy"
-                                                fallback={
-                                                <div className="w-full h-full flex items-center justify-center text-[10px] font-bold text-slate-500">
-                                                    {player.number}
-                                                </div>
-                                                }
-                                            />
-                                        </div>
-                                        <span className="text-xs text-slate-400 truncate">{player.name}</span>
-                                    </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                    <MatchLineups
+                        lineups={data.lineups}
+                        homeTeamName={data.homeTeam.name}
+                        awayTeamName={data.awayTeam.name}
+                        matchId={data.matchId}
+                    />
                 </div>
             </div>
         </div>

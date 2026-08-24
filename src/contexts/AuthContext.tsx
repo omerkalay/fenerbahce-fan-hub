@@ -47,6 +47,8 @@ const hasCrossOriginAuthDomain = (): boolean => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const [adminLoading, setAdminLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     const markRedirectPending = useCallback(() => {
         if (typeof window === 'undefined') return;
@@ -105,6 +107,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
             setUser(firebaseUser ?? null);
+            setAdminLoading(true);
+            if (firebaseUser) {
+                void firebaseUser.getIdTokenResult()
+                    .then((result) => setIsAdmin(result.claims.admin === true))
+                    .catch(() => setIsAdmin(false))
+                    .finally(() => setAdminLoading(false));
+            } else {
+                setIsAdmin(false);
+                setAdminLoading(false);
+            }
             if (firebaseUser) {
                 clearRedirectPending();
             }
@@ -216,6 +228,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const signOut = useCallback(async () => {
         clearRedirectPending();
+        setIsAdmin(false);
         await firebaseSignOut(auth);
     }, [clearRedirectPending]);
 
@@ -223,6 +236,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         <AuthContext.Provider value={{
             user,
             loading,
+            adminLoading,
+            isAdmin,
             signInWithGoogle,
             signOut
         }}>

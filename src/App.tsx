@@ -14,12 +14,14 @@ import { useForegroundMessaging } from './hooks/useForegroundMessaging';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { useTheme } from './contexts/themeContextDef';
 import { resolveTeamCrest } from './theme/teamCrest';
+import AdminPanel from './components/AdminPanel';
 
 type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
 
 function AppContent() {
   const [fontsReady, setFontsReady] = useState(typeof window === 'undefined');
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
   const { theme } = useTheme();
   const isWhiteKit = theme === 'white-kit';
   const headerCrest = resolveTeamCrest({
@@ -124,7 +126,7 @@ function AppContent() {
           </div>
           <div className="flex items-center gap-3">
             <NotificationSettings />
-            <UserAvatar />
+            <UserAvatar onOpenAdmin={() => setShowAdminPanel(true)} />
             <div className="brand-medallion w-10 h-10 rounded-full p-0.5">
               <div className="brand-medallion-inner w-full h-full rounded-full flex items-center justify-center overflow-hidden">
                 <img
@@ -216,6 +218,11 @@ function AppContent() {
             <span className="text-[10px] mt-1 font-medium">Kadro Kur</span>
           </button>
         </nav>
+        <AdminPanel
+          visible={showAdminPanel}
+          matches={[...(matchData ? [matchData] : []), ...next3Matches]}
+          onClose={() => setShowAdminPanel(false)}
+        />
       </div>
     </div>
   );

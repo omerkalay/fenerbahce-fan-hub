@@ -20,13 +20,18 @@ export default function MiniPitch({
     subOutByPlayer
 }: MiniPitchProps) {
     const { rows, confident, renderedFormation } = buildRows(lineup.formation, lineup.starters);
+    const formationLabel = lineup.formationSource === 'inferred'
+        ? `${renderedFormation || 'Diziliş'} · Tahmini`
+        : lineup.formationSource === 'manual'
+            ? `${renderedFormation || 'Diziliş'} · Manuel`
+            : renderedFormation;
 
     return (
         <div className="relative w-full aspect-[68/105] rounded-xl overflow-hidden border border-white/10 bg-[#14532d] shadow-inner shadow-black/25">
             <img src={PITCH_SVG} alt="" className="absolute inset-0 h-full w-full object-cover opacity-95" />
-            {confident && renderedFormation && (
+            {confident && formationLabel && (
                 <span className="absolute top-2 left-1/2 -translate-x-1/2 z-10 rounded-md border border-white/15 bg-slate-950/70 px-2.5 py-0.5 text-[10px] font-bold text-yellow-300 backdrop-blur-sm shadow-sm">
-                    {renderedFormation}
+                    {formationLabel}
                 </span>
             )}
             <div className="absolute inset-0">
