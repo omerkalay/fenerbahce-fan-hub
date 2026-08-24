@@ -160,7 +160,7 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
                         throw new Error('Firebase Messaging başlatılamadı');
                     }
                 } catch (err) {
-                    console.error('Token alınamadı:', err);
+                    console.error('Notification token acquisition failed:', err);
                     alert(`Bildirim hatası: ${(err as Error).message}`);
                     return false;
                 }
@@ -213,7 +213,7 @@ const useNotificationPreferences = (user: User | null): NotificationPreferencesS
             setDraftOptions(null);
             return true;
         } catch (saveError) {
-            console.error('Bildirim kaydetme hatası:', saveError);
+            console.error('Notification preference save failed:', saveError);
             alert('Bağlantı hatası! Lütfen tekrar deneyin.');
             return false;
         } finally {

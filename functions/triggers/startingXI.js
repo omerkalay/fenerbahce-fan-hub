@@ -4,9 +4,9 @@ const { admin, db } = require('../config');
 /**
  * Starting XI Push Trigger
  *
- * admin/startingXI/push/requested false/null -> true geçişinde çalışır.
- * Veriyi validate eder, dedupe kontrol eder, all_fans topic'ine
- * tek seferlik data-only push gönderir.
+ * Runs when admin/startingXI/push/requested changes from false/null to true.
+ * This legacy compatibility trigger validates and deduplicates the payload
+ * before sending a single data-only message to the all_fans topic.
  */
 const onStartingXIPushRequested = onValueWritten(
     { ref: "admin/startingXI/push/requested", instance: "fb-hub-ed9de-default-rtdb", region: "europe-west1" },
@@ -14,7 +14,7 @@ const onStartingXIPushRequested = onValueWritten(
         const before = event.data.before.val();
         const after = event.data.after.val();
 
-        // Sadece false/null -> true geçişinde çalış
+        // Run only on a false/null to true transition.
         if (after !== true || before === true) {
             return;
         }
@@ -22,7 +22,7 @@ const onStartingXIPushRequested = onValueWritten(
         const pushRef = db.ref('admin/startingXI/push');
 
         try {
-            // 1. admin/startingXI node'unu oku
+            // 1. Read the legacy Starting XI node.
             const snapshot = await db.ref('admin/startingXI').once('value');
             const xiData = snapshot.val();
 
@@ -34,7 +34,7 @@ const onStartingXIPushRequested = onValueWritten(
                 return;
             }
 
-            // 2. Validate: publishedAt geçerli number olmalı
+            // 2. Require a valid publishedAt timestamp.
             const { publishedAt, starters } = xiData;
 
             if (typeof publishedAt !== 'number' || !Number.isFinite(publishedAt) || publishedAt <= 0) {
@@ -45,7 +45,7 @@ const onStartingXIPushRequested = onValueWritten(
                 return;
             }
 
-            // 3. Validate: starters normalize edilince tam 11 oyuncu olmalı
+            // 3. Require exactly 11 normalized starters.
             const starterList = normalizeStarters(starters);
 
             if (!starterList || starterList.length !== 11) {
@@ -57,7 +57,7 @@ const onStartingXIPushRequested = onValueWritten(
                 return;
             }
 
-            // 4. Dedupe: sentForPublishedAt === publishedAt ise tekrar gönderme
+            // 4. Deduplicate by publishedAt.
             const pushData = xiData.push || {};
             if (pushData.sentForPublishedAt === publishedAt) {
                 console.log(`Starting XI push already sent for publishedAt=${publishedAt}, skipping.`);
@@ -67,7 +67,7 @@ const onStartingXIPushRequested = onValueWritten(
                 return;
             }
 
-            // 5. all_fans topic'e data-only push gönder
+            // 5. Send a data-only message to the fixed all_fans topic.
             const message = {
                 topic: 'all_fans',
                 data: {
@@ -81,7 +81,7 @@ const onStartingXIPushRequested = onValueWritten(
             await admin.messaging().send(message);
             console.log(`Starting XI push sent to all_fans for publishedAt=${publishedAt}`);
 
-            // 6. Success: state güncelle
+            // 6. Persist the accepted state.
             await pushRef.update({
                 requested: false,
                 sentAt: Date.now(),
@@ -92,7 +92,7 @@ const onStartingXIPushRequested = onValueWritten(
         } catch (error) {
             console.error('Starting XI push failed:', error);
 
-            // 7. Failure: hata kaydet, admin tekrar deneyebilsin
+            // 7. Persist a retryable legacy error state.
             await pushRef.update({
                 requested: false,
                 lastError: error.message || 'unknown error'
@@ -106,8 +106,7 @@ const onStartingXIPushRequested = onValueWritten(
 const VALID_GROUPS = ['GK', 'DEF', 'MID', 'FWD'];
 
 /**
- * Tek bir oyuncuyu validate + normalize et.
- * Frontend Dashboard.tsx normalizeStartingXIPlayer ile uyumlu.
+ * Validate and normalize one legacy player entry.
  */
 function normalizePlayer(value) {
     if (!value || typeof value !== 'object') return null;
@@ -124,9 +123,7 @@ function normalizePlayer(value) {
 }
 
 /**
- * starters alanını normalize et: object veya array olabilir.
- * Her entry normalizePlayer'dan geçer; geçersiz oyuncular düşer.
- * Boş/null ise null döner.
+ * Normalize a legacy starters object or array and drop invalid entries.
  */
 function normalizeStarters(starters) {
     if (!starters) return null;

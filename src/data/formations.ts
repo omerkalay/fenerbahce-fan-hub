@@ -10,7 +10,7 @@ export const getPositionFamily = (positionKey: string): string => {
     return 'other';
 };
 
-// Pozisyonlar saha çizgilerine göre optimize edildi
+// Positions are aligned to the pitch markings.
 export const formations: Formations = {
     '4-3-3': {
         GK: { top: '93%', left: '50%' },

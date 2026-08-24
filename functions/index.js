@@ -1,12 +1,12 @@
 /**
  * Firebase Cloud Functions - Fenerbahçe Fan Hub Backend
  *
- * Modüler yapı:
- *   config.js           - Firebase init, sabitler, yardımcılar
- *   services/espn.js     - ESPN veri çekme ve parse
- *   services/sofascore.js - SofaScore API çağrıları
- *   handlers/api.js      - HTTP endpoint'leri
- *   schedulers/          - Zamanlanmış görevler
+ * Module structure:
+ *   config.js             - Firebase initialization, constants and helpers
+ *   services/espn.js      - ESPN parsing and data access
+ *   services/sofascore.js - SofaScore API access
+ *   handlers/api.js       - HTTP endpoint routing
+ *   schedulers/           - Scheduled tasks
  */
 
 const { api } = require('./handlers/api');

@@ -6,19 +6,29 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.12.2-blue)
+![Version](https://img.shields.io/badge/version-2.12.3-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.12.2
+## What's New in v2.12.3
+
+- **Dependency Maintenance** - Removed the unused local `gh-pages` deployment dependency plus unused direct Functions `dotenv` and `node-fetch` dependencies
+- **Functions Runtime Update** - Upgraded `firebase-functions` within major version 7 and omitted optional Firestore/Storage transports because the backend uses Realtime Database
+- **Release Safety Preserved** - Kept the 06:00 fixture transition, durable previous-match cache, notification scheduler, and PWA delivery behavior unchanged
+- **Upgrade Scope Control** - Left Firebase Admin 14, Vite 8, and other major-version migrations for a separate maintenance cycle
+
+<details>
+<summary>Previous: v2.12.2</summary>
 
 - **Notification Authorization Hardening** - Token rotation now accepts an old FCM token only when it matches the token already stored for the authenticated user, preventing one user from targeting another user's notification record or topic subscription
 - **Due-Window Scheduling** - The minute scheduler always reads the next three cached fixtures first, but scans user preferences only during the 09:00 daily window or an active 3-hour/1-hour/30-minute/15-minute reminder window
 - **Durable Final-Match Continuity** - The transient live payload is removed five minutes after full time while the final score, events, and summary remain available through `cache/lastFinishedMatch` until the next fixture replaces the dashboard context
 - **Indexed Topic Recovery** - FCM topic reconciliation now queries only pending or deferred-cleanup users instead of downloading every notification preference record every five minutes
 - **Versioned Database Security** - Realtime Database rules and owner-isolation tests now live in the repository, with CI blocking deployment unless typecheck, lint, application tests, rules tests, and the production build all pass
+
+</details>
 
 <details>
 <summary>Previous: v2.12.1</summary>
@@ -519,6 +529,8 @@ cd functions
 npm install
 ```
 
+Functions installs omit optional Firestore and Storage transports because this project uses Realtime Database only.
+
 2. **Configure Secrets**
    
 ```bash
@@ -616,12 +628,7 @@ Pushes and pull requests targeting `main` run the CI quality gate. A successful
 push to `main` automatically runs the gated GitHub Pages deployment job;
 feature branches do not deploy the live site.
 
-Manual fallback:
-
-```bash
-npm run build
-npm run deploy
-```
+There is no local `gh-pages` deployment script. Build locally with `npm run build`, then let the reviewed `main` push use the repository's gated deployment workflow.
 
 ### Functions (Firebase)
 
@@ -631,6 +638,8 @@ configuration change:
 ```bash
 firebase deploy --only functions
 ```
+
+For releases that change both layers, deploy the backward-compatible Functions backend first. Push the reviewed frontend only after backend verification; that `main` push starts the GitHub Pages deployment.
 
 ## Contributing
 
@@ -651,4 +660,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.12.2** | August 2026
+**v2.12.3** | August 2026
