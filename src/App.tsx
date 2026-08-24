@@ -121,7 +121,7 @@ function AppContent() {
               Fenerbahçe Hub
             </h1>
             <p className="app-tagline text-xs">
-              {isWhiteKit ? '120. Yıla Özel' : 'Taraftarın Sesi'}
+              {isWhiteKit ? '120. Yıla Özel' : 'Taraftar İçin'}
             </p>
           </div>
           <div className="flex items-center gap-3">
