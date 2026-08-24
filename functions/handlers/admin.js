@@ -16,8 +16,6 @@ async function handleHealth(req, res) {
     const cacheSnapshot = await db.ref('cache/lastUpdate').once('value');
     const lastUpdate = cacheSnapshot.val();
 
-    const notifSnapshot = await db.ref('notifications').once('value');
-    const notifCount = Object.keys(notifSnapshot.val() || {}).length;
     const imageCacheSnapshot = await db.ref('imageCache/meta').once('value');
     const imageCache = imageCacheSnapshot.val() || null;
 
@@ -25,8 +23,7 @@ async function handleHealth(req, res) {
         status: 'ok',
         platform: 'Firebase Cloud Functions',
         lastCacheUpdate: lastUpdate ? new Date(lastUpdate).toISOString() : null,
-        imageCache,
-        subscribedUsers: notifCount
+        imageCache
     });
 }
 

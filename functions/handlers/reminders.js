@@ -5,7 +5,7 @@ const {
     countActiveOptions,
     isDisablingAll,
     hasPathTraversal,
-    shouldCleanupOldToken,
+    resolveTrustedOldToken,
     canCleanupOldTokenNow,
     buildSavedOptions
 } = require('./notificationLogic');
@@ -59,24 +59,11 @@ async function handleReminder(req, res) {
             rootUpdates[`${basePath}/matches`] = null;
         }
 
-        // Legacy migration: token-keyed -> uid-keyed
-        if (fcmToken && authenticatedUid !== fcmToken) {
-            const legacySnapshot = await db.ref(`notifications/${fcmToken}`).once('value');
-            const legacyData = legacySnapshot.val();
-            if (legacyData && typeof legacyData === 'object') {
-                if (legacyData.sentNotifications && !currentData.sentNotifications) {
-                    rootUpdates[`${basePath}/sentNotifications`] = legacyData.sentNotifications;
-                }
-                if (legacyData.lastDailyNotification && !currentData.lastDailyNotification) {
-                    rootUpdates[`${basePath}/lastDailyNotification`] = legacyData.lastDailyNotification;
-                }
-                rootUpdates[`notifications/${fcmToken}`] = null;
-            }
-        }
-
-        if (oldFcmToken && oldFcmToken !== fcmToken && oldFcmToken !== authenticatedUid) {
-            rootUpdates[`notifications/${oldFcmToken}`] = null;
-        }
+        const trustedOldFcmToken = resolveTrustedOldToken({
+            oldFcmToken,
+            fcmToken,
+            storedFcmToken: currentData.fcmToken
+        });
 
         // DB-first: include topic sync pending state in the atomic write
         const topicToken = fcmToken || currentData.fcmToken;
@@ -129,33 +116,32 @@ async function handleReminder(req, res) {
         }
 
         // Old token topic cleanup: defer if current subscribe is pending to avoid coverage gap
-        const hasOldToken = shouldCleanupOldToken({ oldFcmToken, fcmToken, authenticatedUid });
-        if (hasOldToken) {
+        if (trustedOldFcmToken) {
             if (canCleanupOldTokenNow({ topicSyncPending, desiredTopicState })) {
                 // Safe: new token confirmed, or unsubscribing anyway
                 try {
-                    const oldResult = await admin.messaging().unsubscribeFromTopic(oldFcmToken, 'all_fans');
+                    const oldResult = await admin.messaging().unsubscribeFromTopic(trustedOldFcmToken, 'all_fans');
                     if (oldResult.failureCount > 0) {
                         const code = oldResult.errors?.[0]?.error?.code;
                         if (code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered') {
-                            console.info(`Old token expired, cleanup skipped: ${oldFcmToken.slice(0, 10)}...`);
+                            console.info(`Old token expired, cleanup skipped for ${authenticatedUid.slice(0, 8)}...`);
                         } else {
                             console.warn('Old token topic unsubscribe partial failure:', oldResult.errors);
-                            await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                            await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(trustedOldFcmToken);
                         }
                     }
                 } catch (oldTopicErr) {
                     const code = oldTopicErr.code || oldTopicErr.errorInfo?.code;
                     if (code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered') {
-                        console.info(`Old token expired, cleanup skipped: ${oldFcmToken.slice(0, 10)}...`);
+                        console.info(`Old token expired, cleanup skipped for ${authenticatedUid.slice(0, 8)}...`);
                     } else {
                         console.error('Old token topic unsubscribe failed:', oldTopicErr);
-                        await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                        await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(trustedOldFcmToken);
                     }
                 }
             } else {
                 // Defer: reconciler will clean up after current sync succeeds
-                await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(oldFcmToken);
+                await db.ref(`${basePath}/topicSync/allFans/oldTokenToCleanup`).set(trustedOldFcmToken);
             }
         }
 

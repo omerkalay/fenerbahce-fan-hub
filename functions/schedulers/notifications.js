@@ -1,5 +1,6 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { admin, db, ISTANBUL_TIMEZONE, formatDateKey } = require('../config');
+const { admin, db, ISTANBUL_TIMEZONE } = require('../config');
+const { buildNotificationSchedule } = require('../utils/notificationSchedule');
 
 /**
  * Check Match Notifications - Her dakika çalışır
@@ -9,6 +10,7 @@ const checkMatchNotifications = onSchedule(
     { schedule: "every 1 minutes", maxInstances: 1 },
     async (_event) => {
     try {
+        const runStartedAt = Date.now();
         const matchesSnapshot = await db.ref('cache/next3Matches').once('value');
         const nextMatches = matchesSnapshot.val();
 
@@ -16,32 +18,30 @@ const checkMatchNotifications = onSchedule(
             return;
         }
 
-        const notifSnapshot = await db.ref('notifications').once('value');
-        const allNotifications = notifSnapshot.val() || {};
-
-        if (Object.keys(allNotifications).length === 0) {
+        const now = Date.now();
+        const schedule = buildNotificationSchedule(nextMatches, now, ISTANBUL_TIMEZONE);
+        if (!schedule.shouldReadNotifications) {
             return;
         }
 
-        const MATCH_CONFIG = {
-            threeHours: { offsetMs: 3 * 60 * 60 * 1000, timeText: '3 saat kaldı' },
-            oneHour: { offsetMs: 1 * 60 * 60 * 1000, timeText: '1 saat kaldı' },
-            thirtyMinutes: { offsetMs: 30 * 60 * 1000, timeText: '30 dakika kaldı' },
-            fifteenMinutes: { offsetMs: 15 * 60 * 1000, timeText: '15 dakika kaldı' }
-        };
+        const notifSnapshot = await db.ref('notifications').once('value');
+        const allNotifications = notifSnapshot.val() || {};
 
-        const now = Date.now();
+        const userCount = Object.keys(allNotifications).length;
+        if (userCount === 0) {
+            return;
+        }
+
+        const maxDelayMs = schedule.matchWindows.reduce(
+            (maximum, window) => Math.max(maximum, window.delayMs),
+            0
+        );
+        console.log(
+            `[notifications] due daily=${Boolean(schedule.dailyMatch)} matchWindows=${schedule.matchWindows.length} ` +
+            `users=${userCount} maxDelayMs=${maxDelayMs}`
+        );
+
         const pendingNotificationsMap = new Map();
-
-        const istanbulParts = new Intl.DateTimeFormat('en-US', {
-            timeZone: ISTANBUL_TIMEZONE,
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: false
-        }).formatToParts(new Date(now));
-        const istanbulHour = parseInt(istanbulParts.find(p => p.type === 'hour').value);
-        const istanbulMinute = parseInt(istanbulParts.find(p => p.type === 'minute').value);
-        const isDailyCheckTime = istanbulHour === 9 && istanbulMinute <= 4;
 
         const toSentArray = (val) => {
             if (Array.isArray(val)) return val;
@@ -83,37 +83,33 @@ const checkMatchNotifications = onSchedule(
                 continue;
             }
 
-            if (playerData.dailyCheck && isDailyCheckTime) {
-                const todayStr = formatDateKey(now);
-                const nextMatch = nextMatches[0];
+            if (playerData.dailyCheck && schedule.dailyMatch) {
+                const todayStr = schedule.todayKey;
+                const nextMatch = schedule.dailyMatch;
                 const matchDate = new Date(nextMatch.startTimestamp * 1000);
-                const matchDayStr = formatDateKey(matchDate.getTime());
+                const lastDaily = playerData.lastDailyNotification;
+                if (!lastDaily || lastDaily !== todayStr) {
+                    const timeString = matchDate.toLocaleTimeString('tr-TR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: ISTANBUL_TIMEZONE
+                    });
 
-                if (matchDayStr === todayStr) {
-                    const lastDaily = playerData.lastDailyNotification;
-                    if (!lastDaily || lastDaily !== todayStr) {
-                        const timeString = matchDate.toLocaleTimeString('tr-TR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: ISTANBUL_TIMEZONE
-                        });
-
-                        queueNotification(`daily:${token}:${todayStr}`, {
-                            userId,
+                    queueNotification(`daily:${token}:${todayStr}`, {
+                        userId,
+                        token,
+                        message: {
                             token,
-                            message: {
-                                token,
-                                data: {
-                                    title: '📅 Bugün Maç Var!',
-                                    body: `💛💙 ${nextMatch.homeTeam.name} - ${nextMatch.awayTeam.name} | ${timeString}`,
-                                    url: 'https://omerkalay.com/fenerbahce-fan-hub/'
-                                }
-                            },
-                            successUpdates: {
-                                [`notifications/${userId}/lastDailyNotification`]: todayStr
+                            data: {
+                                title: '📅 Bugün Maç Var!',
+                                body: `💛💙 ${nextMatch.homeTeam.name} - ${nextMatch.awayTeam.name} | ${timeString}`,
+                                url: 'https://omerkalay.com/fenerbahce-fan-hub/'
                             }
-                        });
-                    }
+                        },
+                        successUpdates: {
+                            [`notifications/${userId}/lastDailyNotification`]: todayStr
+                        }
+                    });
                 }
             }
 
@@ -122,45 +118,36 @@ const checkMatchNotifications = onSchedule(
             const defaultOpts = playerData.defaultOptions;
             const sentNotificationsMap = playerData.sentNotifications || {};
 
-            for (const match of nextMatches) {
-                const matchId = String(match.id);
-                const matchTime = match.startTimestamp * 1000;
+            for (const window of schedule.matchWindows) {
+                const { match, matchId, matchTime, optionKey, timeText } = window;
                 const sentForMatch = toSentArray(sentNotificationsMap[matchId]);
+                if (!defaultOpts[optionKey]) continue;
+                if (sentForMatch.includes(optionKey)) continue;
 
-                for (const [optionKey, config] of Object.entries(MATCH_CONFIG)) {
-                    if (!defaultOpts[optionKey]) continue;
-                    if (sentForMatch.includes(optionKey)) continue;
+                const timeString = new Date(matchTime).toLocaleTimeString('tr-TR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: ISTANBUL_TIMEZONE
+                });
 
-                    const triggerTime = matchTime - config.offsetMs;
-                    const triggerWindowEnd = triggerTime + (5 * 60 * 1000);
-
-                    if (now >= triggerTime && now < triggerWindowEnd) {
-                        const timeString = new Date(matchTime).toLocaleTimeString('tr-TR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: ISTANBUL_TIMEZONE
-                        });
-
-                        const sentPath = `notifications/${userId}/sentNotifications/${matchId}`;
-                        queueNotification(`${matchId}:${optionKey}:${token}`, {
-                            userId,
-                            token,
-                            message: {
-                                token,
-                                data: {
-                                    title: `💛💙 ${match.homeTeam.name} - ${match.awayTeam.name}`,
-                                    body: `${timeString} · ${config.timeText}`,
-                                    matchId: matchId,
-                                    type: optionKey,
-                                    url: 'https://omerkalay.com/fenerbahce-fan-hub/'
-                                }
-                            },
-                            sentPath,
-                            optionKey,
-                            baseSentList: sentForMatch
-                        });
-                    }
-                }
+                const sentPath = `notifications/${userId}/sentNotifications/${matchId}`;
+                queueNotification(`${matchId}:${optionKey}:${token}`, {
+                    userId,
+                    token,
+                    message: {
+                        token,
+                        data: {
+                            title: `💛💙 ${match.homeTeam.name} - ${match.awayTeam.name}`,
+                            body: `${timeString} · ${timeText}`,
+                            matchId: matchId,
+                            type: optionKey,
+                            url: 'https://omerkalay.com/fenerbahce-fan-hub/'
+                        }
+                    },
+                    sentPath,
+                    optionKey,
+                    baseSentList: sentForMatch
+                });
             }
         }
 
@@ -224,6 +211,11 @@ const checkMatchNotifications = onSchedule(
         if (Object.keys(dbUpdates).length > 0) {
             await db.ref().update(dbUpdates);
         }
+
+        console.log(
+            `[notifications] complete queued=${pendingNotifications.length} sent=${success} failed=${failed} ` +
+            `durationMs=${Date.now() - runStartedAt}`
+        );
 
     } catch (error) {
         console.error('❌ Notification check failed:', error);

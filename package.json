@@ -1,7 +1,7 @@
 {
   "name": "football",
   "private": true,
-  "version": "2.12.1",
+  "version": "2.12.2",
   "type": "module",
   "scripts": {
     "generate-sw": "node scripts/generate-sw.js",
@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm run test:run && npm run build",
+    "test:rules": "npx --yes firebase-tools@15.28.1 emulators:exec --project demo-fb-hub-rules --only database \"node --test rules/database.rules.spec.mjs\"",
+    "check": "npm run lint && npm run typecheck && npm run test:run && npm run test:rules && npm run build",
     "preview": "vite preview",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4.1.17",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

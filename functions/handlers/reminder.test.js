@@ -296,6 +296,7 @@ describe('handleReminder', () => {
 
     it('defers old token cleanup to topicSync/allFans/oldTokenToCleanup when sync is pending', async () => {
         setupAuth('uid-1');
+        mockOnce.mockResolvedValue(snapshotVal({ fcmToken: 'old-tok' }));
         mockSubscribeToTopic.mockResolvedValue({
             failureCount: 1,
             errors: [{ error: { message: 'fail' } }],
@@ -318,6 +319,48 @@ describe('handleReminder', () => {
             (c) => c[0] === 'notifications/uid-1/topicSync/allFans/oldTokenToCleanup'
         );
         expect(deferRefCall).toBeDefined();
+    });
+
+    it('ignores an unrelated oldFcmToken and never touches another notification record', async () => {
+        setupAuth('uid-1');
+        mockOnce.mockResolvedValue(snapshotVal({ fcmToken: 'own-old-token' }));
+        const res = makeRes();
+
+        await handleReminder(makeReq({
+            authUid: 'uid-1',
+            body: {
+                fcmToken: 'own-new-token',
+                oldFcmToken: 'victim-uid',
+                options: { generalNotifications: true },
+            },
+        }), res);
+
+        expect(res._status).toBe(200);
+        expect(mockRef).not.toHaveBeenCalledWith('notifications/victim-uid');
+        expect(mockUnsubscribeFromTopic).not.toHaveBeenCalledWith('victim-uid', 'all_fans');
+
+        const rootUpdate = mockUpdate.mock.calls[0][0];
+        expect(rootUpdate['notifications/victim-uid']).toBeUndefined();
+        expect(Object.keys(rootUpdate).every((path) => path.startsWith('notifications/uid-1/'))).toBe(true);
+    });
+
+    it('unsubscribes only the old token already stored for the authenticated user', async () => {
+        setupAuth('uid-1');
+        mockOnce.mockResolvedValue(snapshotVal({ fcmToken: 'own-old-token' }));
+        const res = makeRes();
+
+        await handleReminder(makeReq({
+            authUid: 'uid-1',
+            body: {
+                fcmToken: 'own-new-token',
+                oldFcmToken: 'own-old-token',
+                options: { generalNotifications: true },
+            },
+        }), res);
+
+        expect(res._status).toBe(200);
+        expect(mockUnsubscribeFromTopic).toHaveBeenCalledWith('own-old-token', 'all_fans');
+        expect(mockRef).not.toHaveBeenCalledWith('notifications/own-old-token');
     });
 
     it('activeNotifications reflects correct count', async () => {

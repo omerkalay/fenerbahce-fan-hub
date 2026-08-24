@@ -25,13 +25,15 @@ const isDisablingAll = (options) => (
 const hasPathTraversal = (v) => typeof v === 'string' && v.includes('/');
 
 /**
- * Determines whether an old token should be cleaned up from topics.
- * Returns true when the old token exists and differs from both
- * the current token and the authenticated UID.
+ * Trust an old token only when it matches the token already stored for the
+ * authenticated user and the request is rotating to a different new token.
+ * Client-provided token values must never identify another RTDB record.
  */
-const shouldCleanupOldToken = ({ oldFcmToken, fcmToken, authenticatedUid }) => (
-    !!oldFcmToken && oldFcmToken !== fcmToken && oldFcmToken !== authenticatedUid
-);
+const resolveTrustedOldToken = ({ oldFcmToken, fcmToken, storedFcmToken }) => {
+    if (!oldFcmToken || !fcmToken || !storedFcmToken) return null;
+    if (oldFcmToken === fcmToken) return null;
+    return oldFcmToken === storedFcmToken ? oldFcmToken : null;
+};
 
 /**
  * Determines whether it is safe to immediately unsubscribe the old token
@@ -62,7 +64,7 @@ module.exports = {
     countActiveOptions,
     isDisablingAll,
     hasPathTraversal,
-    shouldCleanupOldToken,
+    resolveTrustedOldToken,
     canCleanupOldTokenNow,
     buildSavedOptions
 };

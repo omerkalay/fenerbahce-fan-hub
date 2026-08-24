@@ -1,4 +1,7 @@
 {
+    "database": {
+        "rules": "database.rules.json"
+    },
     "functions": {
         "source": "functions",
         "codebase": "default",
@@ -8,5 +11,13 @@
             "firebase-debug.log",
             "firebase-debug.*.log"
         ]
+    },
+    "emulators": {
+        "database": {
+            "port": 9000
+        },
+        "functions": {
+            "port": 5001
+        }
     }
 }

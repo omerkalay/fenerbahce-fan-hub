@@ -1,0 +1,50 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "cache": {
+      ".read": true,
+      ".write": false
+    },
+    "admin": {
+      "playerStatus": {
+        ".read": true,
+        ".write": false
+      },
+      "startingXI": {
+        ".read": true,
+        ".write": false
+      }
+    },
+    "match_polls": {
+      "$matchId": {
+        "votes": {
+          ".read": true,
+          ".write": false
+        },
+        "users": {
+          "$userId": {
+            ".read": "auth != null && auth.uid === $userId",
+            ".write": false
+          }
+        }
+      }
+    },
+    "notifications": {
+      ".indexOn": [
+        "topicSync/allFans/pending",
+        "topicSync/allFans/oldTokenToCleanup"
+      ],
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    }
+  }
+}

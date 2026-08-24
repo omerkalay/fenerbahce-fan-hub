@@ -4,137 +4,146 @@ const { admin, db } = require('../config');
 const isTerminalTokenCode = (code) =>
     code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered';
 
-/**
- * Reconcile pending topic syncs - 5 dakikada bir
- * topicSync/allFans.pending=true olan kullanicilari bulup retry eder.
- */
-const reconcileTopicSync = onSchedule(
-    { schedule: "every 5 minutes", maxInstances: 1 },
-    async () => {
-        try {
-            const snapshot = await db.ref('notifications').once('value');
-            const allNotifications = snapshot.val() || {};
+const readTopicSyncWork = async (database) => {
+    const notificationsRef = database.ref('notifications');
+    const [pendingSnapshot, cleanupSnapshot] = await Promise.all([
+        notificationsRef
+            .orderByChild('topicSync/allFans/pending')
+            .equalTo(true)
+            .once('value'),
+        notificationsRef
+            .orderByChild('topicSync/allFans/oldTokenToCleanup')
+            .startAt('')
+            .once('value')
+    ]);
 
-            const pending = [];
-            for (const [userId, data] of Object.entries(allNotifications)) {
-                if (data.topicSync?.allFans?.pending) {
-                    pending.push({ userId, data });
-                }
+    const workByUser = new Map();
+    for (const snapshot of [pendingSnapshot, cleanupSnapshot]) {
+        for (const [userId, data] of Object.entries(snapshot.val() || {})) {
+            workByUser.set(userId, data);
+        }
+    }
+    return Array.from(workByUser, ([userId, data]) => ({ userId, data }));
+};
+
+const clearOldTopicToken = async ({ database, messaging, userId, syncPath, oldToken }) => {
+    if (!oldToken) return;
+
+    try {
+        const oldResult = await messaging.unsubscribeFromTopic(oldToken, 'all_fans');
+        if (oldResult.failureCount > 0) {
+            const code = oldResult.errors?.[0]?.error?.code;
+            if (!isTerminalTokenCode(code)) {
+                console.warn(`Old token cleanup partial failure for ${userId.slice(0, 8)}...`, oldResult.errors);
+                return;
             }
+            console.info(`Old token expired, cleanup cleared for ${userId.slice(0, 8)}...`);
+        }
+        await database.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+    } catch (cleanupErr) {
+        const code = cleanupErr.code || cleanupErr.errorInfo?.code;
+        if (isTerminalTokenCode(code)) {
+            console.info(`Old token expired, cleanup cleared for ${userId.slice(0, 8)}...`);
+            await database.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+            return;
+        }
+        console.error(`Old token cleanup failed for ${userId.slice(0, 8)}...`, cleanupErr.message);
+    }
+};
 
-            if (pending.length > 0) {
-            console.log(`Reconciling ${pending.length} pending topic sync(s)...`);
-            }
+const createTopicSyncReconciler = ({
+    database = db,
+    messaging = admin.messaging(),
+    now = () => Date.now()
+} = {}) => async () => {
+    try {
+        const work = await readTopicSyncWork(database);
+        if (work.length > 0) {
+            console.log(`[topicSync] reconciling users=${work.length}`);
+        }
 
-            for (const { userId, data } of pending) {
-                const { desired, token } = data.topicSync.allFans;
-                const syncPath = `notifications/${userId}/topicSync/allFans`;
+        for (const { userId, data } of work) {
+            const allFans = data.topicSync?.allFans;
+            if (!allFans) continue;
+
+            const syncPath = `notifications/${userId}/topicSync/allFans`;
+            let primarySyncReady = !allFans.pending;
+
+            if (allFans.pending) {
+                const { desired, token } = allFans;
 
                 if (!token) {
                     if (!desired) {
-                        // No token + unsubscribe = effectively synced
-                        await db.ref(syncPath).update({
+                        await database.ref(syncPath).update({
                             pending: false,
-                            lastAttemptAt: Date.now(),
-                            lastSyncedAt: Date.now(),
+                            lastAttemptAt: now(),
+                            lastSyncedAt: now(),
                             lastError: null
                         });
+                        primarySyncReady = true;
                     } else {
-                        await db.ref(syncPath).update({
-                            lastAttemptAt: Date.now(),
+                        await database.ref(syncPath).update({
+                            lastAttemptAt: now(),
                             lastError: 'no token available'
                         });
                     }
-                    continue;
-                }
-
-                try {
-                    const result = desired
-                        ? await admin.messaging().subscribeToTopic(token, 'all_fans')
-                        : await admin.messaging().unsubscribeFromTopic(token, 'all_fans');
-
-                    if (result.failureCount > 0) {
-                        const reasons = result.errors?.map(e => e.error?.message || e.error?.code).join(', ') || 'unknown';
-                        await db.ref(syncPath).update({
-                            lastAttemptAt: Date.now(),
-                            lastError: reasons
-                        });
-                    } else {
-                        await db.ref(syncPath).update({
-                            pending: false,
-                            lastAttemptAt: Date.now(),
-                            lastSyncedAt: Date.now(),
-                            lastError: null
-                        });
-                        // Clean up deferred old token now that new subscribe is confirmed
-                        const oldCleanupToken = data.topicSync.allFans.oldTokenToCleanup;
-                        if (oldCleanupToken) {
-                            try {
-                                const oldResult = await admin.messaging().unsubscribeFromTopic(oldCleanupToken, 'all_fans');
-                                if (oldResult.failureCount > 0) {
-                                    const code = oldResult.errors?.[0]?.error?.code;
-                                    if (isTerminalTokenCode(code)) {
-                                        console.info(`Old token expired, cleanup cleared for ${userId.slice(0, 8)}...`);
-                                        await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
-                                    } else {
-                                        console.warn(`Old token cleanup partial failure for ${userId.slice(0, 8)}:`, oldResult.errors);
-                                    }
-                                } else {
-                                    await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
-                                }
-                            } catch (cleanupErr) {
-                                const code = cleanupErr.code || cleanupErr.errorInfo?.code;
-                                if (isTerminalTokenCode(code)) {
-                                    console.info(`Old token expired, cleanup cleared for ${userId.slice(0, 8)}...`);
-                                    await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
-                                } else {
-                                    console.error(`Old token cleanup failed for ${userId.slice(0, 8)}:`, cleanupErr.message);
-                                }
-                            }
-                        }
-                    }
-                } catch (syncErr) {
-                    await db.ref(syncPath).update({
-                        lastAttemptAt: Date.now(),
-                        lastError: syncErr.message || 'unknown error'
-                    });
-                    console.error(`Topic sync failed for ${userId.slice(0, 8)}:`, syncErr.message);
-                }
-            }
-
-            // Straggler cleanup: old tokens where sync already resolved but cleanup didn't complete
-            for (const [userId, data] of Object.entries(allNotifications)) {
-                const allFans = data.topicSync?.allFans;
-                if (allFans && !allFans.pending && allFans.oldTokenToCleanup) {
-                    const syncPath = `notifications/${userId}/topicSync/allFans`;
+                } else {
                     try {
-                        const oldResult = await admin.messaging().unsubscribeFromTopic(allFans.oldTokenToCleanup, 'all_fans');
-                        if (oldResult.failureCount > 0) {
-                            const code = oldResult.errors?.[0]?.error?.code;
-                            if (isTerminalTokenCode(code)) {
-                                console.info(`Old token expired, straggler cleanup cleared for ${userId.slice(0, 8)}...`);
-                                await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
-                            } else {
-                                console.warn(`Old token straggler cleanup partial failure for ${userId.slice(0, 8)}:`, oldResult.errors);
-                            }
+                        const result = desired
+                            ? await messaging.subscribeToTopic(token, 'all_fans')
+                            : await messaging.unsubscribeFromTopic(token, 'all_fans');
+
+                        if (result.failureCount > 0) {
+                            const reasons = result.errors
+                                ?.map((entry) => entry.error?.message || entry.error?.code)
+                                .join(', ') || 'unknown';
+                            await database.ref(syncPath).update({
+                                lastAttemptAt: now(),
+                                lastError: reasons
+                            });
                         } else {
-                            await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
+                            await database.ref(syncPath).update({
+                                pending: false,
+                                lastAttemptAt: now(),
+                                lastSyncedAt: now(),
+                                lastError: null
+                            });
+                            primarySyncReady = true;
                         }
-                    } catch (cleanupErr) {
-                        const code = cleanupErr.code || cleanupErr.errorInfo?.code;
-                        if (isTerminalTokenCode(code)) {
-                            console.info(`Old token expired, straggler cleanup cleared for ${userId.slice(0, 8)}...`);
-                            await db.ref(`${syncPath}/oldTokenToCleanup`).set(null);
-                        } else {
-                            console.error(`Old token cleanup failed for ${userId.slice(0, 8)}:`, cleanupErr.message);
-                        }
+                    } catch (syncErr) {
+                        await database.ref(syncPath).update({
+                            lastAttemptAt: now(),
+                            lastError: syncErr.message || 'unknown error'
+                        });
+                        console.error(`Topic sync failed for ${userId.slice(0, 8)}...`, syncErr.message);
                     }
                 }
             }
-        } catch (error) {
-            console.error('Topic sync reconcile failed:', error);
+
+            if (primarySyncReady && allFans.oldTokenToCleanup) {
+                await clearOldTopicToken({
+                    database,
+                    messaging,
+                    userId,
+                    syncPath,
+                    oldToken: allFans.oldTokenToCleanup
+                });
+            }
         }
+    } catch (error) {
+        console.error('Topic sync reconcile failed:', error);
     }
+};
+
+const runTopicSyncReconciler = createTopicSyncReconciler();
+
+const reconcileTopicSync = onSchedule(
+    { schedule: "every 5 minutes", maxInstances: 1 },
+    runTopicSyncReconciler
 );
 
-module.exports = { reconcileTopicSync };
+module.exports = {
+    reconcileTopicSync,
+    createTopicSyncReconciler,
+    readTopicSyncWork
+};

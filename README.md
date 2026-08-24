@@ -6,17 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.12.1-blue)
+![Version](https://img.shields.io/badge/version-2.12.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.12.1
+## What's New in v2.12.2
+
+- **Notification Authorization Hardening** - Token rotation now accepts an old FCM token only when it matches the token already stored for the authenticated user, preventing one user from targeting another user's notification record or topic subscription
+- **Due-Window Scheduling** - The minute scheduler always reads the next three cached fixtures first, but scans user preferences only during the 09:00 daily window or an active 3-hour/1-hour/30-minute/15-minute reminder window
+- **Durable Final-Match Continuity** - The transient live payload is removed five minutes after full time while the final score, events, and summary remain available through `cache/lastFinishedMatch` until the next fixture replaces the dashboard context
+- **Indexed Topic Recovery** - FCM topic reconciliation now queries only pending or deferred-cleanup users instead of downloading every notification preference record every five minutes
+- **Versioned Database Security** - Realtime Database rules and owner-isolation tests now live in the repository, with CI blocking deployment unless typecheck, lint, application tests, rules tests, and the production build all pass
+
+<details>
+<summary>Previous: v2.12.1</summary>
 
 - **Desktop Scroll Recovery** - The UEFA bracket now keeps a constrained desktop viewport with working vertical scrolling, while the squad builder releases desktop wheel scrolling without changing its contained mobile touch behavior
 - **Historical Route Clarity** - Stages after a confirmed European elimination now display a simple `-` instead of suggesting that their outcome is still pending
 - **Mobile Behavior Preserved** - The full-screen compact PWA bracket and mobile player-list scrolling continue to work as before
+
+</details>
 
 <details>
 <summary>Previous: v2.12.0</summary>
@@ -160,6 +171,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
   - 15 minutes before match
   - **Daily Match Check**: Automatically notifies at 09:00 TR if there is a match that day
 - **Always-On Delivery**: Powered by **Firebase Cloud Functions** (Serverless)
+- **Due-Window Reads**: The scheduler reads `cache/next3Matches` every minute and loads user preferences only when a reminder is actually due
+- **Delivery Retry Window**: Each reminder remains eligible for five minutes and successful sends are deduplicated per user, match, and reminder type
 - **Cross-Platform**: Works on mobile & desktop (PWA support)
 - **Beautiful Format**: `Fenerbahçe - Opponent | 20:45 - 1 saat kaldi`
 
@@ -262,6 +275,7 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 - **@testing-library/react** — component testing utilities
 - **@testing-library/jest-dom** — DOM assertion matchers
 - **happy-dom** — browser environment simulation for React component and hook tests
+- **Firebase Local Emulator Suite** — Realtime Database rules and authenticated owner-isolation tests
 
 ### Quality Commands
 
@@ -271,7 +285,9 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 | `npm run lint` | Run ESLint on `src/` (TypeScript + React rules) |
 | `npm run test` | Run Vitest in watch mode |
 | `npm run test:run` | Run Vitest once (CI mode) |
+| `npm run test:rules` | Start the local RTDB emulator and verify public, owner-only, and server-only access paths |
 | `npm run build` | Production build (includes service worker generation) |
+| `npm run check` | Run lint, typecheck, all application/rules tests, and the production build |
 
 ### Test Coverage
 
@@ -285,26 +301,31 @@ This node is managed manually via the Firebase Console on matchday. Recommended 
 | Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Super Lig/Europa requests and combined goal/assist totals |
 | Cache refresh safety | `functions/utils/cacheRefresh.test.js` | Last known-good cache preservation on provider failure and replacement only after a successful response |
 | Match bootstrap fallback | `src/hooks/useMatchBootstrap.test.ts` | Local match preservation across empty backend responses and request failures |
+| Reminder authorization | `functions/handlers/reminder.test.js` | Authenticated preference writes, trusted token rotation, deferred FCM cleanup, and malicious old-token rejection |
+| Notification timing | `functions/utils/notificationSchedule.test.js` | Istanbul daily window and next-three-match reminder windows without early full-user scans |
+| Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
+| Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
+| RTDB security rules | `rules/database.rules.spec.mjs` | Public sports data, owner isolation, and server-only writes against the Firebase emulator |
 
-Backend parser and cache-safety tests import pure helper modules without Firebase dependencies, so they run without database mocks or side effects.
+Pure backend helpers run without Firebase side effects; the rules suite separately uses a demo-project emulator and never connects to production data.
 
 ### CI Quality Gate
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR to `main`:
 
-**typecheck** → **lint** → **test** → **build**
+**typecheck** → **lint** → **application tests** → **RTDB rules tests** → **build** → **deploy on a successful `main` push**
 
-All four steps must pass for the pipeline to succeed.
+Deployment is part of the same workflow and cannot run if any quality step fails.
 
 ## Development Workflow
 
 After making changes, run the quality checks locally before pushing:
 
 ```bash
-npm run typecheck && npm run lint && npm run test:run && npm run build
+npm run check
 ```
 
-CI runs the same four steps. If all pass locally, the pipeline will pass.
+CI runs the same quality command sequence with Node.js 22 and Java 21 for the Firebase emulator.
 
 ## Architecture
 
@@ -312,7 +333,7 @@ CI runs the same four steps. If all pass locally, the pipeline will pass.
 ┌─────────────────┐     ┌──────────────────────────────────────┐
 │   GitHub Pages  │     │         Firebase Cloud Functions     │
 │    (Frontend)   │────▶│  /api/next-match     (from cache)    │
-│                 │     │  /api/standings      (from cache)    │
+│                 │     │  /api/standings      (legacy cache)  │
 │  React + Vite   │     │  /api/squad          (from cache)    │
 │                 │     │  /api/reminder       (save prefs)    │
 └─────────────────┘     │  /api/poll-vote      (vote write)    │
@@ -347,7 +368,7 @@ CI runs the same four steps. If all pass locally, the pipeline will pass.
                 └──────────────┘
 ```
 
-Note: The fixture tab merges client-side ESPN schedules with the cached `GET /api/cup-fixtures?seasonStartYear=YYYY` SofaScore supplement. Türkiye Kupası coverage starts with 2026/27; older selectable seasons remain ESPN-only. The Europe modal reads the cache-first `GET /api/uefa-journey?seasonStartYear=YYYY` endpoint; add `summary=true` for the compact dashboard label. Finished ESPN fixture summaries are served by `/api/match-summary/:matchId`, while SofaScore cup cards intentionally omit the unsupported summary action.
+Note: The fixture tab merges client-side ESPN schedules with the cached `GET /api/cup-fixtures?seasonStartYear=YYYY` SofaScore supplement, and standings are fetched directly from ESPN by the frontend. Türkiye Kupası coverage starts with 2026/27; older selectable seasons remain ESPN-only. The Europe modal calls `GET /api/uefa-journey?seasonStartYear=YYYY`; that handler automatically refreshes stale current-season ESPN data and stores the result under `cache/uefaJourney/{seasonStartYear}`, while `summary=true` returns the compact dashboard label. Finished ESPN fixture summaries are served by `/api/match-summary/:matchId`, while SofaScore cup cards intentionally omit the unsupported summary action.
 
 ## Project Structure
 
@@ -362,7 +383,14 @@ fenerbahce-fan-hub/
 │   │   ├── uefaJourney.js     # UEFA schedules, standings, bracket and cache
 │   │   └── sofascore.js       # SofaScore API calls (matches, squad, images)
 │   ├── handlers/
-│   │   └── api.js             # HTTP endpoint routing & handler functions
+│   │   ├── api.js             # HTTP endpoint routing
+│   │   ├── admin.js           # Health and protected cache refresh
+│   │   ├── assets.js          # Cache-only public image endpoints
+│   │   ├── matches.js         # Match, fixture, UEFA and summary handlers
+│   │   ├── middleware.js      # Baseline request rate limiting
+│   │   ├── polls.js           # Authenticated atomic poll writes
+│   │   ├── reminders.js       # Authenticated FCM preference writes
+│   │   └── squad.js           # Cached squad endpoint
 │   ├── schedulers/
 │   │   ├── dailyRefresh.js    # Daily data refresh (03:00 UTC)
 │   │   ├── liveMatch.js       # Live match updater (every 1 min)
@@ -431,9 +459,11 @@ fenerbahce-fan-hub/
 │   ├── firebase.ts                    # Firebase client init (Auth, RTDB, Messaging)
 │   ├── App.tsx                        # Main app & routing
 │   └── main.tsx                       # React entry point
+├── rules/
+│   └── database.rules.spec.mjs        # RTDB emulator authorization tests
 ├── .github/workflows/
-│   ├── ci.yml                         # CI quality gate (typecheck, lint, test, build)
-│   └── deploy.yml                     # Deploys main to GitHub Pages after CI succeeds
+│   └── ci.yml                         # Quality gate plus gated GitHub Pages deploy
+├── database.rules.json                # Versioned Realtime Database security rules
 ├── vitest.config.ts                   # Vitest test runner configuration
 ├── tsconfig.json                      # TypeScript configuration (strict mode)
 ├── public/                            # Static assets & PWA icons
@@ -444,7 +474,8 @@ fenerbahce-fan-hub/
 
 ### Prerequisites
 - Node.js 22+
-- Firebase CLI (`npm install -g firebase-tools`)
+- Firebase CLI 15.28.1 (or a compatible installed `firebase` command)
+- Java 21 (required by the Firebase Database emulator)
 - RapidAPI key for SofaScore
 
 ### Frontend Setup
@@ -503,6 +534,12 @@ firebase login
 firebase deploy --only functions
 ```
 
+Deploy the versioned Realtime Database rules separately after reviewing them:
+
+```bash
+firebase deploy --only database
+```
+
 4. **Initialize Cache**
    ```bash
    curl -H "x-admin-key: YOUR_ADMIN_REFRESH_KEY" https://us-central1-YOUR-PROJECT.cloudfunctions.net/api/refresh
@@ -515,18 +552,20 @@ firebase deploy --only functions
 | Function | Schedule | Description |
 |----------|----------|-------------|
 | `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
-| `checkMatchNotifications` | Every minute | Reads from cache (no API calls), checks user preferences, sends FCM notifications. |
-| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches across Süper Lig and all UEFA club competitions during the match window. Writes `cache/liveMatch`, archives final payload to `cache/lastFinishedMatch`, and stores fixture summary in `cache/matchSummaries/{matchId}`. |
-| `reconcileTopicSync` | Every 5 minutes | Retries pending `all_fans` topic subscribe/unsubscribe intents until FCM confirms. |
+| `checkMatchNotifications` | Every minute | Reads `cache/next3Matches` first (no external API call) and scans user preferences only inside a due reminder window before sending through FCM. |
+| `updateLiveMatch` | Every minute | Checks ESPN for live Fenerbahçe matches across Süper Lig and all UEFA club competitions during the match window. Keeps the final live payload for five minutes, archives it durably to `cache/lastFinishedMatch`, and stores the fixture summary. |
+| `reconcileTopicSync` | Every 5 minutes | Uses indexed RTDB queries to retry only pending `all_fans` intents or deferred old-token cleanups. |
 | `onStartingXIPushRequested` | RTDB trigger | Fires when `admin/startingXI/push/requested` transitions to `true`. Validates payload, dedupes by `publishedAt`, sends one-shot push to `all_fans`. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
 2. **Database**: Preferences saved to `notifications/{uid}` in Firebase (UID-keyed, requires Google sign-in)
 3. **Cloud Function**: Scheduled function checks every minute
-   - Reads match data from **cache** (not external API!)
+   - Reads all three upcoming matches from **cache** (not an external API)
+   - Returns immediately outside a due reminder window, without downloading the user preference tree
    - Applies `defaultOptions` to all upcoming matches
-   - Sends push notification via FCM
+   - Retries within a five-minute window and records successful delivery to prevent duplicates
+   - Sends the push notification via FCM
 4. **Delivery**: Notification arrives on user's device via Service Worker
 
 ### Live Match System
@@ -535,8 +574,8 @@ firebase deploy --only functions
 - **Frontend State Flow**: Countdown → Checking → Live/Post (no misleading pre fallback after kickoff)
 - **Leagues**: Süper Lig plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
 - **Match Identity Guard**: Live/final cache is shown only when its home team, away team, and available kickoff time match the dashboard's current fixture
-- **Cleanup**: Live cache deleted 5min after match ends
-- **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` fallback
+- **Cleanup**: Only the transient `liveMatch` payload is deleted five minutes after full time; repeated ESPN polling for that finished fixture then stops
+- **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` until the next scheduled fixture changes the dashboard identity
 
 ### How to Use Starting XI
 1. Refresh the cache if kickoff time or opponent data changed (`/api/refresh` with `ADMIN_REFRESH_KEY`)
@@ -574,7 +613,7 @@ firebase deploy --only functions
 ### Frontend (GitHub Pages)
 
 Pushes and pull requests targeting `main` run the CI quality gate. A successful
-push to `main` automatically triggers the GitHub Pages deployment workflow;
+push to `main` automatically runs the gated GitHub Pages deployment job;
 feature branches do not deploy the live site.
 
 Manual fallback:
@@ -612,4 +651,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.12.1** | August 2026
+**v2.12.2** | August 2026

@@ -55,8 +55,7 @@ dist-ssr
 # Claude Code
 .claude/
 
-# Firebase security rules (applied manually via Console)
-database.rules.json
+# Firebase security rules are versioned and emulator-tested.
 
 # Project roadmap (local reference)
 ROADMAP.md

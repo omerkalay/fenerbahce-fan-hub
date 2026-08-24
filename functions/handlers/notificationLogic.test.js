@@ -4,7 +4,7 @@ import {
     countActiveOptions,
     isDisablingAll,
     hasPathTraversal,
-    shouldCleanupOldToken,
+    resolveTrustedOldToken,
     canCleanupOldTokenNow,
     buildSavedOptions
 } from './notificationLogic.js';
@@ -220,44 +220,52 @@ describe('hasPathTraversal', () => {
     });
 });
 
-// ─── shouldCleanupOldToken ───────────────────────────────
+// ─── resolveTrustedOldToken ──────────────────────────────
 
-describe('shouldCleanupOldToken', () => {
-    it('returns true when old token exists and differs from both fcm and uid', () => {
-        expect(shouldCleanupOldToken({
+describe('resolveTrustedOldToken', () => {
+    it('returns the old token only when it matches the authenticated user record', () => {
+        expect(resolveTrustedOldToken({
             oldFcmToken: 'old-tok',
             fcmToken: 'new-tok',
-            authenticatedUid: 'uid-123'
-        })).toBe(true);
+            storedFcmToken: 'old-tok'
+        })).toBe('old-tok');
     });
 
-    it('returns false when oldFcmToken is null/undefined', () => {
-        expect(shouldCleanupOldToken({ oldFcmToken: null, fcmToken: 'x', authenticatedUid: 'y' })).toBe(false);
-        expect(shouldCleanupOldToken({ oldFcmToken: undefined, fcmToken: 'x', authenticatedUid: 'y' })).toBe(false);
+    it('returns null when the client supplies an unrelated token', () => {
+        expect(resolveTrustedOldToken({
+            oldFcmToken: 'victim-token',
+            fcmToken: 'new-tok',
+            storedFcmToken: 'own-old-token'
+        })).toBeNull();
     });
 
-    it('returns false when oldFcmToken equals fcmToken', () => {
-        expect(shouldCleanupOldToken({
+    it('returns null when oldFcmToken is null/undefined', () => {
+        expect(resolveTrustedOldToken({ oldFcmToken: null, fcmToken: 'x', storedFcmToken: 'y' })).toBeNull();
+        expect(resolveTrustedOldToken({ oldFcmToken: undefined, fcmToken: 'x', storedFcmToken: 'y' })).toBeNull();
+    });
+
+    it('returns null when oldFcmToken equals fcmToken', () => {
+        expect(resolveTrustedOldToken({
             oldFcmToken: 'same',
             fcmToken: 'same',
-            authenticatedUid: 'uid'
-        })).toBe(false);
+            storedFcmToken: 'same'
+        })).toBeNull();
     });
 
-    it('returns false when oldFcmToken equals authenticatedUid', () => {
-        expect(shouldCleanupOldToken({
-            oldFcmToken: 'uid-123',
-            fcmToken: 'new-tok',
-            authenticatedUid: 'uid-123'
-        })).toBe(false);
+    it('returns null when the request is not rotating to a new token', () => {
+        expect(resolveTrustedOldToken({
+            oldFcmToken: 'old-tok',
+            fcmToken: null,
+            storedFcmToken: 'old-tok'
+        })).toBeNull();
     });
 
-    it('returns false for empty string oldFcmToken', () => {
-        expect(shouldCleanupOldToken({
+    it('returns null for empty string oldFcmToken', () => {
+        expect(resolveTrustedOldToken({
             oldFcmToken: '',
             fcmToken: 'new',
-            authenticatedUid: 'uid'
-        })).toBe(false);
+            storedFcmToken: 'old'
+        })).toBeNull();
     });
 });
 
@@ -401,10 +409,10 @@ describe('notification decision contracts', () => {
     });
 
     it('old token cleanup deferred when new subscribe is still pending', () => {
-        const hasOld = shouldCleanupOldToken({
-            oldFcmToken: 'old', fcmToken: 'new', authenticatedUid: 'uid'
+        const trustedOldToken = resolveTrustedOldToken({
+            oldFcmToken: 'old', fcmToken: 'new', storedFcmToken: 'old'
         });
-        expect(hasOld).toBe(true);
+        expect(trustedOldToken).toBe('old');
 
         // Subscribe still pending → defer
         expect(canCleanupOldTokenNow({ topicSyncPending: true, desiredTopicState: true })).toBe(false);

@@ -155,30 +155,34 @@ async function handleStandings(req, res) {
     return res.json(data);
 }
 
-async function handleLiveMatch(req, res) {
+const createLiveMatchHandler = ({
+    database = db,
+    sameMatch = isSameMatch,
+    cupMatch = isTurkeyCupMatch
+} = {}) => async function liveMatchHandler(req, res) {
     try {
-        const currentMatchSnapshot = await db.ref('cache/nextMatch').once('value');
+        const currentMatchSnapshot = await database.ref('cache/nextMatch').once('value');
         const currentMatch = currentMatchSnapshot.val();
         if (!currentMatch) {
             return res.json({ matchState: 'no-match' });
         }
 
-        if (isTurkeyCupMatch(currentMatch)) {
+        if (cupMatch(currentMatch)) {
             return res.json({ matchState: 'unsupported' });
         }
 
         const [liveSnapshot, lastFinishedSnapshot] = await Promise.all([
-            db.ref('cache/liveMatch').once('value'),
-            db.ref('cache/lastFinishedMatch').once('value')
+            database.ref('cache/liveMatch').once('value'),
+            database.ref('cache/lastFinishedMatch').once('value')
         ]);
         const liveData = liveSnapshot.val();
 
-        if (liveData && isSameMatch(liveData, currentMatch)) {
+        if (liveData && sameMatch(liveData, currentMatch)) {
             return res.json(liveData);
         }
 
         const lastFinished = lastFinishedSnapshot.val();
-        if (lastFinished && isSameMatch(lastFinished, currentMatch)) {
+        if (lastFinished && sameMatch(lastFinished, currentMatch)) {
             return res.json(lastFinished);
         }
 
@@ -187,7 +191,9 @@ async function handleLiveMatch(req, res) {
         console.error('Live match error:', error);
         return res.status(500).json({ error: 'Failed to fetch live match' });
     }
-}
+};
+
+const handleLiveMatch = createLiveMatchHandler();
 
 function teamLineupHasDetailedSlots(teamLineup) {
     return Array.isArray(teamLineup?.starters) && teamLineup.starters.some((player) =>
@@ -252,6 +258,7 @@ module.exports = {
     handleUefaJourney,
     createUefaJourneyHandler,
     handleLiveMatch,
+    createLiveMatchHandler,
     handleMatchSummary,
     handleStandings
 };

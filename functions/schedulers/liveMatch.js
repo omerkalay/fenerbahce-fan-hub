@@ -3,6 +3,8 @@ const { db } = require('../config');
 const { getEspnLeaguesForMatch } = require('../constants/espnCompetitions');
 const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, buildSummaryPayloadFromLiveData } = require('../services/espn');
 const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
+const { isSameMatch } = require('../utils/matchIdentity');
+const { buildFinalMatchCachePlan, shouldStopFinalPolling } = require('../utils/finalMatchCache');
 
 /**
  * Update Live Match - Her dakika çalışır
@@ -34,6 +36,28 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
                 console.log('🗑️ Live match cache cleaned (outside match window)');
             }
             return;
+        }
+
+        let existingFinalMatch = null;
+        if (now >= matchTime) {
+            const finalSnapshot = await db.ref('cache/lastFinishedMatch').once('value');
+            existingFinalMatch = finalSnapshot.val();
+
+            if (shouldStopFinalPolling({
+                finalData: existingFinalMatch,
+                scheduledMatch: nextMatch,
+                now,
+                matches: isSameMatch
+            })) {
+                if (!existingFinalMatch.liveCacheClearedAt) {
+                    await Promise.all([
+                        db.ref('cache/liveMatch').remove(),
+                        db.ref('cache/lastFinishedMatch/liveCacheClearedAt').set(now)
+                    ]);
+                    console.log('🗑️ Transient live cache cleaned; final match archive preserved');
+                }
+                return;
+            }
         }
 
         console.log('⚽ Checking live match from ESPN...');
@@ -281,12 +305,19 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         };
 
         // 4. Cache'e yaz
-        await db.ref('cache/liveMatch').set(liveData);
         if (matchState === 'post') {
-            await db.ref('cache/lastFinishedMatch').set({
-                ...liveData,
-                archivedAt: now
+            const finalPlan = buildFinalMatchCachePlan({
+                liveData,
+                existingFinal: existingFinalMatch,
+                now
             });
+            await db.ref('cache/lastFinishedMatch').set(finalPlan.finalPayload);
+
+            if (finalPlan.expired) {
+                await db.ref('cache/liveMatch').remove();
+            } else {
+                await db.ref('cache/liveMatch').set(finalPlan.livePayload);
+            }
 
             const summaryRef = db.ref(`cache/matchSummaries/${String(liveData.matchId)}`);
             const summarySnapshot = await summaryRef.once('value');
@@ -295,20 +326,10 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
                 await summaryRef.set(summaryPayload);
                 console.log(`🧾 Match summary stored for fixture: ${liveData.matchId}`);
             }
+        } else {
+            await db.ref('cache/liveMatch').set(liveData);
         }
         console.log(`✅ Live match updated: ${liveData.homeTeam.name} ${liveData.homeTeam.score} - ${liveData.awayTeam.score} ${liveData.awayTeam.name} [${matchState}]`);
-
-        if (matchState === 'post') {
-            const markedSnapshot = await db.ref('cache/liveMatch/postMarkedAt').once('value');
-            const existingMark = markedSnapshot.val();
-
-            if (!existingMark) {
-                await db.ref('cache/liveMatch/postMarkedAt').set(now);
-            } else if (now - existingMark > 5 * 60 * 1000) {
-                await db.ref('cache/liveMatch').remove();
-                console.log('🗑️ Live match cache cleaned (5 min after post)');
-            }
-        }
 
     } catch (error) {
         console.error('❌ Live match update failed:', error);
