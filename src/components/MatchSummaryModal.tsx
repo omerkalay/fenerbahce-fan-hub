@@ -1,40 +1,7 @@
-import MatchEventIcon from './MatchEventIcon';
-import { getEventVisualType } from '../utils/eventVisualType';
-import MatchLineups from './MatchLineups';
-import { formatMatchClock } from '../utils/matchClock';
-import { localizePlayerName } from '../utils/playerDisplay';
-import { localizeTeamName } from '../utils/localize';
+import { useEffect, useMemo, useRef } from 'react';
+import LiveMatchScore from './LiveMatchScore';
 import { getCurrentSeasonStartYear } from '../utils/seasons';
-import { useTheme } from '../contexts/themeContextDef';
-import { resolveTeamCrest } from '../theme/teamCrest';
-import type { EspnFixtureMatch, MatchSummaryData } from '../types';
-
-// ─── Helpers ─────────────────────────────────────────────
-
-
-const localizeSummaryStatus = (value: string = ''): string => {
-    const normalized = String(value || '').trim().toLowerCase();
-
-    if (!normalized) return 'Maç Sonucu';
-    if (normalized === 'ft' || normalized === 'full time' || normalized.includes('full time')) return 'Maç Sonu';
-    if (normalized === 'ht' || normalized === 'halftime' || normalized.includes('half time')) return 'Devre Arası';
-    if (normalized === 'aet' || normalized.includes('after extra time')) return 'Uzatma Sonu';
-    if (normalized.includes('penalties')) return 'Penaltılar Sonu';
-
-    return value;
-};
-
-const formatIncidentLabel = (event: NonNullable<MatchSummaryData['events']>[number]): string => {
-    const playerName = localizePlayerName(event?.player || event?.type || 'Olay');
-    const suffixes: string[] = [];
-
-    if (event?.isGoal && event?.isPenalty) suffixes.push('(P)');
-    if (event?.isGoal && event?.isOwnGoal) suffixes.push('(K.K)');
-
-    return [playerName, ...suffixes].join(' ');
-};
-
-// ─── Props ───────────────────────────────────────────────
+import type { EspnFixtureMatch, LiveMatchData, MatchSummaryData } from '../types';
 
 interface MatchSummaryModalProps {
     activeSummaryMatch: EspnFixtureMatch | null;
@@ -47,8 +14,6 @@ interface MatchSummaryModalProps {
     onClose: () => void;
 }
 
-// ─── Component ───────────────────────────────────────────
-
 function MatchSummaryModal({
     activeSummaryMatch,
     activeSummaryData,
@@ -59,230 +24,133 @@ function MatchSummaryModal({
     seasonStartYear,
     onClose,
 }: MatchSummaryModalProps) {
-    const { theme } = useTheme();
-    if (!activeSummaryMatch) return null;
-    const summaryHomeName = activeSummaryData?.homeTeam?.name || activeSummaryMatch.homeTeam?.name || '';
-    const summaryAwayName = activeSummaryData?.awayTeam?.name || activeSummaryMatch.awayTeam?.name || '';
-    const displaySummaryHomeLogo = resolveTeamCrest({
-        theme,
-        defaultSrc: summaryHomeLogo,
-        teamName: summaryHomeName,
-    });
-    const displaySummaryAwayLogo = resolveTeamCrest({
-        theme,
-        defaultSrc: summaryAwayLogo,
-        teamName: summaryAwayName,
-    });
-    const homeIncidentTeamId = String(activeSummaryMatch.homeTeam?.id || activeSummaryData?.homeTeam?.id || '');
-    const awayIncidentTeamId = String(activeSummaryMatch.awayTeam?.id || activeSummaryData?.awayTeam?.id || '');
-    const summaryIncidentEvents = (activeSummaryData?.events || []).filter((event) => event.isGoal || event.isRedCard);
-    const homeSummaryIncidents = summaryIncidentEvents.filter((event) => String(event.team || '') === homeIncidentTeamId);
-    const awaySummaryIncidents = summaryIncidentEvents.filter((event) => String(event.team || '') === awayIncidentTeamId);
-    const neutralSummaryIncidents = summaryIncidentEvents.filter((event) => {
-        const teamId = String(event.team || '');
-        return teamId !== homeIncidentTeamId && teamId !== awayIncidentTeamId;
-    });
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const closeButtonRef = useRef<HTMLButtonElement>(null);
+    const visible = activeSummaryMatch !== null;
     const useSquadPhotos = seasonStartYear == null || seasonStartYear === getCurrentSeasonStartYear();
 
-    return (
-        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-4">
-            <button
-                onClick={onClose}
-                className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-                aria-label="Kapat"
-            />
+    const matchCenterData = useMemo<LiveMatchData | null>(() => {
+        if (!activeSummaryMatch || !activeSummaryData) return null;
 
-            <div className="relative w-full max-w-2xl max-h-[88vh] overflow-hidden glass-card rounded-2xl border border-yellow-400/20">
-                <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                    <div>
-                        <p className="text-sm font-bold text-yellow-300">Maç İstatistikleri</p>
-                        <p className="text-[11px] text-slate-400">
-                            {localizeTeamName(activeSummaryMatch.homeTeam?.name)} vs {localizeTeamName(activeSummaryMatch.awayTeam?.name)}
-                        </p>
+        return {
+            matchId: activeSummaryMatch.id,
+            matchState: 'post',
+            statusDetail:
+                activeSummaryData.statusDetail
+                || activeSummaryMatch.status.detail
+                || activeSummaryMatch.status.shortDetail
+                || 'FT',
+            displayClock: 'Maç Sonu',
+            homeTeam: {
+                id: activeSummaryData.homeTeam?.id ?? activeSummaryMatch.homeTeam.id ?? undefined,
+                name: activeSummaryData.homeTeam?.name || activeSummaryMatch.homeTeam.name || 'Ev Sahibi',
+                logo: summaryHomeLogo || undefined,
+                score: String(activeSummaryData.homeTeam?.score ?? activeSummaryMatch.homeTeam.score ?? '0'),
+            },
+            awayTeam: {
+                id: activeSummaryData.awayTeam?.id ?? activeSummaryMatch.awayTeam.id ?? undefined,
+                name: activeSummaryData.awayTeam?.name || activeSummaryMatch.awayTeam.name || 'Deplasman',
+                logo: summaryAwayLogo || undefined,
+                score: String(activeSummaryData.awayTeam?.score ?? activeSummaryMatch.awayTeam.score ?? '0'),
+            },
+            events: activeSummaryData.events ?? [],
+            stats: (activeSummaryData.stats ?? []).map((stat) => ({
+                ...stat,
+                name: stat.name || stat.key || '',
+            })),
+            lineups: activeSummaryData.lineups ?? null,
+        };
+    }, [activeSummaryData, activeSummaryMatch, summaryAwayLogo, summaryHomeLogo]);
+
+    useEffect(() => {
+        if (!visible) return;
+        const previouslyFocused = document.activeElement as HTMLElement | null;
+        closeButtonRef.current?.focus();
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                onClose();
+                return;
+            }
+
+            if (event.key !== 'Tab' || !dialogRef.current) return;
+            const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            ));
+            if (focusable.length === 0) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            previouslyFocused?.focus();
+        };
+    }, [onClose, visible]);
+
+    if (!activeSummaryMatch) return null;
+
+    return (
+        <div
+            className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/80 sm:items-center sm:p-5"
+            onMouseDown={onClose}
+        >
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="finished-match-dialog-title"
+                className="live-match-dialog flex max-h-[96dvh] min-h-[72dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#061225] shadow-2xl sm:min-h-0 sm:rounded-3xl"
+                onMouseDown={(event) => event.stopPropagation()}
+            >
+                <header className="live-match-dialog-header flex shrink-0 items-center justify-between border-b border-white/10 bg-[#061225]/95 px-4 py-3 backdrop-blur-md sm:px-5">
+                    <div className="min-w-0">
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-yellow-300">Fenerbahçe Hub</p>
+                        <h2 id="finished-match-dialog-title" className="mt-0.5 truncate text-base font-black text-white">Maç Merkezi</h2>
                     </div>
                     <button
+                        ref={closeButtonRef}
+                        type="button"
                         onClick={onClose}
-                        className="p-1 text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
-                        aria-label="Kapat"
+                        className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.05] text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/70"
+                        aria-label="Maç merkezini kapat"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
-                </div>
+                </header>
 
-                <div className="p-4 overflow-y-auto max-h-[calc(88vh-72px)] space-y-4">
+                <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
                     {summaryLoading && (
-                        <div className="space-y-3 animate-pulse">
-                            <div className="h-20 rounded-xl bg-white/5" />
-                            <div className="h-28 rounded-xl bg-white/5" />
-                            <div className="h-28 rounded-xl bg-white/5" />
+                        <div className="space-y-4 animate-pulse" aria-label="Maç özeti yükleniyor">
+                            <div className="h-56 rounded-2xl bg-white/5" />
+                            <div className="h-40 rounded-2xl bg-white/5" />
                         </div>
                     )}
 
                     {!summaryLoading && summaryError && (
-                        <div className="rounded-xl border border-rose-400/20 bg-rose-500/10 p-4 text-sm text-rose-200">
+                        <div className="rounded-2xl border border-rose-400/20 bg-rose-500/10 p-4 text-sm text-rose-200">
                             {summaryError}
                         </div>
                     )}
 
-                    {!summaryLoading && !summaryError && activeSummaryData && (
-                        <>
-                            <div className="glass-panel rounded-xl p-4">
-                                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                                    <div className="flex items-center gap-2.5 min-w-0">
-                                        <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                                            {displaySummaryHomeLogo ? (
-                                                <img src={displaySummaryHomeLogo} alt={localizeTeamName(summaryHomeName)} className="w-full h-full object-contain p-1" loading="lazy" />
-                                            ) : (
-                                                <span className="text-[10px] text-slate-300 font-bold">
-                                                    {localizeTeamName(activeSummaryData.homeTeam?.name || '').slice(0, 2).toUpperCase()}
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="hidden sm:block text-base font-bold text-white text-left truncate">{localizeTeamName(activeSummaryData.homeTeam?.name || '')}</p>
-                                    </div>
-                                    <p className="text-3xl font-black text-white px-4">
-                                        {activeSummaryData.homeTeam?.score ?? '0'} <span className="text-slate-500">-</span> {activeSummaryData.awayTeam?.score ?? '0'}
-                                    </p>
-                                    <div className="flex items-center justify-end gap-2.5 min-w-0">
-                                        <p className="hidden sm:block text-base font-bold text-white text-right truncate">{localizeTeamName(activeSummaryData.awayTeam?.name || '')}</p>
-                                        <div className="w-11 h-11 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center shrink-0">
-                                            {displaySummaryAwayLogo ? (
-                                                <img src={displaySummaryAwayLogo} alt={localizeTeamName(summaryAwayName)} className="w-full h-full object-contain p-1" loading="lazy" />
-                                            ) : (
-                                                <span className="text-[10px] text-slate-300 font-bold">
-                                                    {localizeTeamName(activeSummaryData.awayTeam?.name || '').slice(0, 2).toUpperCase()}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                <p className="text-[11px] text-slate-400 mt-2 text-center">
-                                    {localizeSummaryStatus(activeSummaryData.statusDetail)}
-                                </p>
-                                {summaryIncidentEvents.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
-                                        <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
-                                            <div className="space-y-1 min-w-0">
-                                                {homeSummaryIncidents.map((event, index) => (
-                                                    <div key={`summary-home-incident-${index}`} className="flex items-center gap-1 text-[11px] min-w-0">
-                                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
-                                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
-                                                            {formatIncidentLabel(event)}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="text-slate-500 text-xs pt-1">•</div>
-                                            <div className="space-y-1 min-w-0">
-                                                {awaySummaryIncidents.map((event, index) => (
-                                                    <div key={`summary-away-incident-${index}`} className="flex items-center justify-end gap-1 text-[11px] min-w-0">
-                                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate text-right' : 'text-red-300 font-medium truncate text-right'}>
-                                                            {formatIncidentLabel(event)}
-                                                        </span>
-                                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                                        <span className="text-slate-400 shrink-0 w-10 tabular-nums">{formatMatchClock(event.clock)}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-
-                                        {neutralSummaryIncidents.length > 0 && (
-                                            <div className="space-y-1">
-                                                {neutralSummaryIncidents.map((event, index) => (
-                                                    <div key={`summary-neutral-incident-${index}`} className="flex items-center justify-center gap-1 text-[11px] min-w-0">
-                                                        <span className="text-slate-400 shrink-0 w-10 text-right tabular-nums">{formatMatchClock(event.clock)}</span>
-                                                        <MatchEventIcon event={event} className={event.isGoal ? 'w-3.5 h-3.5 shrink-0' : 'w-3 h-4 shrink-0'} />
-                                                        <span className={event.isGoal ? 'text-yellow-300 font-semibold truncate' : 'text-red-300 font-medium truncate'}>
-                                                            {formatIncidentLabel(event)}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {Array.isArray(activeSummaryData.stats) && activeSummaryData.stats.length > 0 && (
-                                <div className="glass-panel rounded-xl p-4">
-                                    <h4 className="text-sm font-bold text-white mb-3">Özet İstatistikler</h4>
-                                    <div className="space-y-3">
-                                        {activeSummaryData.stats.map((stat, index) => {
-                                            const homeVal = Number.parseFloat(String(stat.homeValue).replace(',', '.')) || 0;
-                                            const awayVal = Number.parseFloat(String(stat.awayValue).replace(',', '.')) || 0;
-                                            const total = homeVal + awayVal || 1;
-
-                                            return (
-                                                <div key={`${stat.key}-${index}`} className="space-y-1">
-                                                    <div className="flex justify-between text-xs text-slate-300">
-                                                        <span className="font-semibold text-white">{stat.homeValue}</span>
-                                                        <span>{stat.label}</span>
-                                                        <span className="font-semibold text-white">{stat.awayValue}</span>
-                                                    </div>
-                                                    <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden flex">
-                                                        <div className="h-full bg-yellow-400" style={{ width: `${(homeVal / total) * 100}%` }} />
-                                                        <div className="h-full flex-1 bg-slate-600" />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeSummaryData.lineups && (
-                                <MatchLineups
-                                    lineups={activeSummaryData.lineups}
-                                    homeTeamName={activeSummaryData.homeTeam?.name}
-                                    awayTeamName={activeSummaryData.awayTeam?.name}
-                                    matchId={activeSummaryMatch?.id}
-                                    useSquadPhotos={useSquadPhotos}
-                                />
-                            )}
-
-                            {Array.isArray(activeSummaryData.events) && activeSummaryData.events.length > 0 && (
-                                <div className="glass-panel rounded-xl p-4">
-                                    <h4 className="text-sm font-bold text-white mb-3">Maç Olayları</h4>
-                                    <div className="space-y-2">
-                                        {activeSummaryData.events.map((event, index) => {
-                                            const eventType = getEventVisualType(event);
-                                            const rowClass = eventType === 'goal'
-                                                ? 'bg-yellow-400/10'
-                                                : eventType === 'red-card'
-                                                    ? 'bg-red-500/10'
-                                                    : 'bg-white/5';
-                                            const textClass = eventType === 'goal'
-                                                ? 'text-yellow-300 font-semibold'
-                                                : eventType === 'red-card'
-                                                    ? 'text-red-300'
-                                                    : 'text-slate-200';
-
-                                            return (
-                                                <div key={`${event.clock}-${index}`} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${rowClass}`}>
-                                                    <span className="text-[11px] text-yellow-300 w-12">{formatMatchClock(event.clock)}</span>
-                                                    <span className="w-4 h-4 flex items-center justify-center">
-                                                        <MatchEventIcon event={event} className={eventType === 'goal' ? 'w-4 h-4' : 'w-3 h-4'} />
-                                                    </span>
-                                                    <span className={`text-sm ${textClass}`}>
-                                                        {localizePlayerName(event.player || '') || event.type || 'Olay'}
-                                                        {event.isGoal && event.isPenalty && (
-                                                            <span className="ml-1 text-yellow-200 font-semibold">(P)</span>
-                                                        )}
-                                                        {event.isGoal && event.isOwnGoal && (
-                                                            <span className="ml-1 text-yellow-200 font-semibold">(K.K)</span>
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-
-                        </>
+                    {!summaryLoading && !summaryError && matchCenterData && (
+                        <LiveMatchScore
+                            data={matchCenterData}
+                            useSquadPhotos={useSquadPhotos}
+                            initialSection="stats"
+                        />
                     )}
                 </div>
             </div>
@@ -291,4 +159,3 @@ function MatchSummaryModal({
 }
 
 export default MatchSummaryModal;
-

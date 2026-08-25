@@ -10,6 +10,9 @@ interface SeasonSelectorProps {
     className?: string;
 }
 
+const formatCompactSeasonLabel = (startYear: number): string =>
+    `${String(startYear).slice(-2)}/${String(startYear + 1).slice(-2)}`;
+
 const SeasonSelector: React.FC<SeasonSelectorProps> = ({
     value,
     options,
@@ -62,7 +65,8 @@ const SeasonSelector: React.FC<SeasonSelectorProps> = ({
                     >
                         {options.map((option) => (
                             <option key={option.startYear} value={option.startYear} className="bg-slate-950 text-white">
-                                {option.label}{!compact && option.badge ? ` (${option.badge})` : ''}
+                                {compact ? formatCompactSeasonLabel(option.startYear) : option.label}
+                                {!compact && option.badge ? ` (${option.badge})` : ''}
                             </option>
                         ))}
                     </select>

@@ -70,4 +70,24 @@ describe('FixtureSchedule competition UI', () => {
 
         expect(screen.getByTitle('UEFA Şampiyonlar Ligi Elemeleri')).toHaveClass('text-white');
     });
+
+    it('opens a finished match summary with a chart icon instead of a chevron', async () => {
+        const onOpenSummary = vi.fn();
+        const finishedMatch: FixtureMatch = {
+            ...cupFixture,
+            source: 'espn',
+            summaryAvailable: true,
+        };
+
+        render(<FixtureMatchCard match={finishedMatch} onOpenSummary={onOpenSummary} />);
+
+        const action = screen.getByRole('button', { name: 'Maç Detayları' });
+        expect(action.querySelector('svg.lucide')).toBeInTheDocument();
+        expect(action).toHaveTextContent('Maç Detayları');
+        expect(action).toHaveClass('h-9', 'rounded-md', 'border', 'bg-white/[0.04]', 'text-slate-200');
+        expect(action.querySelector('span')).not.toBeInTheDocument();
+
+        action.click();
+        expect(onOpenSummary).toHaveBeenCalledWith(finishedMatch);
+    });
 });

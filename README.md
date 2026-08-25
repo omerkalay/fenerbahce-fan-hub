@@ -6,18 +6,26 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.14.0-blue)
+![Version](https://img.shields.io/badge/version-2.14.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.14.0
+## What's New in v2.14.1
+
+- **Mobile Fixture Polish** - The compact fixture season picker now uses a clear `26/27` label without changing the selected season value, while completed-match cards replace the chevron with a touch-friendly match-details action
+- **Unified Completed Match Center** - Finished fixtures now reuse the live Match Center's score card, tabbed event timeline, hybrid comparison statistics, shared lineup view, accessible dialog behavior, and dual-theme styling
+
+<details>
+<summary>Previous: v2.14.0</summary>
 
 - **Mobile-First Live Match Redesign** - The existing production live-match dashboard has been redesigned to present teams, score, match state, and clock at a glance while handling countdown, starting, live, halftime, full-time, and partial-data states without changing the existing backend contract
 - **Redesigned Match Center** - The existing live detail experience now uses an accessible match-center dialog with a side-aware event timeline for goals, assists, cards, substitutions, and VAR decisions, compact hybrid comparison statistics, and the shared lineup view
 - **Dual-Theme Matchday Polish** - Live surfaces, timelines, statistics, and responsive lineup pitches now remain readable and consistent in both `Klasik Gece` and `Beyaz Forma`, from narrow phones to desktop dialogs
 - **Isolated Development Simulator** - Local Vite development can preview every match phase through `mockLive` while keeping Firebase writes, authentication, notifications, administration, and live-lineup writes disabled; production builds remove the simulator and reject leaked development markers automatically
+
+</details>
 
 <details>
 <summary>Previous: v2.10.0 – v2.13.1</summary>
@@ -622,4 +630,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.14.0** | August 2026
+**v2.14.1** | August 2026

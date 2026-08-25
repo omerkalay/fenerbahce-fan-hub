@@ -3,7 +3,7 @@ import MatchSummaryModal from './MatchSummaryModal';
 import { localizeTeamName } from '../utils/localize';
 import type { FixtureMatch, FixtureTeam } from '../types';
 import SeasonSelector from './SeasonSelector';
-import { Search } from 'lucide-react';
+import { BarChart3, Search } from 'lucide-react';
 import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
 import { COMPETITION_FILTERS } from './fixtureFilters';
@@ -180,13 +180,13 @@ export const FixtureMatchCard = ({ match, featured = false, cardRef = null, onOp
 
                     {isFinished && onOpenSummary && match.summaryAvailable && (
                         <button
+                            type="button"
                             onClick={() => onOpenSummary(match)}
-                            className="group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/15 bg-white/[0.04] text-slate-200 hover:text-yellow-200 hover:border-yellow-400/35 hover:bg-yellow-400/10 transition-all duration-300 text-[11px] font-semibold whitespace-nowrap"
+                            className="relative inline-flex h-9 items-center gap-1.5 rounded-md border border-white/15 bg-white/[0.04] px-2.5 text-[10px] font-bold text-slate-200 transition-colors after:absolute after:-inset-y-1 after:inset-x-0 after:content-[''] hover:border-white/25 hover:bg-white/[0.07] hover:text-white active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400 whitespace-nowrap"
+                            aria-label="Maç Detayları"
                         >
-                            Maç İstatistikleri
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-yellow-300/90 transition-transform duration-300 group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            <BarChart3 className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                            Maç Detayları
                         </button>
                     )}
                 </div>

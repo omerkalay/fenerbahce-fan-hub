@@ -71,6 +71,7 @@ describe('AdminPanel notices', () => {
 
         fireEvent.click(autoPublishCheckbox);
         expect(await screen.findByText('Otomasyon ayarları güncellendi.')).toBeInTheDocument();
+        await waitFor(() => expect(dismissNotice).not.toBeNull());
         act(() => { dismissNotice?.(); });
         expect(screen.queryByText('Otomasyon ayarları güncellendi.')).not.toBeInTheDocument();
 

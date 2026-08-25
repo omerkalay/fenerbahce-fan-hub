@@ -13,6 +13,7 @@ type MatchCenterSection = 'events' | 'stats' | 'lineups';
 interface LiveMatchScoreProps {
     data: LiveMatchData;
     useSquadPhotos?: boolean;
+    initialSection?: MatchCenterSection;
 }
 
 const localizeStatusDetail = (statusDetail: string = ''): string => {
@@ -36,9 +37,13 @@ const TeamCrest = ({ src, name }: { src: string | null; name: string }) => (
     </div>
 );
 
-export default function LiveMatchScore({ data: liveData, useSquadPhotos = true }: LiveMatchScoreProps) {
+export default function LiveMatchScore({
+    data: liveData,
+    useSquadPhotos = true,
+    initialSection = 'events',
+}: LiveMatchScoreProps) {
     const { theme } = useTheme();
-    const [activeSection, setActiveSection] = useState<MatchCenterSection>('events');
+    const [activeSection, setActiveSection] = useState<MatchCenterSection>(initialSection);
     const isHalftime = isHalftimeDisplay(liveData.statusDetail, liveData.displayClock);
     const homeName = localizeTeamName(liveData.homeTeam?.name || 'Ev Sahibi');
     const awayName = localizeTeamName(liveData.awayTeam?.name || 'Deplasman');
@@ -57,7 +62,7 @@ export default function LiveMatchScore({ data: liveData, useSquadPhotos = true }
 
     return (
         <div className="w-full">
-            <section className="live-match-score-card overflow-hidden rounded-2xl border border-white/10 bg-[#08172c]" aria-label="Canlı skor">
+            <section className="live-match-score-card overflow-hidden rounded-2xl border border-white/10 bg-[#08172c]" aria-label="Maç skoru">
                 <div className="flex items-center justify-between gap-3 px-4 pt-4">
                     <p className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Maç Merkezi</p>
                     <div className={`inline-flex shrink-0 items-center gap-2 py-1 text-[10px] font-black uppercase tracking-wider ${isLive ? 'text-yellow-300' : 'text-emerald-300'}`}>
