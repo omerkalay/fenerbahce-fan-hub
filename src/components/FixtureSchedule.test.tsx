@@ -11,6 +11,12 @@ vi.mock('../services/api', () => ({
     fetchMatchSummary: vi.fn()
 }));
 
+// The data source selector reaches Realtime Database, which cannot initialize
+// without the Firebase environment that CI intentionally withholds from tests.
+vi.mock('../firebase', () => ({
+    database: {},
+}));
+
 const cupFixture: FixtureMatch = {
     id: '987',
     source: 'sofascore',

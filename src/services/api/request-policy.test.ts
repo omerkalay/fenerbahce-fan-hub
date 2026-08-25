@@ -85,4 +85,32 @@ describe('ESPN request policy', () => {
         expect(loader).toHaveBeenCalledTimes(2);
         clearSessionRequest(key);
     });
+
+    it('retries after a rejected session request instead of replaying the failure', async () => {
+        const key = 'request-policy-rejection';
+        clearSessionRequest(key);
+        const loader = vi.fn()
+            .mockRejectedValueOnce(new Error('provider down'))
+            .mockResolvedValueOnce('recovered');
+
+        await expect(runSessionRequest(key, loader)).rejects.toThrow('provider down');
+        await expect(runSessionRequest(key, loader)).resolves.toBe('recovered');
+        expect(loader).toHaveBeenCalledTimes(2);
+        clearSessionRequest(key);
+    });
+
+    it('retries after an unusable result while still deduplicating usable results', async () => {
+        const key = 'request-policy-empty-result';
+        clearSessionRequest(key);
+        const loader = vi.fn()
+            .mockResolvedValueOnce(null)
+            .mockResolvedValue({ rows: 18 });
+        const shouldCache = (value: unknown) => value !== null;
+
+        await expect(runSessionRequest(key, loader, false, shouldCache)).resolves.toBeNull();
+        await expect(runSessionRequest(key, loader, false, shouldCache)).resolves.toEqual({ rows: 18 });
+        await expect(runSessionRequest(key, loader, false, shouldCache)).resolves.toEqual({ rows: 18 });
+        expect(loader).toHaveBeenCalledTimes(2);
+        clearSessionRequest(key);
+    });
 });

@@ -1,6 +1,10 @@
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
 const sessionRequests = new Map<string, Promise<unknown>>();
+
+const evictOwnEntry = (key: string, request: Promise<unknown>): void => {
+    if (sessionRequests.get(key) === request) sessionRequests.delete(key);
+};
 const ESPN_PREFERRED_HOST = 'site.web.api.espn.com';
 const ESPN_LEGACY_HOST = 'site.api.espn.com';
 
@@ -73,14 +77,27 @@ export const settleWithConcurrency = async <T, R>(
 export const runSessionRequest = <T>(
     key: string,
     loader: () => Promise<T>,
-    force = false
+    force = false,
+    shouldCache: (value: T) => boolean = () => true
 ): Promise<T> => {
     if (!force) {
         const existing = sessionRequests.get(key);
         if (existing) return existing as Promise<T>;
     }
 
-    const request = loader();
+    // A failed attempt must not outlive itself. Loaders report provider failure as a
+    // resolved empty value or a rejection, so without this eviction one transient ESPN
+    // error would keep serving the same failure for the rest of the browser session.
+    const request: Promise<T> = loader().then(
+        (value) => {
+            if (!shouldCache(value)) evictOwnEntry(key, request);
+            return value;
+        },
+        (error) => {
+            evictOwnEntry(key, request);
+            throw error;
+        }
+    );
     sessionRequests.set(key, request);
     return request;
 };

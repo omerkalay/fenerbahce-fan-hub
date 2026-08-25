@@ -259,5 +259,6 @@ export const fetchEspnFenerbahceFixtures = (
 ): Promise<EspnFixtureData> => runSessionRequest(
     `espn-fixtures:${seasonStartYear}`,
     () => loadEspnFenerbahceFixtures(seasonStartYear),
-    options.force === true
+    options.force === true,
+    (data) => data.error !== true
 );

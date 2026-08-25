@@ -85,15 +85,19 @@ const dailyDataRefresh = onSchedule({
         const cacheUpdates = { ...cache };
         delete cacheUpdates.uefaJourney;
         await db.ref('cache').update(cacheUpdates);
-        const snapshotResults = await refreshDataSnapshots({
-            resources: 'all',
-            seasonStartYear: cache.season.startYear,
-            now
-        });
-        if (snapshotResults.some((result) => result.status === 'error')) {
-            console.warn('Core data snapshots completed with preserved fallback data:', snapshotResults);
-        } else {
-            console.log('Core data snapshots refreshed successfully');
+        try {
+            const snapshotResults = await refreshDataSnapshots({
+                resources: 'all',
+                seasonStartYear: cache.season.startYear,
+                now
+            });
+            if (snapshotResults.some((result) => result.status === 'error')) {
+                console.warn('Core data snapshots completed with preserved fallback data:', snapshotResults);
+            } else {
+                console.log('Core data snapshots refreshed successfully');
+            }
+        } catch (error) {
+            console.error(`❌ Core data snapshot refresh failed: ${error.message}`);
         }
         try {
             await refreshUefaJourneyCache(cache.season.startYear, { now });

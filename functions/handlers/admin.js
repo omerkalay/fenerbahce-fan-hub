@@ -83,11 +83,16 @@ async function handleRefresh(req, res) {
         const cacheUpdates = { ...cache };
         delete cacheUpdates.uefaJourney;
         await db.ref('cache').update(cacheUpdates);
-        const dataSnapshots = await refreshDataSnapshots({
-            resources: 'all',
-            seasonStartYear: cache.season.startYear,
-            now
-        });
+        let dataSnapshots = null;
+        try {
+            dataSnapshots = await refreshDataSnapshots({
+                resources: 'all',
+                seasonStartYear: cache.season.startYear,
+                now
+            });
+        } catch (error) {
+            console.error(`Core data snapshot refresh failed: ${error.message}`);
+        }
         let uefaJourney = null;
         try {
             uefaJourney = await refreshUefaJourneyCache(cache.season.startYear, { now });

@@ -150,7 +150,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Home/Away Filter**: Quickly narrow down to home or away fixtures
 - **Always-Visible Team Search**: Search by opponent directly beside the season picker without opening advanced filters
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
-- **Resilient Direct ESPN Requests**: Browser requests remain the default, use bounded concurrency, retry one transient network/CORS/5xx failure through ESPN's alternate official API hostname, and keep successful competitions when another competition feed fails
+- **Resilient Direct ESPN Requests**: Browser requests remain the default, use bounded concurrency, retry one transient network/CORS/5xx failure through ESPN's alternate official API hostname, and keep successful competitions when another competition feed fails. Only usable responses are deduplicated for the session, so a failed attempt is retried instead of replayed
 - **Manual Refresh**: Force a fresh ESPN request (or reload the selected cache snapshot when cache mode is active)
 - **Fixture Match Summary Modal**: For completed matches, opens cached summary data (scoreline, ordered stats, key events, and actual lineups with formation/bench/substitutions when available)
 
@@ -263,7 +263,7 @@ This small public read-only node is published from the claim-protected administr
 | Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, and goal summary formatting |
 | Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
 | Season helpers | `src/utils/seasons.test.ts` | July season rollover, recent-season options, historical detection, selected-season date boundaries |
-| ESPN request resilience | `src/services/api/request-policy.test.ts`, `src/services/api/espn-fixtures.test.ts` | Bounded concurrency, one transient retry, session deduplication, and partial competition success |
+| ESPN request resilience | `src/services/api/request-policy.test.ts`, `src/services/api/espn-fixtures.test.ts` | Bounded concurrency, one transient retry, session deduplication of usable results only, retry after a rejected or empty attempt, and partial competition success |
 | Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Süper Lig and all-European-competition requests with combined goal/assist totals |
 | Data snapshots | `functions/services/dataSnapshots.test.js` | 06:00/admin snapshot generation and last-known-good preservation after provider failures |
 | Cache refresh safety | `functions/utils/cacheRefresh.test.js` | Last known-good cache preservation on provider failure and replacement only after a successful response |

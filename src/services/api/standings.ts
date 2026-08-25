@@ -78,5 +78,6 @@ export const fetchEspnStandings = (
 ): Promise<StandingsData | null> => runSessionRequest(
     `espn-standings:${leagueId}:${seasonStartYear}`,
     () => loadEspnStandings(leagueId, seasonStartYear),
-    options.force === true
+    options.force === true,
+    (data) => data !== null
 );

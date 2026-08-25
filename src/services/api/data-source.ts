@@ -42,15 +42,19 @@ export const readCachedSnapshot = async <T>(
         return snapshotRequests.get(path) as Promise<CachedSnapshot<T> | null>;
     }
 
-    const request = get(ref(database, path))
-        .then((snapshot) => {
+    // A missing or unreadable snapshot is not cached, so a later attempt can still
+    // find the node once the scheduled refresh or an administrator has written it.
+    const request = (async (): Promise<CachedSnapshot<T> | null> => {
+        try {
+            const snapshot = await get(ref(database, path));
             const value = snapshot.val() as CachedSnapshot<T> | null;
-            return value?.data ? value : null;
-        })
-        .catch((error) => {
+            if (value?.data) return value;
+        } catch (error) {
             console.warn(`Cached ${resource} data could not be loaded:`, error);
-            return null;
-        });
+        }
+        snapshotRequests.delete(path);
+        return null;
+    })();
     snapshotRequests.set(path, request);
     return request;
 };
