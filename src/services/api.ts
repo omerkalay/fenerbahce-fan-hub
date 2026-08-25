@@ -13,4 +13,4 @@ export { fetchEspnFenerbahceFixtures } from './api/espn-fixtures';
 export { fetchCupFixtures, normalizeCupFixtureMatch } from './api/cup-fixtures';
 export { fetchUefaJourney, fetchUefaJourneySummary } from './api/uefa-journey';
 export { fetchFenerbahceFixtures } from './api/combined-fixtures';
-export { fetchPlayerStats, fetchFormResults, fetchPlayerStatus } from './api/statistics';
+export { fetchPlayerStats, fetchFormResults, fetchPlayerStatus, parsePlayerStatus, subscribePlayerStatus } from './api/statistics';

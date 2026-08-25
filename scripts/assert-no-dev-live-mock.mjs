@@ -8,6 +8,8 @@ const FORBIDDEN_MARKERS = [
   'Canlı Maç Simülatörü',
   'Yazmalar Kapalı',
   'partial-data',
+  'adminStatusPreview',
+  'Yerel önizleme — Firebase’e yazılmaz',
 ];
 
 const collectFiles = async (directoryUrl) => {
@@ -39,8 +41,7 @@ for (const fileUrl of files) {
 }
 
 if (violations.length > 0) {
-  throw new Error(`Production output contains development live mock markers:\n${violations.join('\n')}`);
+  throw new Error(`Production output contains development-only preview markers:\n${violations.join('\n')}`);
 }
 
-console.log('Production output excludes the development live match simulator.');
-
+console.log('Production output excludes development-only preview tools.');

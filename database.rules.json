@@ -10,10 +10,6 @@
       "playerStatus": {
         ".read": true,
         ".write": false
-      },
-      "startingXI": {
-        ".read": true,
-        ".write": false
       }
     },
     "match_polls": {

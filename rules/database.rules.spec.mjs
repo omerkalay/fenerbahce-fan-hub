@@ -60,14 +60,30 @@ after(async () => {
   await testEnvironment?.cleanup();
 });
 
-test('public sports cache and published admin data are readable but not writable', async () => {
+test('public sports cache and published player statuses are readable but not writable', async () => {
   const database = testEnvironment.unauthenticatedContext().database();
+  const userDatabase = testEnvironment.authenticatedContext('uid-a').database();
+  const adminDatabase = testEnvironment.authenticatedContext('uid-admin', { admin: true }).database();
   await assertSucceeds(get(ref(database, 'cache/nextMatch')));
   await assertSucceeds(get(ref(database, 'cache/matchLineups/401888314')));
   await assertSucceeds(get(ref(database, 'admin/playerStatus')));
-  await assertSucceeds(get(ref(database, 'admin/startingXI')));
   await assertFails(set(ref(database, 'cache/nextMatch'), { id: 'attacker' }));
-  await assertFails(set(ref(database, 'admin/startingXI/publishedAt'), 999));
+  await assertFails(set(ref(database, 'admin/playerStatus/player1'), { status: 'fit' }));
+  await assertFails(set(ref(userDatabase, 'admin/playerStatus/player1'), { status: 'fit' }));
+  await assertFails(set(ref(adminDatabase, 'admin/playerStatus/player1'), { status: 'fit' }));
+});
+
+test('legacy Starting XI path is closed to public, user and admin clients', async () => {
+  const publicDatabase = testEnvironment.unauthenticatedContext().database();
+  const userDatabase = testEnvironment.authenticatedContext('uid-a').database();
+  const adminDatabase = testEnvironment.authenticatedContext('uid-admin', { admin: true }).database();
+
+  await assertFails(get(ref(publicDatabase, 'admin/startingXI')));
+  await assertFails(get(ref(userDatabase, 'admin/startingXI')));
+  await assertFails(get(ref(adminDatabase, 'admin/startingXI')));
+  await assertFails(set(ref(publicDatabase, 'admin/startingXI/publishedAt'), 999));
+  await assertFails(set(ref(userDatabase, 'admin/startingXI/publishedAt'), 999));
+  await assertFails(set(ref(adminDatabase, 'admin/startingXI/publishedAt'), 999));
 });
 
 test('private operations state is inaccessible even to a client with an admin claim', async () => {
@@ -78,6 +94,8 @@ test('private operations state is inaccessible even to a client with an admin cl
   await assertFails(get(ref(adminClientDatabase, 'ops/adminSettings')));
   await assertFails(set(ref(adminClientDatabase, 'ops/adminSettings/lineups/autoPushLineups'), true));
   await assertFails(set(ref(adminClientDatabase, 'cache/matchLineups/401888314'), { attacker: true }));
+  await assertFails(get(ref(adminClientDatabase, 'ops/playerStatus')));
+  await assertFails(set(ref(adminClientDatabase, 'ops/playerStatus/drafts/uid-admin'), { attacker: true }));
 });
 
 test('poll totals are public while individual votes are owner-only and server-written', async () => {

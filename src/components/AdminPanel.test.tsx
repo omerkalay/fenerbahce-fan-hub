@@ -8,7 +8,10 @@ const mocks = vi.hoisted(() => ({
     fetchAdminSession: vi.fn(),
     fetchAdminOverview: vi.fn(),
     fetchAdminLineup: vi.fn(),
+    fetchAdminPlayerStatus: vi.fn(),
     updateAdminSettings: vi.fn(),
+    saveAdminPlayerStatusDraft: vi.fn(),
+    publishAdminPlayerStatus: vi.fn(),
     saveAdminLineupDraft: vi.fn(),
     publishAdminLineup: vi.fn(),
     releaseAdminLineup: vi.fn(),
@@ -17,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../services/admin', () => mocks);
+vi.mock('../services/api', () => ({ fetchSquad: vi.fn().mockResolvedValue([]), fetchPlayerStatus: vi.fn().mockResolvedValue([]) }));
 vi.mock('./FormationBuilder', () => ({ default: () => <div>Formation builder</div> }));
 vi.mock('./MatchLineups', () => ({ default: () => <div>Lineup preview</div> }));
 
@@ -33,7 +37,7 @@ describe('AdminPanel notices', () => {
         vi.clearAllMocks();
         mocks.fetchAdminSession.mockResolvedValue({ success: true, uid: 'admin-user', admin: true });
         mocks.fetchAdminOverview.mockResolvedValue({
-            version: '2.13.1',
+            version: '2.15.0',
             settings: { autoPublishLineups: false, autoPushLineups: false },
             topicSync: { pending: 0, cleanupPending: 0 },
             health: {}

@@ -1,5 +1,5 @@
 import { database } from '../../firebase';
-import { ref, get } from 'firebase/database';
+import { ref, get, onValue } from 'firebase/database';
 import { localizePlayerName } from '../../utils/playerDisplay';
 import type { PlayerStat, FormResult, PlayerStatusEntry } from '../../types';
 import { fetchEspnFenerbahceFixtures } from './espn-fixtures';
@@ -168,36 +168,51 @@ export const fetchFormResults = async (): Promise<FormResult[]> => {
     }
 };
 
+export const parsePlayerStatus = (raw: unknown): PlayerStatusEntry[] => {
+    if (!raw) return [];
+    const entries: unknown[] = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>);
+
+    return entries
+        .filter((entry): entry is Record<string, unknown> => entry !== null && typeof entry === 'object')
+        .map(entry => {
+            const statusValue = String(entry.status ?? 'fit');
+            const validStatuses: PlayerStatusEntry['status'][] = ['injured', 'suspended', 'card-risk', 'doubtful', 'fit'];
+            const status: PlayerStatusEntry['status'] = validStatuses.includes(statusValue as PlayerStatusEntry['status'])
+                ? (statusValue as PlayerStatusEntry['status'])
+                : 'fit';
+            const sourceValue: PlayerStatusEntry['source'] = entry.source === 'squad' || entry.source === 'manual'
+                ? entry.source
+                : undefined;
+
+            return {
+                ...(entry.playerId ? { playerId: String(entry.playerId) } : {}),
+                ...(sourceValue ? { source: sourceValue } : {}),
+                name: String(entry.name ?? ''),
+                status,
+                detail: String(entry.detail ?? ''),
+                returnDate: String(entry.returnDate ?? ''),
+                updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : 0,
+            };
+        })
+        .filter(entry => entry.name.trim().length > 0);
+};
+
 export const fetchPlayerStatus = async (): Promise<PlayerStatusEntry[]> => {
     try {
         const snapshot = await get(ref(database, 'admin/playerStatus'));
-        const raw = snapshot.val();
-        if (!raw) return [];
-
-        const entries: unknown[] = Array.isArray(raw) ? raw : Object.values(raw as Record<string, unknown>);
-
-        return entries
-            .filter((entry): entry is Record<string, unknown> =>
-                entry !== null && typeof entry === 'object'
-            )
-            .map(entry => {
-                const statusValue = String(entry.status ?? 'fit');
-                const validStatuses: PlayerStatusEntry['status'][] = ['injured', 'suspended', 'card-risk', 'doubtful', 'fit'];
-                const status: PlayerStatusEntry['status'] = validStatuses.includes(statusValue as PlayerStatusEntry['status'])
-                    ? (statusValue as PlayerStatusEntry['status'])
-                    : 'fit';
-
-                return {
-                    name: String(entry.name ?? ''),
-                    status,
-                    detail: String(entry.detail ?? ''),
-                    returnDate: String(entry.returnDate ?? ''),
-                    updatedAt: typeof entry.updatedAt === 'number' ? entry.updatedAt : 0,
-                };
-            });
+        return parsePlayerStatus(snapshot.val());
     } catch (error) {
         console.error('Error fetching player status:', error);
         if (error instanceof Error) throw error;
         throw new Error('Player status fetch failed.');
     }
 };
+
+export const subscribePlayerStatus = (
+    onData: (entries: PlayerStatusEntry[]) => void,
+    onError: (error: Error) => void
+): (() => void) => onValue(
+    ref(database, 'admin/playerStatus'),
+    (snapshot) => onData(parsePlayerStatus(snapshot.val())),
+    (error) => onError(error)
+);

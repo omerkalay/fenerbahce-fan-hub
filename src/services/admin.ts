@@ -55,6 +55,31 @@ export interface AdminNotificationPayload {
     url: string;
 }
 
+export type AdminPlayerStatus = 'injured' | 'suspended' | 'doubtful' | 'card-risk';
+
+export interface AdminPlayerStatusEntry {
+    playerId: string;
+    source: 'squad' | 'manual';
+    name: string;
+    status: AdminPlayerStatus;
+    detail: string;
+    returnDate: string;
+    updatedAt?: number;
+}
+
+export interface AdminPlayerStatusDraft {
+    baseRevision: number;
+    entries: AdminPlayerStatusEntry[];
+    updatedAt?: number;
+}
+
+export interface AdminPlayerStatusState {
+    published: AdminPlayerStatusEntry[];
+    draft: AdminPlayerStatusDraft | null;
+    revision: number;
+    lastPublishedAt: number | null;
+}
+
 const ADMIN_ERROR_MESSAGES: Record<number, string> = {
     400: 'Gönderilen bilgiler geçersiz.',
     401: 'Yönetici oturumu doğrulanamadı. Tekrar giriş yap.',
@@ -88,6 +113,24 @@ const adminRequest = async <T>(path: string, init: RequestInit = {}): Promise<T>
 export const fetchAdminSession = () => adminRequest<{ authenticated: true; admin: true; uid: string }>('session');
 export const fetchAdminOverview = () => adminRequest<AdminOverview>('overview');
 export const fetchAdminLineup = (matchId: number | string) => adminRequest<AdminLineupDetail>(`lineups/${matchId}`);
+export const fetchAdminPlayerStatus = () => adminRequest<AdminPlayerStatusState>('player-status');
+
+export const saveAdminPlayerStatusDraft = (baseRevision: number, entries: AdminPlayerStatusEntry[]) => (
+    adminRequest<{ success: true; draft: AdminPlayerStatusDraft }>('player-status/draft', {
+        method: 'PUT',
+        body: JSON.stringify({
+            baseRevision,
+            entries: entries.map(({ updatedAt: _updatedAt, ...entry }) => entry)
+        })
+    })
+);
+
+export const publishAdminPlayerStatus = (baseRevision: number) => (
+    adminRequest<{ success: true; published: AdminPlayerStatusEntry[]; revision: number; lastPublishedAt: number }>('player-status/publish', {
+        method: 'POST',
+        body: JSON.stringify({ baseRevision })
+    })
+);
 
 export const saveAdminLineupDraft = (matchId: number | string, draft: FormationDraft) => (
     adminRequest<{ success: true; draft: FormationDraft }>(`lineups/${matchId}/draft`, {

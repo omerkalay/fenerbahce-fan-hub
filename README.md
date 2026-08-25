@@ -6,22 +6,24 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.14.1-blue)
+![Version](https://img.shields.io/badge/version-2.15.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.14.1
+## What's New in v2.15.0
 
-- **Mobile Fixture Polish** - The compact fixture season picker now uses a clear `26/27` label without changing the selected season value, while completed-match cards replace the chevron with a touch-friendly match-details action
-- **Unified Completed Match Center** - Finished fixtures now reuse the live Match Center's score card, tabbed event timeline, hybrid comparison statistics, shared lineup view, accessible dialog behavior, and dual-theme styling
+- **Protected Player Status Operations** - The claim-protected administration panel now provides a mobile-first draft, preview, revision-safe publish, manual-player fallback, status-specific description presets, and estimated-return shortcuts for injuries, suspensions, doubts, and card risks without sending automatic notifications
+- **Atomic Public Status Publishing** - Strict server schemas, generated manual IDs, private drafts, revision conflict handling, operation locks, and audit records publish the small public `admin/playerStatus` node atomically while every browser write remains denied
+- **Legacy Starting XI Removal** - The former `admin/startingXI` RTDB trigger, public rule, normalizers, tests, and console workflow are removed; verified lineups now use only `cache/matchLineups/{matchId}` with private state under `ops/lineups/{matchId}`
+- **Safe Local Review Mode** - Development-only `adminStatusPreview` reads the live public status and squad data but keeps every edit and simulated publish in memory; production builds reject any leaked preview marker
 
 <details>
-<summary>Previous: v2.14.0</summary>
+<summary>Previous: v2.14.x (v2.14.0 – v2.14.1)</summary>
 
-- **Mobile-First Live Match Redesign** - The existing production live-match dashboard has been redesigned to present teams, score, match state, and clock at a glance while handling countdown, starting, live, halftime, full-time, and partial-data states without changing the existing backend contract
-- **Redesigned Match Center** - The existing live detail experience now uses an accessible match-center dialog with a side-aware event timeline for goals, assists, cards, substitutions, and VAR decisions, compact hybrid comparison statistics, and the shared lineup view
+- **Unified Matchday Experience** - The mobile-first live dashboard and accessible Match Center now present score, match state, clock, side-aware events, comparison statistics, and shared lineups across live and completed fixtures without changing the backend contract
+- **Fixture Usability** - The compact season picker uses a clear `26/27` label, completed-match cards expose a touch-friendly details action, and finished fixtures reuse the same Match Center experience
 - **Dual-Theme Matchday Polish** - Live surfaces, timelines, statistics, and responsive lineup pitches now remain readable and consistent in both `Klasik Gece` and `Beyaz Forma`, from narrow phones to desktop dialogs
 - **Isolated Development Simulator** - Local Vite development can preview every match phase through `mockLive` while keeping Firebase writes, authentication, notifications, administration, and live-lineup writes disabled; production builds remove the simulator and reject leaked development markers automatically
 
@@ -163,12 +165,14 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 #### `admin/playerStatus` Schema
 
-This node is managed manually via the Firebase Console. Each entry:
+This small public read-only node is published from the claim-protected administration panel. Administrators prepare a private draft, review the shared Statistics preview, and explicitly publish it; clients never write this path directly. Each published entry:
 
 ```json
 {
+  "playerId": "123456",
+  "source": "squad | manual",
   "name": "Player Name",
-  "status": "injured | suspended | doubtful | card-risk | fit",
+  "status": "injured | suspended | doubtful | card-risk",
   "detail": "Right knee ligament injury",
   "returnDate": "March 2026",
   "updatedAt": 1709500000000
@@ -177,8 +181,10 @@ This node is managed manually via the Firebase Console. Each entry:
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `playerId` | `string` | Provider ID for squad players or a server-generated safe ID for manual entries |
+| `source` | `"squad" \| "manual"` | Whether the player came from the cached squad or the administrator fallback |
 | `name` | `string` | Player display name |
-| `status` | `"injured" \| "suspended" \| "doubtful" \| "card-risk" \| "fit"` | Current status. Only non-fit entries are rendered. `card-risk` marks players near a yellow card suspension threshold. |
+| `status` | `"injured" \| "suspended" \| "doubtful" \| "card-risk"` | Current active status. `card-risk` marks players near a yellow card suspension threshold. |
 | `detail` | `string` | Description of injury/suspension |
 | `returnDate` | `string` | Estimated return date (free text) |
 | `updatedAt` | `number` | Unix timestamp in milliseconds. Used to show "Last updated: X hours ago" |
@@ -191,7 +197,7 @@ This node is managed manually via the Firebase Console. Each entry:
 - **Safe Rollout**: `autoPublishLineups` and `autoPushLineups` default to `false`. A late lineup is displayed after validation but never sends a Starting XI push after kickoff
 - **Durable Match Binding**: Published lineups remain under `cache/matchLineups/{matchId}`. The dashboard follows only the active fixture, so the previous lineup disappears at the normal 06:00 fixture transition without deleting its stored data
 - **Public/Private Separation**: Published sports data is public read-only cache data. Detection fingerprints, drafts, manual locks, settings, health records, notification locks, and audit records live under server-only `ops`
-- **Legacy Compatibility**: The old `admin/startingXI` RTDB trigger remains temporarily available for backend compatibility but is no longer the dashboard's publication path
+- **Single Publication Path**: Verified lineups are published only under `cache/matchLineups/{matchId}`, with detection, locks, drafts, settings, and audit state isolated under private `ops`
 
 ### Formation Builder
 - **6 Formations**: 4-3-3, 4-4-2, 4-2-3-1, 4-1-4-1, 3-5-2, 4-1-2-1-2 Diamond
@@ -243,7 +249,7 @@ This node is managed manually via the Firebase Console. Each entry:
 |------|------|---------------|
 | ESPN parsing | `functions/services/espn.test.js` | Event flag normalization, summary event filtering, key event parsing, ordered stat picking |
 | Formation engine | `src/components/match-lineups/formation-engine.test.ts` | Position classification, formation parsing, preset/numeric/detailed/fallback row building |
-| Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, goal summary formatting, Starting XI normalization |
+| Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, and goal summary formatting |
 | Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
 | Season helpers | `src/utils/seasons.test.ts` | July season rollover, recent-season options, historical detection, selected-season date boundaries |
 | Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Super Lig/Europa requests and combined goal/assist totals |
@@ -254,12 +260,10 @@ This node is managed manually via the Firebase Console. Each entry:
 | Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
 | Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
 | Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
-| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, draft constraints, and notification URLs |
+| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, lineup/player-status draft constraints, revision conflicts, generated manual IDs, and notification URLs |
 | Shared lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away tabs, incomplete provider sides, and mobile touch editing |
-| Realtime Database rules | `rules/database.rules.spec.mjs` | Public read-only sports cache, private operations state, owner isolation, and denied direct lineup writes |
-| Admin authorization | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin denial, shared route gating, path and schema manipulation, field limits, and internal notification links |
-| Lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away navigation, provider-side fallback, and touch-based administrator drafting |
-| RTDB security rules | `rules/database.rules.spec.mjs` | Public sports data, owner isolation, direct lineup write denial, and private `ops` denial even for clients carrying an admin claim |
+| Player-status UI and realtime parsing | `src/components/admin/AdminPlayerStatusManager.test.tsx`, `src/components/AdminPanel.preview.test.tsx`, `src/services/api/statistics.player-status.test.ts` | Mobile squad/manual editing, stale warnings, local-only writes, legacy/modern data parsing, and realtime updates |
+| Realtime Database rules | `rules/database.rules.spec.mjs` | Public read-only sports cache/status data, owner isolation, private `ops`, denied direct writes, and the closed legacy `admin/startingXI` path |
 
 Pure backend helpers run without Firebase side effects; the rules suite separately uses a demo-project emulator and never connects to production data.
 
@@ -278,6 +282,14 @@ After making changes, run the quality checks locally before pushing:
 ```bash
 npm run check
 ```
+
+To review the player-status UI without an administrator session or any Firebase write, start Vite and open:
+
+```text
+http://localhost:5173/fenerbahce-fan-hub/?adminStatusPreview=1
+```
+
+The development-only header control opens the **Durumlar** tab directly. It reads the public live status and squad data, but save and publish actions remain in memory and disappear on refresh. The production build removes the query switch and its warning marker.
 
 CI runs the same quality command sequence with Node.js 22 and Java 21 for the Firebase emulator.
 
@@ -318,8 +330,7 @@ CI runs the same quality command sequence with Node.js 22 and Java 21 for the Fi
                 │   matchLineups/  ← Public, server-written
                 │ ops/             ← Private server state
                 │ admin/       │
-                │   playerStatus   ← Manual (Firebase Console)
-                │   startingXI     ← Legacy compatibility only
+                │   playerStatus   ← Public read-only, admin API published
                 │ match_polls/ │
                 │ notifications│
                 └──────────────┘
@@ -355,13 +366,12 @@ fenerbahce-fan-hub/
 │   │   ├── liveMatch.js       # Live match updater (every 1 min)
 │   │   ├── notifications.js   # Match notification checker (every 1 min)
 │   │   └── topicSync.js       # all_fans topic reconciler (every 5 min)
-│   ├── triggers/
-│   │   └── startingXI.js      # One-shot Starting XI push (RTDB trigger)
 │   └── package.json           # Functions dependencies
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.tsx              # Main dashboard (orchestrator, helpers in utils/)
-│   │   ├── AdminPanel.tsx             # Private operations, lineup and notification UI
+│   │   ├── AdminPanel.tsx             # Private operations, lineup, player-status and notification UI
+│   │   ├── admin/                      # Mobile player-status draft and publish workflow
 │   │   ├── match-lineups/             # Post-match lineup viewer (split module)
 │   │   │   ├── formation-engine.ts    # Pure formation/row-building logic
 │   │   │   ├── MiniPitch.tsx          # SVG pitch visualization
@@ -528,7 +538,6 @@ firebase deploy --only database
 | `checkMatchNotifications` | Every minute | Reads `cache/next3Matches` first (no external API call) and scans user preferences only inside a due reminder window before sending through FCM. |
 | `updateLiveMatch` | Every minute | Uses the existing live task for verified ESPN lineup discovery from T-90 (three-minute cadence until T-30, then every minute) and full live tracking in Süper Lig and supported UEFA competitions. Keeps the final live payload for five minutes, archives it durably, and stores the fixture summary. |
 | `reconcileTopicSync` | Every 5 minutes | Uses indexed RTDB queries to retry only pending `all_fans` intents or deferred old-token cleanups. |
-| `onStartingXIPushRequested` | RTDB trigger | Legacy compatibility path for the previous Firebase Console workflow. New Starting XI publication and push delivery use the claim-protected admin API. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
@@ -630,4 +639,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.14.1** | August 2026
+**v2.15.0** | August 2026

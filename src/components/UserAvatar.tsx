@@ -5,9 +5,10 @@ import GoogleSignInModal, { GoogleSignInButton } from './GoogleSignInModal';
 
 interface UserAvatarProps {
   onOpenAdmin?: () => void;
+  localAdminPreview?: boolean;
 }
 
-const UserAvatar = ({ onOpenAdmin }: UserAvatarProps) => {
+const UserAvatar = ({ onOpenAdmin, localAdminPreview = false }: UserAvatarProps) => {
   const { user, isAdmin, signInWithGoogle, signOut } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -19,6 +20,22 @@ const UserAvatar = ({ onOpenAdmin }: UserAvatarProps) => {
   };
 
   if (!user) {
+    if (localAdminPreview && onOpenAdmin) {
+      return (
+        <button
+          type="button"
+          onClick={onOpenAdmin}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-sky-500/15 text-sky-200 ring-2 ring-sky-400/50 transition-all hover:bg-sky-500/25"
+          title="Yerel yönetim önizlemesi"
+          aria-label="Yerel yönetim önizlemesi"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15.5a3.5 3.5 0 100-7 3.5 3.5 0 000 7z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06-2.12 2.12-.06-.06a1.7 1.7 0 00-1.88-.34 1.7 1.7 0 00-1.04 1.56V20h-3v-.08a1.7 1.7 0 00-1.04-1.56 1.7 1.7 0 00-1.88.34l-.06.06-2.12-2.12.06-.06A1.7 1.7 0 007 14.7a1.7 1.7 0 00-1.56-1.04H5.3v-3h.14A1.7 1.7 0 007 9.62a1.7 1.7 0 00-.34-1.88l-.06-.06 2.12-2.12.06.06A1.7 1.7 0 0010.66 6a1.7 1.7 0 001.04-1.56V4.3h3v.14A1.7 1.7 0 0015.74 6a1.7 1.7 0 001.88-.34l.06-.06 2.12 2.12-.06.06a1.7 1.7 0 00-.34 1.88 1.7 1.7 0 001.56 1.04h.14v3h-.14A1.7 1.7 0 0019.4 15z" />
+          </svg>
+        </button>
+      );
+    }
     return (
       <>
         <button

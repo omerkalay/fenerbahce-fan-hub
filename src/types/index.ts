@@ -510,23 +510,11 @@ export interface FormResult {
 }
 
 export interface PlayerStatusEntry {
+  playerId?: string;
+  source?: "squad" | "manual";
   name: string;
   status: "injured" | "suspended" | "card-risk" | "doubtful" | "fit";
   detail: string;
   returnDate: string;
   updatedAt: number;
-}
-
-// ─── Starting XI ─────────────────────────────────────────
-
-export interface StartingXIPlayer {
-  name: string;
-  number: number;
-  group: 'GK' | 'DEF' | 'MID' | 'FWD';
-}
-
-export interface StartingXIData {
-  publishedAt: number;
-  starters: StartingXIPlayer[];
-  bench?: StartingXIPlayer[];
 }

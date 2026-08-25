@@ -14,6 +14,11 @@ const ALLOWED_FORMATIONS = new Set(['4-3-3', '4-4-2', '4-2-3-1', '4-1-4-1', '3-5
 const ALLOWED_PLAYER_KEYS = new Set(['slot', 'id', 'name', 'position', 'number']);
 const APP_URL = 'https://omerkalay.com/fenerbahce-fan-hub/';
 const NOTIFICATION_TEST_TTL_MS = 10 * 60 * 1000;
+const PLAYER_STATUS_VALUES = new Set(['injured', 'suspended', 'doubtful', 'card-risk']);
+const PLAYER_STATUS_SOURCES = new Set(['squad', 'manual']);
+const PLAYER_STATUS_MAX_ENTRIES = 40;
+const PLAYER_STATUS_LOCK_TTL_MS = 30 * 1000;
+const PLAYER_STATUS_ENTRY_KEYS = new Set(['playerId', 'source', 'name', 'status', 'detail', 'returnDate']);
 
 const hasOnlyKeys = (value, allowedKeys) => (
     value && typeof value === 'object' && !Array.isArray(value)
@@ -163,6 +168,164 @@ const notificationHash = (payload) => crypto
     .update(JSON.stringify({ title: payload.title, body: payload.body, url: payload.url }))
     .digest('hex');
 
+const normalizePlayerStatusName = (value) => String(value || '')
+    .trim()
+    .toLocaleLowerCase('tr-TR')
+    .replace(/\s+/g, ' ');
+
+const createLegacyPlayerStatusId = (name) => `legacy-${crypto
+    .createHash('sha256')
+    .update(normalizePlayerStatusName(name))
+    .digest('hex')
+    .slice(0, 16)}`;
+
+const isValidPlayerStatusId = (playerId, source) => {
+    if (source === 'squad') return /^\d{1,20}$/.test(playerId);
+    return /^(?:manual-[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|legacy-[0-9a-f]{16})$/i.test(playerId);
+};
+
+const normalizePublishedPlayerStatuses = (value) => {
+    const rawEntries = Array.isArray(value)
+        ? value
+        : (value && typeof value === 'object' ? Object.values(value) : []);
+
+    return rawEntries
+        .filter((entry) => entry && typeof entry === 'object' && !Array.isArray(entry))
+        .map((entry) => {
+            const name = String(entry.name || '').trim();
+            const status = String(entry.status || '');
+            if (!name || !PLAYER_STATUS_VALUES.has(status)) return null;
+            const requestedSource = PLAYER_STATUS_SOURCES.has(entry.source) ? entry.source : 'manual';
+            const requestedId = String(entry.playerId || '').trim();
+            const playerId = isValidPlayerStatusId(requestedId, requestedSource)
+                ? requestedId
+                : createLegacyPlayerStatusId(name);
+            const source = playerId.startsWith('legacy-') ? 'manual' : requestedSource;
+            return {
+                playerId,
+                source,
+                name,
+                status,
+                detail: String(entry.detail || '').trim(),
+                returnDate: String(entry.returnDate || '').trim(),
+                updatedAt: Number.isFinite(Number(entry.updatedAt)) ? Number(entry.updatedAt) : 0
+            };
+        })
+        .filter(Boolean);
+};
+
+const normalizePlayerStatusDraft = (body) => {
+    if (!hasOnlyKeys(body, new Set(['baseRevision', 'entries']))) return null;
+    if (!Number.isInteger(body.baseRevision) || body.baseRevision < 0) return null;
+    if (!Array.isArray(body.entries) || body.entries.length > PLAYER_STATUS_MAX_ENTRIES) return null;
+
+    const ids = new Set();
+    const names = new Set();
+    const entries = [];
+    for (const raw of body.entries) {
+        if (!hasOnlyKeys(raw, PLAYER_STATUS_ENTRY_KEYS)) return null;
+        const source = String(raw.source || '');
+        const name = String(raw.name || '').trim().replace(/\s+/g, ' ');
+        const status = String(raw.status || '');
+        const detail = String(raw.detail || '').trim();
+        const returnDate = String(raw.returnDate || '').trim();
+        let playerId = String(raw.playerId || '').trim();
+
+        if (
+            !PLAYER_STATUS_SOURCES.has(source)
+            || !PLAYER_STATUS_VALUES.has(status)
+            || name.length < 2
+            || name.length > 80
+            || !/\p{L}/u.test(name)
+            || detail.length > 160
+            || returnDate.length > 60
+        ) return null;
+
+        if (!playerId && source === 'manual') playerId = `manual-${crypto.randomUUID()}`;
+        if (!isValidPlayerStatusId(playerId, source)) return null;
+
+        const nameKey = normalizePlayerStatusName(name);
+        const idKey = `${source}:${playerId.toLowerCase()}`;
+        if (ids.has(idKey) || names.has(nameKey)) return null;
+        ids.add(idKey);
+        names.add(nameKey);
+        entries.push({
+            playerId,
+            source,
+            name,
+            status,
+            detail,
+            returnDate: status === 'injured' || status === 'doubtful' ? returnDate : ''
+        });
+    }
+
+    return { baseRevision: body.baseRevision, entries };
+};
+
+const canonicalizeSquadPlayerStatuses = async (draft, database = db) => {
+    if (!draft.entries.some((entry) => entry.source === 'squad')) return draft;
+    const squadSnapshot = await database.ref('cache/squad').once('value');
+    const rawSquad = squadSnapshot.val();
+    const squad = Array.isArray(rawSquad)
+        ? rawSquad
+        : (rawSquad && typeof rawSquad === 'object' ? Object.values(rawSquad) : []);
+    const squadById = new Map(squad
+        .filter((player) => player && typeof player === 'object')
+        .map((player) => [String(player.id || ''), String(player.name || '').trim()]));
+    const entries = [];
+    for (const entry of draft.entries) {
+        if (entry.source !== 'squad') {
+            entries.push(entry);
+            continue;
+        }
+        const canonicalName = squadById.get(entry.playerId);
+        if (!canonicalName || normalizePlayerStatusName(canonicalName) !== normalizePlayerStatusName(entry.name)) {
+            return null;
+        }
+        entries.push({ ...entry, name: canonicalName });
+    }
+    return { ...draft, entries };
+};
+
+const authorizeManualPlayerStatusIds = async (draft, newManualIndexes, uid, database = db) => {
+    const providedManualEntries = draft.entries.filter((entry, index) => (
+        entry.source === 'manual' && !newManualIndexes.has(index)
+    ));
+    if (providedManualEntries.length === 0) return draft;
+
+    const [publishedSnapshot, ownDraftSnapshot] = await Promise.all([
+        database.ref('admin/playerStatus').once('value'),
+        database.ref(`ops/playerStatus/drafts/${uid}`).once('value')
+    ]);
+    const allowedIds = new Set(normalizePublishedPlayerStatuses(publishedSnapshot.val())
+        .filter((entry) => entry.source === 'manual')
+        .map((entry) => entry.playerId));
+    const ownDraft = ownDraftSnapshot.val();
+    const normalizedOwnDraft = hasOnlyKeys(ownDraft, new Set(['baseRevision', 'entries', 'updatedAt']))
+        ? normalizePlayerStatusDraft({ baseRevision: ownDraft.baseRevision, entries: ownDraft.entries })
+        : null;
+    for (const entry of normalizedOwnDraft?.entries || []) {
+        if (entry.source === 'manual') allowedIds.add(entry.playerId);
+    }
+
+    return providedManualEntries.every((entry) => allowedIds.has(entry.playerId)) ? draft : null;
+};
+
+const acquirePlayerStatusLock = async (database, operationId, now = Date.now()) => {
+    const lockRef = database.ref('ops/playerStatus/writeLock');
+    const result = await lockRef.transaction((current) => {
+        if (current?.expiresAt > now) return;
+        return { operationId, acquiredAt: now, expiresAt: now + PLAYER_STATUS_LOCK_TTL_MS };
+    });
+    return result.committed;
+};
+
+const releasePlayerStatusLock = async (database, operationId) => {
+    await database.ref('ops/playerStatus/writeLock').transaction((current) => (
+        current?.operationId === operationId ? null : current
+    ));
+};
+
 const writeAudit = (uid, action, details = {}, database = db) => database.ref('ops/adminAudit').push({
     uid,
     action,
@@ -175,6 +338,114 @@ const handleSession = async (_req, res, claims) => res.json({
     admin: true,
     uid: claims.uid
 });
+
+const handlePlayerStatusGet = async (_req, res, claims, database = db) => {
+    const [publishedSnapshot, draftSnapshot, stateSnapshot] = await Promise.all([
+        database.ref('admin/playerStatus').once('value'),
+        database.ref(`ops/playerStatus/drafts/${claims.uid}`).once('value'),
+        database.ref('ops/playerStatus/state').once('value')
+    ]);
+    const published = normalizePublishedPlayerStatuses(publishedSnapshot.val());
+    const state = stateSnapshot.val() || {};
+    const revision = Number.isInteger(state.revision) && state.revision >= 0 ? state.revision : 0;
+    const draft = draftSnapshot.val();
+    const fallbackPublishedAt = published.reduce((latest, entry) => Math.max(latest, entry.updatedAt || 0), 0);
+    return res.json({
+        published,
+        draft: draft && draft.baseRevision === revision && Array.isArray(draft.entries) ? draft : null,
+        revision,
+        lastPublishedAt: Number(state.lastPublishedAt || fallbackPublishedAt || 0) || null
+    });
+};
+
+const handlePlayerStatusDraftPut = async (req, res, claims, database = db) => {
+    const newManualIndexes = new Set(Array.isArray(req.body?.entries)
+        ? req.body.entries
+            .map((entry, index) => entry?.source === 'manual' && !String(entry?.playerId || '').trim() ? index : -1)
+            .filter((index) => index >= 0)
+        : []);
+    const normalizedDraft = normalizePlayerStatusDraft(req.body);
+    if (!normalizedDraft) return res.status(400).json({ error: 'Invalid player status draft' });
+    const canonicalDraft = await canonicalizeSquadPlayerStatuses(normalizedDraft, database);
+    if (!canonicalDraft) return res.status(400).json({ error: 'Squad player identity does not match the current squad' });
+    const draft = await authorizeManualPlayerStatusIds(canonicalDraft, newManualIndexes, claims.uid, database);
+    if (!draft) return res.status(400).json({ error: 'Manual player identity was not created by the server' });
+
+    const operationId = crypto.randomUUID();
+    const now = Date.now();
+    const acquired = await acquirePlayerStatusLock(database, operationId, now);
+    if (!acquired) return res.status(409).json({ error: 'Another player status operation is in progress' });
+
+    try {
+        const revisionSnapshot = await database.ref('ops/playerStatus/state/revision').once('value');
+        const revision = Number.isInteger(revisionSnapshot.val()) ? revisionSnapshot.val() : 0;
+        if (draft.baseRevision !== revision) {
+            return res.status(409).json({ error: 'Player status data changed; reload before saving' });
+        }
+        const value = { ...draft, updatedAt: now };
+        await database.ref(`ops/playerStatus/drafts/${claims.uid}`).set(value);
+        await writeAudit(claims.uid, 'playerStatus.draft.saved', { entryCount: value.entries.length, revision }, database);
+        return res.json({ success: true, draft: value });
+    } finally {
+        await releasePlayerStatusLock(database, operationId);
+    }
+};
+
+const handlePlayerStatusPublish = async (req, res, claims, database = db) => {
+    if (!hasOnlyKeys(req.body || {}, new Set(['baseRevision']))
+        || !Number.isInteger(req.body.baseRevision)
+        || req.body.baseRevision < 0) {
+        return res.status(400).json({ error: 'Invalid player status publish request' });
+    }
+
+    const operationId = crypto.randomUUID();
+    const now = Date.now();
+    const acquired = await acquirePlayerStatusLock(database, operationId, now);
+    if (!acquired) return res.status(409).json({ error: 'Another player status operation is in progress' });
+
+    try {
+        const [revisionSnapshot, draftSnapshot] = await Promise.all([
+            database.ref('ops/playerStatus/state/revision').once('value'),
+            database.ref(`ops/playerStatus/drafts/${claims.uid}`).once('value')
+        ]);
+        const revision = Number.isInteger(revisionSnapshot.val()) ? revisionSnapshot.val() : 0;
+        const storedDraft = draftSnapshot.val();
+        const draft = hasOnlyKeys(storedDraft, new Set(['baseRevision', 'entries', 'updatedAt']))
+            ? normalizePlayerStatusDraft({ baseRevision: storedDraft.baseRevision, entries: storedDraft.entries })
+            : null;
+        if (req.body.baseRevision !== revision || draft?.baseRevision !== revision) {
+            return res.status(409).json({ error: 'Player status draft is missing or stale' });
+        }
+
+        const entries = draft.entries.map((entry) => ({ ...entry, updatedAt: now }));
+        const nextRevision = revision + 1;
+        const auditKey = database.ref('ops/adminAudit').push().key || crypto.randomUUID();
+        await database.ref().update({
+            'admin/playerStatus': entries.length > 0 ? entries : null,
+            'ops/playerStatus/state': {
+                revision: nextRevision,
+                lastPublishedAt: now,
+                updatedBy: claims.uid
+            },
+            [`ops/playerStatus/drafts/${claims.uid}`]: null,
+            'ops/playerStatus/writeLock': null,
+            [`ops/adminAudit/${auditKey}`]: {
+                uid: claims.uid,
+                action: 'playerStatus.published',
+                details: { entryCount: entries.length, revision: nextRevision },
+                createdAt: now
+            }
+        });
+        return res.json({
+            success: true,
+            published: entries,
+            revision: nextRevision,
+            lastPublishedAt: now
+        });
+    } finally {
+        await releasePlayerStatusLock(database, operationId);
+    }
+};
 
 const summarizeUefaJourney = (value) => {
     if (!value || typeof value !== 'object') return null;
@@ -207,7 +478,7 @@ const handleOverview = async (_req, res, _claims, database = db) => {
         : null;
     const startingLineupPush = startingLineupPushSnapshot?.val() || null;
     return res.json({
-        version: '2.13.1',
+        version: '2.15.0',
         lastCacheUpdate: lastUpdate.val() || null,
         nextMatch: nextMatchValue,
         uefaJourney: summarizeUefaJourney(uefaJourney.val()),
@@ -460,6 +731,18 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
         if (resource === 'session' && segments.length === 1 && req.method === 'GET') return handleSession(req, res, claims);
         if (resource === 'overview' && segments.length === 1 && req.method === 'GET') return handleOverview(req, res, claims, database);
         if (resource === 'settings' && segments.length === 1 && req.method === 'PUT') return handleSettings(req, res, claims, database);
+        if (resource === 'player-status') {
+            if (segments.length === 1 && req.method === 'GET') {
+                return handlePlayerStatusGet(req, res, claims, database);
+            }
+            if (segments.length === 2 && rawMatchId === 'draft' && req.method === 'PUT') {
+                return handlePlayerStatusDraftPut(req, res, claims, database);
+            }
+            if (segments.length === 2 && rawMatchId === 'publish' && req.method === 'POST') {
+                return handlePlayerStatusPublish(req, res, claims, database);
+            }
+            return res.status(405).json({ error: 'Method not allowed' });
+        }
         if (resource === 'notifications' && rawMatchId === 'test' && req.method === 'POST') {
             if (segments.length !== 2) return res.status(404).json({ error: 'Admin endpoint not found' });
             return handleNotificationTest(req, res, claims, database, messaging);
@@ -491,6 +774,8 @@ module.exports = {
     validateMatchId,
     normalizeDraft,
     normalizeNotification,
+    normalizePlayerStatusDraft,
+    normalizePublishedPlayerStatuses,
     notificationHash,
     summarizeUefaJourney,
     handleAdminRoute

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../firebase', () => ({ database: {} }));
-vi.mock('firebase/database', () => ({ ref: vi.fn(), get: vi.fn() }));
+vi.mock('firebase/database', () => ({ ref: vi.fn(), get: vi.fn(), onValue: vi.fn() }));
 vi.mock('../../utils/fetchWithTimeout', () => ({ fetchWithTimeout: vi.fn() }));
 
 import { fetchWithTimeout } from '../../utils/fetchWithTimeout';

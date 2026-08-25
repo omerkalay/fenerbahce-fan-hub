@@ -16,6 +16,7 @@ import { useTheme } from './contexts/themeContextDef';
 import { resolveTeamCrest } from './theme/teamCrest';
 import AdminPanel from './components/AdminPanel';
 import type { LiveMatchData, LiveMatchState, MatchData, PublishedMatchLineups } from './types';
+import { ADMIN_STATUS_PREVIEW_MODE } from './utils/adminStatusPreview';
 
 type TabId = 'dashboard' | 'fixtures' | 'statistics' | 'builder';
 
@@ -149,7 +150,7 @@ function AppContent({ runtimeOverrides }: AppProps) {
           </div>
           <div className="flex items-center gap-3">
             <NotificationSettings themeOnly={safeMode} />
-            {!safeMode && <UserAvatar onOpenAdmin={() => setShowAdminPanel(true)} />}
+            {!safeMode && <UserAvatar onOpenAdmin={() => setShowAdminPanel(true)} localAdminPreview={ADMIN_STATUS_PREVIEW_MODE} />}
             <div className="brand-medallion w-10 h-10 rounded-full p-0.5">
               <div className="brand-medallion-inner w-full h-full rounded-full flex items-center justify-center overflow-hidden">
                 <img

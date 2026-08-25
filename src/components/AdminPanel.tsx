@@ -1,21 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormationBuilder from './FormationBuilder';
 import MatchLineups from './MatchLineups';
+import AdminPlayerStatusManager from './admin/AdminPlayerStatusManager';
 import {
     fetchAdminLineup,
     fetchAdminOverview,
+    fetchAdminPlayerStatus,
     fetchAdminSession,
+    publishAdminPlayerStatus,
     publishAdminLineup,
     releaseAdminLineup,
+    saveAdminPlayerStatusDraft,
     saveAdminLineupDraft,
     sendAdminNotificationBroadcast,
     sendAdminNotificationTest,
     updateAdminSettings,
     type AdminLineupDetail,
     type AdminNotificationPayload,
-    type AdminOverview
+    type AdminOverview,
+    type AdminPlayerStatusEntry,
+    type AdminPlayerStatusState
 } from '../services/admin';
-import type { AdminLineupSettings, FormationDraft, MatchData, PublishedMatchLineups } from '../types';
+import { fetchPlayerStatus, fetchSquad } from '../services/api';
+import type { AdminLineupSettings, FormationDraft, MatchData, Player, PublishedMatchLineups } from '../types';
+import { ADMIN_STATUS_PREVIEW_MODE } from '../utils/adminStatusPreview';
 
 interface AdminPanelProps {
     visible: boolean;
@@ -23,7 +31,7 @@ interface AdminPanelProps {
     onClose: () => void;
 }
 
-type AdminTab = 'overview' | 'lineups' | 'notifications';
+type AdminTab = 'overview' | 'lineups' | 'player-status' | 'notifications';
 
 const DEFAULT_NOTIFICATION: AdminNotificationPayload = {
     title: '',
@@ -46,10 +54,12 @@ const findLineupPreview = (detail: AdminLineupDetail | null): PublishedMatchLine
 );
 
 const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
-    const [tab, setTab] = useState<AdminTab>('overview');
+    const [tab, setTab] = useState<AdminTab>(() => ADMIN_STATUS_PREVIEW_MODE ? 'player-status' : 'overview');
     const [overview, setOverview] = useState<AdminOverview | null>(null);
     const [selectedMatchId, setSelectedMatchId] = useState<string>('');
     const [lineupDetail, setLineupDetail] = useState<AdminLineupDetail | null>(null);
+    const [playerStatusState, setPlayerStatusState] = useState<AdminPlayerStatusState | null>(null);
+    const [squad, setSquad] = useState<Player[]>([]);
     const [draft, setDraft] = useState<FormationDraft | null>(null);
     const [notification, setNotification] = useState<AdminNotificationPayload>(DEFAULT_NOTIFICATION);
     const [testId, setTestId] = useState<string | null>(null);
@@ -57,6 +67,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const lineupRequestRef = useRef(0);
+    const playerStatusRequestRef = useRef(0);
 
     const uniqueMatches = useMemo(() => {
         const seen = new Set<number>();
@@ -81,8 +92,47 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         setDraft(data.draft);
     }, []);
 
+    const loadPlayerStatuses = useCallback(async () => {
+        const requestId = ++playerStatusRequestRef.current;
+        const squadPromise = fetchSquad();
+        let data: AdminPlayerStatusState;
+
+        if (ADMIN_STATUS_PREVIEW_MODE) {
+            const publicEntries = await fetchPlayerStatus();
+            data = {
+                published: publicEntries
+                    .filter((entry): entry is typeof entry & { status: AdminPlayerStatusEntry['status'] } => entry.status !== 'fit')
+                    .map((entry, index) => ({
+                        playerId: entry.playerId || `legacy-${String(index + 1).padStart(16, '0')}`,
+                        source: entry.source || 'manual',
+                        name: entry.name,
+                        status: entry.status,
+                        detail: entry.detail,
+                        returnDate: entry.returnDate,
+                        updatedAt: entry.updatedAt
+                    })),
+                draft: null,
+                revision: 0,
+                lastPublishedAt: publicEntries.reduce((latest, entry) => Math.max(latest, entry.updatedAt || 0), 0) || null
+            };
+        } else {
+            data = await fetchAdminPlayerStatus();
+        }
+
+        const loadedSquad = await squadPromise;
+        if (requestId !== playerStatusRequestRef.current) return;
+        setPlayerStatusState(data);
+        setSquad(loadedSquad);
+    }, []);
+
     useEffect(() => {
         if (!visible) return;
+        if (ADMIN_STATUS_PREVIEW_MODE) {
+            setTab('player-status');
+            setBusy(false);
+            setError(null);
+            return;
+        }
         let cancelled = false;
         setBusy(true);
         setError(null);
@@ -118,6 +168,21 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
             });
         return () => { cancelled = true; };
     }, [loadLineup, selectedMatchId, visible]);
+
+    useEffect(() => {
+        if (!visible || tab !== 'player-status') return;
+        let cancelled = false;
+        setBusy(true);
+        setError(null);
+        void loadPlayerStatuses()
+            .catch((requestError) => {
+                if (!cancelled) setError((requestError as Error).message);
+            })
+            .finally(() => {
+                if (!cancelled) setBusy(false);
+            });
+        return () => { cancelled = true; };
+    }, [loadPlayerStatuses, tab, visible]);
 
     useEffect(() => {
         setTestId(null);
@@ -182,6 +247,47 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         }, 'Manuel kilit kaldırıldı; kadro yeniden ESPN otomasyonuna bırakıldı.');
     };
 
+    const savePlayerStatuses = async (entries: AdminPlayerStatusEntry[]) => {
+        await runAction(async () => {
+            const revision = playerStatusState?.revision || 0;
+            if (ADMIN_STATUS_PREVIEW_MODE) {
+                setPlayerStatusState((current) => current ? {
+                    ...current,
+                    draft: { baseRevision: current.revision, entries, updatedAt: Date.now() }
+                } : current);
+                return;
+            }
+            const result = await saveAdminPlayerStatusDraft(revision, entries);
+            setPlayerStatusState((current) => current ? { ...current, draft: result.draft } : current);
+        }, ADMIN_STATUS_PREVIEW_MODE ? 'Yerel taslak güncellendi; Firebase’e yazılmadı.' : 'Oyuncu durumu taslağı güvenli alana kaydedildi.');
+    };
+
+    const publishPlayerStatuses = async (entries: AdminPlayerStatusEntry[]) => {
+        const confirmed = window.confirm('Canlı oyuncu durumu listesini bu önizlemeyle değiştirmek istediğine emin misin? Bu işlem bildirim göndermez.');
+        if (!confirmed) return;
+        await runAction(async () => {
+            const revision = playerStatusState?.revision || 0;
+            if (ADMIN_STATUS_PREVIEW_MODE) {
+                const now = Date.now();
+                setPlayerStatusState((current) => current ? {
+                    published: entries.map((entry) => ({ ...entry, updatedAt: now })),
+                    draft: null,
+                    revision: current.revision + 1,
+                    lastPublishedAt: now
+                } : current);
+                return;
+            }
+            await saveAdminPlayerStatusDraft(revision, entries);
+            const result = await publishAdminPlayerStatus(revision);
+            setPlayerStatusState({
+                published: result.published,
+                draft: null,
+                revision: result.revision,
+                lastPublishedAt: result.lastPublishedAt
+            });
+        }, ADMIN_STATUS_PREVIEW_MODE ? 'Yerel yayın önizlemesi güncellendi; Firebase’e yazılmadı.' : 'Oyuncu durumları yayınlandı. Bildirim gönderilmedi.');
+    };
+
     const testNotification = async () => {
         await runAction(async () => {
             const result = await sendAdminNotificationTest(notification);
@@ -213,7 +319,11 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                 <header className="flex items-center justify-between border-b border-white/10 p-4">
                     <div>
                         <p className="text-lg font-black text-white">Yönetim Paneli</p>
-                        <p className="text-xs text-slate-400">Yetkili işlemler sunucu tarafında doğrulanır</p>
+                        <p className="text-xs text-slate-400">
+                            {ADMIN_STATUS_PREVIEW_MODE
+                                ? 'Yerel arayüz incelemesi; yönetim API’si kullanılmaz'
+                                : 'Yetkili işlemler sunucu tarafında doğrulanır'}
+                        </p>
                     </div>
                     <button
                         type="button"
@@ -231,13 +341,15 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                     {([
                         ['overview', 'Sistem'],
                         ['lineups', 'İlk 11'],
+                        ['player-status', 'Durumlar'],
                         ['notifications', 'Bildirim']
                     ] as const).map(([key, label]) => (
                         <button
                             key={key}
                             type="button"
                             onClick={() => setTab(key)}
-                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold ${tab === key ? 'bg-yellow-400 text-slate-950' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
+                            disabled={ADMIN_STATUS_PREVIEW_MODE && key !== 'player-status'}
+                            className={`flex-1 rounded-lg px-3 py-2 text-xs font-bold disabled:cursor-not-allowed disabled:opacity-30 ${tab === key ? 'bg-yellow-400 text-slate-950' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
                         >
                             {label}
                         </button>
@@ -257,7 +369,6 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <StatusCard label="Canlı sürüm" value={overview?.version || '—'} />
-                                <StatusCard label="Cache güncellemesi" value={formatDateTime(overview?.lastCacheUpdate)} />
                                 <StatusCard
                                     label="UEFA yolu"
                                     value={`${formatDateTime(overview?.uefaJourney?.lastUpdate)}${overview?.uefaJourney?.stale ? ' · eski' : ''}`}
@@ -340,6 +451,23 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                                     <button type="button" disabled={busy || draft?.players.length !== 11} onClick={() => publish('manual')} className="flex-1 rounded-lg bg-yellow-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-40">Manuel yayınla</button>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {tab === 'player-status' && (
+                        <div className="space-y-3">
+                            {ADMIN_STATUS_PREVIEW_MODE && (
+                                <div className="sticky top-0 z-20 rounded-xl border border-sky-400/30 bg-sky-500/15 px-3 py-2 text-xs font-bold text-sky-100 shadow-lg backdrop-blur">
+                                    Yerel önizleme — Firebase’e yazılmaz
+                                </div>
+                            )}
+                            <AdminPlayerStatusManager
+                                state={playerStatusState}
+                                squad={squad}
+                                busy={busy}
+                                onSave={savePlayerStatuses}
+                                onPublish={publishPlayerStatuses}
+                            />
                         </div>
                     )}
 
