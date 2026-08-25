@@ -36,20 +36,21 @@ describe('fetchPlayerStats', () => {
     });
 
     it('requests and combines league and Europe stats for the selected season', async () => {
-        mockedFetchWithTimeout
-            .mockResolvedValueOnce(buildResponse([buildAthlete(3, 2, 12)]))
-            .mockResolvedValueOnce(buildResponse([buildAthlete(4, 1, 8)]));
+        mockedFetchWithTimeout.mockImplementation(async (url) => {
+            if (String(url).includes('/tur.1/')) return buildResponse([buildAthlete(3, 2, 12)]);
+            if (String(url).includes('/uefa.europa/')) return buildResponse([buildAthlete(4, 1, 8)]);
+            return buildResponse([]);
+        });
 
         const players = await fetchPlayerStats(2025);
 
-        expect(mockedFetchWithTimeout).toHaveBeenNthCalledWith(
-            1,
-            'https://site.api.espn.com/apis/site/v2/sports/soccer/tur.1/teams/436/roster?season=2025'
+        expect(mockedFetchWithTimeout).toHaveBeenCalledWith(
+            'https://site.web.api.espn.com/apis/site/v2/sports/soccer/tur.1/teams/436/roster?season=2025'
         );
-        expect(mockedFetchWithTimeout).toHaveBeenNthCalledWith(
-            2,
-            'https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/teams/436/roster?season=2025'
+        expect(mockedFetchWithTimeout).toHaveBeenCalledWith(
+            'https://site.web.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/teams/436/roster?season=2025'
         );
+        expect(mockedFetchWithTimeout).toHaveBeenCalledTimes(7);
         expect(players).toEqual([{
             playerId: '1',
             name: 'Talisca',

@@ -12,6 +12,7 @@ import { useMatchBootstrap } from './hooks/useMatchBootstrap';
 import { useLiveMatchState } from './hooks/useLiveMatchState';
 import { useForegroundMessaging } from './hooks/useForegroundMessaging';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { DataSourceProvider } from './contexts/DataSourceContext';
 import { useTheme } from './contexts/themeContextDef';
 import { resolveTeamCrest } from './theme/teamCrest';
 import AdminPanel from './components/AdminPanel';
@@ -262,9 +263,11 @@ function AppContent({ runtimeOverrides }: AppProps) {
 function App({ runtimeOverrides }: AppProps) {
   return (
     <ThemeProvider>
-      <AuthProvider enabled={!runtimeOverrides?.safeMode}>
-        <AppContent runtimeOverrides={runtimeOverrides} />
-      </AuthProvider>
+      <DataSourceProvider>
+        <AuthProvider enabled={!runtimeOverrides?.safeMode}>
+          <AppContent runtimeOverrides={runtimeOverrides} />
+        </AuthProvider>
+      </DataSourceProvider>
     </ThemeProvider>
   );
 }

@@ -239,6 +239,18 @@ export interface StandingsData {
   rows: StandingsRow[];
 }
 
+export type DataSourceResource = 'fixtures' | 'standings' | 'statistics';
+export type DataSourceMode = 'espn' | 'cache';
+export type DataSourceModes = Record<DataSourceResource, DataSourceMode>;
+
+export interface CachedSnapshot<T> {
+  data: T;
+  fetchedAt: number;
+  lastAttemptAt: number;
+  status: 'ok' | 'error';
+  errorCode?: string | null;
+}
+
 // UEFA Journey
 
 export type UefaCompetitionKey = 'champions' | 'europa' | 'conference';

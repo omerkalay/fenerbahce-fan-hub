@@ -10,6 +10,8 @@ const {
     validateMatchId,
     normalizeDraft,
     normalizeNotification,
+    normalizeDataSourceUpdate,
+    normalizeDataRefreshRequest,
     normalizePlayerStatusDraft,
     normalizePublishedPlayerStatuses,
     notificationHash,
@@ -105,6 +107,19 @@ describe('admin route validation', () => {
         expect(normalizeDraft('{"formation":"4-2-3-1"}')).toBeNull();
     });
 
+    it('strictly validates data source and cache refresh controls', () => {
+        expect(normalizeDataSourceUpdate({ resource: 'fixtures', mode: 'cache' })).toEqual({ resource: 'fixtures', mode: 'cache' });
+        expect(normalizeDataSourceUpdate({ resource: 'statistics', mode: 'espn' })).toEqual({ resource: 'statistics', mode: 'espn' });
+        expect(normalizeDataSourceUpdate({ resource: 'unknown', mode: 'cache' })).toBeNull();
+        expect(normalizeDataSourceUpdate({ resource: 'fixtures', mode: 'firebase' })).toBeNull();
+        expect(normalizeDataSourceUpdate({ resource: 'fixtures', mode: 'cache', uid: 'forged' })).toBeNull();
+
+        expect(normalizeDataRefreshRequest({ resource: 'all', seasonStartYear: 2026 })).toEqual({ resource: 'all', seasonStartYear: 2026 });
+        expect(normalizeDataRefreshRequest({ resource: 'standings', seasonStartYear: 2025 })).toEqual({ resource: 'standings', seasonStartYear: 2025 });
+        expect(normalizeDataRefreshRequest({ resource: 'fixtures', seasonStartYear: 1999 })).toBeNull();
+        expect(normalizeDataRefreshRequest({ resource: 'unknown', seasonStartYear: 2026 })).toBeNull();
+    });
+
     it('restricts notification content and internal URLs', () => {
         const valid = normalizeNotification({ title: 'Test', body: 'Message', url: '/fenerbahce-fan-hub/' });
         expect(valid?.url).toBe('https://omerkalay.com/fenerbahce-fan-hub/');
@@ -167,6 +182,8 @@ describe('admin route validation', () => {
             { method: 'GET', segments: ['session'] },
             { method: 'GET', segments: ['overview'] },
             { method: 'PUT', segments: ['settings'] },
+            { method: 'PUT', segments: ['data-source'] },
+            { method: 'POST', segments: ['data-refresh'] },
             { method: 'GET', segments: ['player-status'] },
             { method: 'PUT', segments: ['player-status', 'draft'] },
             { method: 'POST', segments: ['player-status', 'publish'] },
@@ -174,6 +191,7 @@ describe('admin route validation', () => {
             { method: 'PUT', segments: ['lineups', '401888314', 'draft'] },
             { method: 'POST', segments: ['lineups', '401888314', 'publish'] },
             { method: 'POST', segments: ['lineups', '401888314', 'release'] },
+            { method: 'POST', segments: ['lineups', '401888314', 'unpublish'] },
             { method: 'POST', segments: ['notifications', 'test'] },
             { method: 'POST', segments: ['notifications', 'send'] }
         ];
@@ -188,6 +206,87 @@ describe('admin route validation', () => {
             expect(res.statusCode).toBe(403);
         }
         expect(authenticate).toHaveBeenCalledTimes(routes.length);
+    });
+
+    it('lets an authenticated admin switch data sources and refresh snapshots', async () => {
+        const database = createMemoryDatabase({ cache: {} });
+        const refreshDataSnapshots = vi.fn().mockResolvedValue([
+            { resource: 'fixtures', status: 'ok', fetchedAt: 123 }
+        ]);
+        const dependencies = {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            messaging: { send: vi.fn() },
+            refreshDataSnapshots
+        };
+
+        const sourceRes = makeRes();
+        await handleAdminRoute(makeReq('PUT', { resource: 'fixtures', mode: 'cache' }), sourceRes, ['data-source'], dependencies);
+        expect(sourceRes.statusCode).toBe(200);
+        expect(sourceRes.body.modes).toEqual({ fixtures: 'cache', standings: 'espn', statistics: 'espn' });
+        expect(database.state.cache.dataSourceModes.fixtures).toBe('cache');
+
+        const refreshRes = makeRes();
+        await handleAdminRoute(makeReq('POST', { resource: 'all', seasonStartYear: 2026 }), refreshRes, ['data-refresh'], dependencies);
+        expect(refreshRes.statusCode).toBe(200);
+        expect(refreshDataSnapshots).toHaveBeenCalledWith({
+            resources: 'all',
+            seasonStartYear: 2026,
+            database
+        });
+        expect(Object.values(database.state.ops.adminAudit)).toEqual(expect.arrayContaining([
+            expect.objectContaining({ action: 'data_source.updated', uid: 'admin-uid' }),
+            expect.objectContaining({ action: 'data_cache.refreshed', uid: 'admin-uid' })
+        ]));
+    });
+
+    it('removes a published lineup without deleting its draft or ESPN detection', async () => {
+        const published = {
+            matchId: '401888314',
+            homeTeam: { id: 436, name: 'Fenerbahçe' },
+            awayTeam: { id: 100, name: 'Opponent' },
+            lineups: { home: { starters: [{ name: 'Goalkeeper' }] }, away: null },
+            publishedAt: 100,
+            updatedAt: 100
+        };
+        const detection = { status: 'ready', payload: published };
+        const draft = { formation: '4-2-3-1', players: [], updatedAt: 90 };
+        const database = createMemoryDatabase({
+            cache: {
+                nextMatch: {
+                    id: 401888314,
+                    startTimestamp: 1_800_000_000,
+                    homeTeam: { id: 436, name: 'Fenerbahçe' },
+                    awayTeam: { id: 100, name: 'Opponent' }
+                },
+                next3Matches: [],
+                matchLineups: { '401888314': published }
+            },
+            ops: {
+                lineups: { '401888314': { detection, manualLocked: true } },
+                adminDrafts: { 'admin-uid': { '401888314': draft } }
+            }
+        });
+        const res = makeRes();
+        await handleAdminRoute(makeReq('POST', {}), res, ['lineups', '401888314', 'unpublish'], {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            messaging: { send: vi.fn() }
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toEqual({ success: true, published: null, manualLocked: true });
+        expect(database.state.cache.matchLineups?.['401888314']).toBeUndefined();
+        expect(database.state.ops.lineups['401888314'].manualLocked).toBe(true);
+        expect(database.state.ops.lineups['401888314'].detection).toEqual(detection);
+        expect(database.state.ops.adminDrafts['admin-uid']['401888314']).toEqual(draft);
+        expect(Object.values(database.state.ops.adminAudit)).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                action: 'lineup.unpublished',
+                uid: 'admin-uid',
+                details: expect.objectContaining({ matchId: '401888314', hadPublishedLineup: true })
+            })
+        ]));
     });
 
     it('lets an authenticated admin save and atomically publish a revisioned status draft', async () => {

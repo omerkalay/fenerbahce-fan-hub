@@ -67,4 +67,20 @@ describe('MatchLineups team navigation', () => {
         expect(screen.queryByRole('button', { name: 'Rakip' })).not.toBeInTheDocument();
         expect(screen.getByText('FB1')).toBeInTheDocument();
     });
+
+    it('normalizes a manual lineup when Firebase omits empty arrays', () => {
+        const manualLineup: Partial<TeamLineup> = makeLineup('1', 'Fenerbahce', 'FB');
+        delete manualLineup.bench;
+        delete manualLineup.substitutions;
+
+        const lineups = {
+            home: null,
+            away: manualLineup
+        } as MatchLineupsData;
+
+        render(<MatchLineups lineups={lineups} homeTeamName="Rakip" awayTeamName="Fenerbahce" matchId="401888316" useSquadPhotos={false} />);
+
+        expect(screen.getByRole('button', { name: 'Fenerbahçe' })).toBeInTheDocument();
+        expect(screen.getByText('FB1')).toBeInTheDocument();
+    });
 });

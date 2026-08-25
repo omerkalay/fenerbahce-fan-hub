@@ -12,6 +12,7 @@ const {
     shouldFetchCupResults
 } = require('../utils/cupFixtures');
 const { refreshUefaJourneyCache } = require('../services/uefaJourney');
+const { refreshDataSnapshots } = require('../services/dataSnapshots');
 
 /**
  * Runs once per day, fetching SofaScore and ESPN data into the Firebase cache.
@@ -84,6 +85,16 @@ const dailyDataRefresh = onSchedule({
         const cacheUpdates = { ...cache };
         delete cacheUpdates.uefaJourney;
         await db.ref('cache').update(cacheUpdates);
+        const snapshotResults = await refreshDataSnapshots({
+            resources: 'all',
+            seasonStartYear: cache.season.startYear,
+            now
+        });
+        if (snapshotResults.some((result) => result.status === 'error')) {
+            console.warn('Core data snapshots completed with preserved fallback data:', snapshotResults);
+        } else {
+            console.log('Core data snapshots refreshed successfully');
+        }
         try {
             await refreshUefaJourneyCache(cache.season.startYear, { now });
             console.log('✅ UEFA journey cache updated');

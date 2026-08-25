@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
-import { getMessaging, Messaging } from "firebase/messaging";
+import { getMessaging, isSupported, type Messaging } from "firebase/messaging";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 const firebaseConfig = {
@@ -27,13 +27,18 @@ googleProvider.setCustomParameters({
     prompt: 'select_account'
 });
 
-// Initialize Firebase Messaging
-let messaging: Messaging | null = null;
-try {
-    messaging = getMessaging(app);
-    console.log('Firebase Messaging initialized');
-} catch (error) {
-    console.error('Firebase Messaging initialization failed:', error);
-}
+let messagingRequest: Promise<Messaging | null> | null = null;
 
-export { database, messaging, auth, googleProvider };
+const getFirebaseMessaging = (): Promise<Messaging | null> => {
+    if (!messagingRequest) {
+        messagingRequest = isSupported()
+            .then((supported) => supported ? getMessaging(app) : null)
+            .catch((error) => {
+                console.error('Firebase Messaging initialization failed:', error);
+                return null;
+            });
+    }
+    return messagingRequest;
+};
+
+export { database, getFirebaseMessaging, auth, googleProvider };

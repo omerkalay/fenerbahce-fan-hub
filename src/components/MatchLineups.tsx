@@ -8,6 +8,7 @@ import { formatSoccerMinute } from './match-lineups/formation-engine';
 import MiniPitch from './match-lineups/MiniPitch';
 import BenchList from './match-lineups/BenchList';
 import SubstitutionList from './match-lineups/SubstitutionList';
+import { normalizeMatchLineups } from '../utils/lineupData';
 
 const FENERBAHCE_NAMES = ['fenerbahce', 'fenerbahce sk'];
 
@@ -32,8 +33,9 @@ interface MatchLineupsProps {
 }
 
 function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPhotos = true, embedded = false }: MatchLineupsProps) {
-    const homeName = homeTeamName || lineups.home?.teamName || 'Ev Sahibi';
-    const awayName = awayTeamName || lineups.away?.teamName || 'Deplasman';
+    const normalizedLineups = normalizeMatchLineups(lineups);
+    const homeName = homeTeamName || normalizedLineups.home?.teamName || 'Ev Sahibi';
+    const awayName = awayTeamName || normalizedLineups.away?.teamName || 'Deplasman';
     const localizedHomeName = localizeTeamName(homeName);
     const localizedAwayName = localizeTeamName(awayName);
     const homeIsFb = isFenerbahce(homeName);
@@ -79,11 +81,11 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
                 { key: 'home', label: localizedHomeName },
                 { key: 'away', label: localizedAwayName }
             ];
-    const tabs = orderedTabs.filter((tab) => tab.key === 'home' ? Boolean(lineups.home) : Boolean(lineups.away));
+    const tabs = orderedTabs.filter((tab) => tab.key === 'home' ? Boolean(normalizedLineups.home) : Boolean(normalizedLineups.away));
 
-    const activeLineup = activeTab === 'home' ? lineups.home : lineups.away;
+    const activeLineup = activeTab === 'home' ? normalizedLineups.home : normalizedLineups.away;
     const resolvedTab = activeLineup ? activeTab : tabs[0]?.key;
-    const resolvedLineup = resolvedTab === 'home' ? lineups.home : lineups.away;
+    const resolvedLineup = resolvedTab === 'home' ? normalizedLineups.home : normalizedLineups.away;
     if (!resolvedTab || !resolvedLineup) return null;
 
     const activeTeamName = resolvedTab === 'home' ? homeName : awayName;

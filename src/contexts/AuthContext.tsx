@@ -150,7 +150,7 @@ export const AuthProvider = ({ children, enabled = true }: { children: ReactNode
         window.addEventListener('pageshow', handleAppResume);
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        if (isStandaloneDisplayMode() && hasCrossOriginAuthDomain()) {
+        if (!import.meta.env.DEV && isStandaloneDisplayMode() && hasCrossOriginAuthDomain()) {
             console.warn(
                 'Installed PWA auth is using a cross-origin authDomain. Popup sign-in will be tried first because redirect may not return reliably until authDomain is moved behind the app domain.'
             );

@@ -6,18 +6,28 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.15.0-blue)
+![Version](https://img.shields.io/badge/version-2.16.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.15.0
+## What's New in v2.16.0
+
+- **Administrator-Controlled Data Source** - Fixtures, Süper Lig standings, and player statistics each carry an independent ESPN or cache selection in the administration panel, backed by one last-known-good snapshot per resource under `cache/dataSnapshots/{seasonStartYear}/{resource}` that `dailyDataRefresh` writes at 06:00 Europe/Istanbul time and an administrator can refresh individually or together on demand
+- **Deliberate Fallback, Not Silent Failover** - A provider failure updates snapshot health metadata while preserving the previous payload, so a transient ESPN error stays visible in ESPN mode and switching to cached data remains an operational decision; public clients read these nodes but every browser write stays denied
+- **Resilient Direct ESPN Requests** - Browser requests keep ESPN as the default source but now use a preferred official hostname, bounded schedule and roster concurrency, one transient retry through the alternate official hostname, per-session deduplication of usable results only, and partial success when a single competition feed fails
+- **Complete European Statistics and Lineup Publication Control** - Player statistics combine every European competition instead of the Europa League alone, published lineups always bind to the selected fixture, and a new administration action removes a published Starting XI from the public cache while preserving its private draft, ESPN detection, and paused automation
+
+<details>
+<summary>Previous: v2.15.0</summary>
 
 - **Protected Player Status Operations** - The claim-protected administration panel now provides a mobile-first draft, preview, revision-safe publish, manual-player fallback, status-specific description presets, and estimated-return shortcuts for injuries, suspensions, doubts, and card risks without sending automatic notifications
 - **Atomic Public Status Publishing** - Strict server schemas, generated manual IDs, private drafts, revision conflict handling, operation locks, and audit records publish the small public `admin/playerStatus` node atomically while every browser write remains denied
 - **Legacy Starting XI Removal** - The former `admin/startingXI` RTDB trigger, public rule, normalizers, tests, and console workflow are removed; verified lineups now use only `cache/matchLineups/{matchId}` with private state under `ops/lineups/{matchId}`
 - **Safe Local Review Mode** - Development-only `adminStatusPreview` reads the live public status and squad data but keeps every edit and simulated publish in memory; production builds reject any leaked preview marker
+
+</details>
 
 <details>
 <summary>Previous: v2.14.x (v2.14.0 – v2.14.1)</summary>
@@ -140,7 +150,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Home/Away Filter**: Quickly narrow down to home or away fixtures
 - **Always-Visible Team Search**: Search by opponent directly beside the season picker without opening advanced filters
 - **Compact Match Cards**: Horizontal team layout with score (or `VS`) and stadium name
-- **Manual Refresh**: Re-fetch ESPN fixture data on demand
+- **Resilient Direct ESPN Requests**: Browser requests remain the default, use bounded concurrency, retry one transient network/CORS/5xx failure through ESPN's alternate official API hostname, and keep successful competitions when another competition feed fails
+- **Manual Refresh**: Force a fresh ESPN request (or reload the selected cache snapshot when cache mode is active)
 - **Fixture Match Summary Modal**: For completed matches, opens cached summary data (scoreline, ordered stats, key events, and actual lineups with formation/bench/substitutions when available)
 
 ### Push Notification System
@@ -195,7 +206,7 @@ This small public read-only node is published from the claim-protected administr
 - **Publication Gate**: Both teams must contain 11 unique, named players with unique numeric shirt numbers, and the same lineup must appear in two consecutive checks
 - **Manual Fallback**: Türkiye Kupası and incomplete ESPN data can be handled from the claim-protected administration panel; a manual Fenerbahçe lock preserves the ESPN opponent lineup and blocks automatic Fenerbahçe overwrites
 - **Safe Rollout**: `autoPublishLineups` and `autoPushLineups` default to `false`. A late lineup is displayed after validation but never sends a Starting XI push after kickoff
-- **Durable Match Binding**: Published lineups remain under `cache/matchLineups/{matchId}`. The dashboard follows only the active fixture, so the previous lineup disappears at the normal 06:00 fixture transition without deleting its stored data
+- **Durable Match Binding**: Published lineups remain under `cache/matchLineups/{matchId}`. The dashboard follows only the active fixture, so the previous lineup disappears at the normal 06:00 fixture transition; an administrator can also explicitly remove a publication while preserving its private draft and ESPN detection
 - **Public/Private Separation**: Published sports data is public read-only cache data. Detection fingerprints, drafts, manual locks, settings, health records, notification locks, and audit records live under server-only `ops`
 - **Single Publication Path**: Verified lineups are published only under `cache/matchLineups/{matchId}`, with detection, locks, drafts, settings, and audit state isolated under private `ops`
 
@@ -252,7 +263,9 @@ This small public read-only node is published from the claim-protected administr
 | Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, and goal summary formatting |
 | Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
 | Season helpers | `src/utils/seasons.test.ts` | July season rollover, recent-season options, historical detection, selected-season date boundaries |
-| Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Super Lig/Europa requests and combined goal/assist totals |
+| ESPN request resilience | `src/services/api/request-policy.test.ts`, `src/services/api/espn-fixtures.test.ts` | Bounded concurrency, one transient retry, session deduplication, and partial competition success |
+| Player statistics | `src/services/api/statistics.test.ts` | Season-scoped Süper Lig and all-European-competition requests with combined goal/assist totals |
+| Data snapshots | `functions/services/dataSnapshots.test.js` | 06:00/admin snapshot generation and last-known-good preservation after provider failures |
 | Cache refresh safety | `functions/utils/cacheRefresh.test.js` | Last known-good cache preservation on provider failure and replacement only after a successful response |
 | Match bootstrap fallback | `src/hooks/useMatchBootstrap.test.ts` | Local match preservation across empty backend responses and request failures |
 | Reminder authorization | `functions/handlers/reminder.test.js` | Authenticated preference writes, trusted token rotation, deferred FCM cleanup, and malicious old-token rejection |
@@ -260,7 +273,7 @@ This small public read-only node is published from the claim-protected administr
 | Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
 | Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
 | Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
-| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, lineup/player-status draft constraints, revision conflicts, generated manual IDs, and notification URLs |
+| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, ESPN/cache controls, lineup/player-status draft constraints, revision conflicts, generated manual IDs, and notification URLs |
 | Shared lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away tabs, incomplete provider sides, and mobile touch editing |
 | Player-status UI and realtime parsing | `src/components/admin/AdminPlayerStatusManager.test.tsx`, `src/components/AdminPanel.preview.test.tsx`, `src/services/api/statistics.player-status.test.ts` | Mobile squad/manual editing, stale warnings, local-only writes, legacy/modern data parsing, and realtime updates |
 | Realtime Database rules | `rules/database.rules.spec.mjs` | Public read-only sports cache/status data, owner isolation, private `ops`, denied direct writes, and the closed legacy `admin/startingXI` path |
@@ -290,6 +303,14 @@ http://localhost:5173/fenerbahce-fan-hub/?adminStatusPreview=1
 ```
 
 The development-only header control opens the **Durumlar** tab directly. It reads the public live status and squad data, but save and publish actions remain in memory and disappear on refresh. The production build removes the query switch and its warning marker.
+
+### Sports Data Source Controls
+
+Fixtures, Süper Lig standings, and player statistics use direct browser-to-ESPN requests by default. The frontend uses `site.web.api.espn.com` as the preferred browser endpoint, limits concurrent schedule/roster requests, retries one transient failure through the legacy `site.api.espn.com` hostname, and deduplicates identical requests for the current browser session. It does not poll these datasets every 60 seconds.
+
+`dailyDataRefresh` stores one last-known-good snapshot for each resource at 06:00 Europe/Istanbul time under `cache/dataSnapshots/{seasonStartYear}/{resource}`. In **Yönetim → Sistem**, an administrator can independently select **ESPN** or **Cache** for each resource and can refresh one snapshot or all snapshots on demand. Provider failures update snapshot health metadata but preserve the previous `data` payload. Public clients can read these nodes but cannot write them.
+
+The cache switch is an operational fallback, not an automatic failover: a transient ESPN error remains visible while ESPN mode is selected, and the administrator decides when to activate cached data. Source-mode changes are delivered through a small Realtime Database listener; the sports payloads themselves are read once and are not continuously streamed.
 
 CI runs the same quality command sequence with Node.js 22 and Java 21 for the Firebase emulator.
 
@@ -323,6 +344,8 @@ CI runs the same quality command sequence with Node.js 22 and Java 21 for the Fi
                 │ cache/       │        ▲
                 │   liveMatch  │────────┘ updateLiveMatch (1/min)
                 │   lastFinishedMatch
+                │   dataSourceModes/
+                │   dataSnapshots/
                 │   cupFixtures/
                 │   uefaJourney/
                 │   squad          ← Statistics tab reads directly
@@ -336,7 +359,7 @@ CI runs the same quality command sequence with Node.js 22 and Java 21 for the Fi
                 └──────────────┘
 ```
 
-Note: The fixture tab merges client-side ESPN schedules with the cached `GET /api/cup-fixtures?seasonStartYear=YYYY` SofaScore supplement, and standings are fetched directly from ESPN by the frontend. Türkiye Kupası coverage starts with 2026/27; older selectable seasons remain ESPN-only. The Europe modal calls `GET /api/uefa-journey?seasonStartYear=YYYY`; that handler automatically refreshes stale current-season ESPN data and stores the result under `cache/uefaJourney/{seasonStartYear}`, while `summary=true` returns the compact dashboard label. Finished ESPN fixture summaries are served by `/api/match-summary/:matchId`, while SofaScore cup cards intentionally omit the unsupported summary action.
+Note: The fixture tab normally merges client-side ESPN schedules with the cached `GET /api/cup-fixtures?seasonStartYear=YYYY` SofaScore supplement, while standings and statistics also use direct ESPN browser requests. Each of these three resources can instead read its administrator-selected 06:00 snapshot. Türkiye Kupası coverage starts with 2026/27; older selectable seasons remain ESPN-only. The Europe modal calls `GET /api/uefa-journey?seasonStartYear=YYYY`; that handler automatically refreshes stale current-season ESPN data and stores the result under `cache/uefaJourney/{seasonStartYear}`, while `summary=true` returns the compact dashboard label. Finished ESPN fixture summaries are served by `/api/match-summary/:matchId`, while SofaScore cup cards intentionally omit the unsupported summary action.
 
 ## Project Structure
 
@@ -348,6 +371,7 @@ fenerbahce-fan-hub/
 │   ├── services/
 │   │   ├── espn.js            # ESPN data fetching & event parsing
 │   │   ├── espn-helpers.js    # Pure ESPN helpers (zero side effects, no Firebase)
+│   │   ├── dataSnapshots.js   # 06:00 and admin-triggered ESPN fallback snapshots
 │   │   ├── lineupPublishing.js # Stable detection, publication and push locking
 │   │   ├── uefaJourney.js     # UEFA schedules, standings, bracket and cache
 │   │   └── sofascore.js       # SofaScore API calls (matches, squad, images)
@@ -402,7 +426,8 @@ fenerbahce-fan-hub/
 │   │   ├── useCooldown.ts             # Async action cooldown hook
 │   │   └── useFixtureData.ts          # Fixture data fetching & filtering hook
 │   ├── contexts/
-│   │   └── AuthContext.tsx            # Firebase Auth context (Google sign-in)
+│   │   ├── AuthContext.tsx             # Firebase Auth context (Google sign-in)
+│   │   └── DataSourceContext.tsx       # Realtime ESPN/cache source-mode listener
 │   ├── services/
 │   │   ├── admin.ts                   # Authenticated administration API client
 │   │   ├── api.ts                     # Barrel re-export (preserves import surface)
@@ -412,6 +437,8 @@ fenerbahce-fan-hub/
 │   │       ├── fixtures.ts           # fetchMatchStatus, fetchSquad, fetchMatchSummary
 │   │       ├── standings.ts          # fetchEspnStandings
 │   │       ├── espn-fixtures.ts      # fetchEspnFenerbahceFixtures
+│   │       ├── data-source.ts        # RTDB snapshot readers and source defaults
+│   │       ├── request-policy.ts     # Concurrency, retry and session deduplication
 │   │       ├── uefa-journey.ts       # cached UEFA journey and summary requests
 │   │       └── statistics.ts         # fetchPlayerStats, fetchFormResults, fetchPlayerStatus
 │   ├── data/
@@ -534,7 +561,7 @@ firebase deploy --only database
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
+| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, writes last-known-good fixture/standings/statistics snapshots, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
 | `checkMatchNotifications` | Every minute | Reads `cache/next3Matches` first (no external API call) and scans user preferences only inside a due reminder window before sending through FCM. |
 | `updateLiveMatch` | Every minute | Uses the existing live task for verified ESPN lineup discovery from T-90 (three-minute cadence until T-30, then every minute) and full live tracking in Süper Lig and supported UEFA competitions. Keeps the final live payload for five minutes, archives it durably, and stores the fixture summary. |
 | `reconcileTopicSync` | Every 5 minutes | Uses indexed RTDB queries to retry only pending `all_fans` intents or deferred old-token cleanups. |
@@ -563,9 +590,10 @@ firebase deploy --only database
 1. Sign in with the verified Google account carrying the server-issued `admin` claim, then open **Yönetim** from the profile menu
 2. Keep both automation switches off for the first real match and confirm that ESPN detection reaches `ready` with the correct teams and formation preview
 3. Publish the detected lineup manually after review, or build exactly 11 Fenerbahçe players in the shared editor when ESPN is incomplete or the competition uses the manual fallback
-4. A manual Fenerbahçe publication creates a lock while retaining any detected opponent lineup; **ESPN'e geri dön** releases that lock
-5. After one verified match, enable automatic publishing. Enable automatic Starting XI push only after a later verified match confirms publication behavior
-6. Published lineup data is never written by a browser directly. Cloud Functions writes the public cache, while private detection, draft, lock, settings, and audit data remain under `ops`
+4. A manual Fenerbahçe publication creates a lock while retaining any detected opponent lineup; **ESPN otomasyonuna dön** releases that lock
+5. The lineup tab shows either the published preview or the manual editor, never two pitches at once. **Yayınlanan İlk 11’i Kaldır** removes the public cache entry, preserves the draft and detection, and keeps automation paused so the lineup is not immediately republished
+6. After one verified match, enable automatic publishing. Enable automatic Starting XI push only after a later verified match confirms publication behavior
+7. Published lineup data is never written by a browser directly. Cloud Functions writes the public cache, while private detection, draft, lock, settings, and audit data remain under `ops`
 
 ### Administration Notification Center
 
@@ -577,7 +605,9 @@ firebase deploy --only database
 The panel reports only whether Firebase accepted or failed the topic submission; it does not invent a delivery count. User-entered tokens, topics, and scheduled custom broadcasts are intentionally unsupported.
 
 ### Fixture System
-- **Flow**: Frontend Fixture Tab → ESPN Team Schedule endpoints + cached SofaScore `cup-fixtures` supplement
+- **Default Flow**: Frontend Fixture Tab → bounded direct ESPN Team Schedule requests + cached SofaScore `cup-fixtures` supplement
+- **Operational Fallback**: Administrator-selected `cache/dataSnapshots/{seasonStartYear}/fixtures`; standings and statistics have independent switches using the same snapshot model
+- **Refresh Frequency**: No dataset-level 60-second polling; snapshots refresh at 06:00 TR or through the authenticated admin action
 - **Coverage**: Süper Lig, Türkiye Kupası from 2026/27 onward, plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
 - **Seasons**: Current season plus the previous two seasons, with July 1 boundaries
 - **Data Merge**: ESPN results (`schedule`) + ESPN upcoming fixtures (`schedule?fixture=true`) + persisted SofaScore cup events
@@ -639,4 +669,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.15.0** | August 2026
+**v2.16.0** | August 2026

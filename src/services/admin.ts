@@ -2,6 +2,10 @@ import { auth } from '../firebase';
 import { BACKEND_URL } from './api/base';
 import type {
     AdminLineupSettings,
+    CachedSnapshot,
+    DataSourceMode,
+    DataSourceModes,
+    DataSourceResource,
     FormationDraft,
     MatchData,
     PublishedMatchLineups
@@ -19,6 +23,11 @@ export interface AdminOverview {
     } | null;
     health: Record<string, Record<string, unknown>>;
     settings: AdminLineupSettings;
+    dataSources: {
+        modes: DataSourceModes;
+        seasonStartYear: number | null;
+        snapshots: Record<string, Partial<Record<DataSourceResource, CachedSnapshot<unknown>>>>;
+    };
     topicSync: { pending: number; cleanupPending: number };
     startingLineupPush: {
         status: string | null;
@@ -153,10 +162,34 @@ export const releaseAdminLineup = (matchId: number | string) => (
     })
 );
 
+export const unpublishAdminLineup = (matchId: number | string) => (
+    adminRequest<{ success: true; published: null; manualLocked: true }>(`lineups/${matchId}/unpublish`, {
+        method: 'POST',
+        body: JSON.stringify({})
+    })
+);
+
 export const updateAdminSettings = (settings: AdminLineupSettings) => (
     adminRequest<{ success: true; settings: AdminLineupSettings }>('settings', {
         method: 'PUT',
         body: JSON.stringify(settings)
+    })
+);
+
+export const updateAdminDataSource = (resource: DataSourceResource, mode: DataSourceMode) => (
+    adminRequest<{ success: true; modes: DataSourceModes }>('data-source', {
+        method: 'PUT',
+        body: JSON.stringify({ resource, mode })
+    })
+);
+
+export const refreshAdminDataCache = (
+    resource: DataSourceResource | 'all',
+    seasonStartYear: number
+) => (
+    adminRequest<{ success: true; results: Array<Record<string, unknown>> }>('data-refresh', {
+        method: 'POST',
+        body: JSON.stringify({ resource, seasonStartYear })
     })
 );
 

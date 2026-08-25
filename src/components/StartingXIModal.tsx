@@ -17,6 +17,8 @@ const StartingXIModal = ({
     useSquadPhotos = true,
 }: StartingXIModalProps) => {
     if (!visible) return null;
+    const availableSides = (['home', 'away'] as const).filter((side) => Boolean(data.lineups[side]));
+    const singleManualLineup = availableSides.length === 1 && data.sources?.[availableSides[0]] === 'manual';
 
     return (
         <div
@@ -30,12 +32,12 @@ const StartingXIModal = ({
                 <div className="flex items-center justify-between border-b border-white/10 p-4">
                     <div>
                         <p className="text-base font-black text-white">
-                            {isSimulation ? 'Simülasyon İlk 11’i' : 'İlk 11’ler Açıklandı'}
+                            {isSimulation ? 'Simülasyon İlk 11’i' : singleManualLineup ? 'Fenerbahçe İlk 11’i' : 'İlk 11’ler Açıklandı'}
                         </p>
                         <p className="mt-0.5 text-[11px] text-slate-400">
                             {isSimulation
                                 ? 'Kaynak: Yerel geliştirme verisi'
-                                : `Kaynak: ${data.sources?.home === 'manual' || data.sources?.away === 'manual' ? 'Yönetim paneli / ESPN' : 'ESPN'}`}
+                                : `Kaynak: ${singleManualLineup ? 'Yönetim paneli' : data.sources?.home === 'manual' || data.sources?.away === 'manual' ? 'Yönetim paneli / ESPN' : 'ESPN'}`}
                         </p>
                     </div>
                     <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white" aria-label="Kapat">

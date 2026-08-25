@@ -8,8 +8,9 @@ export function useForegroundMessaging(enabled = true) {
       try {
         if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
-        const { messaging } = await import('../firebase');
+        const { getFirebaseMessaging } = await import('../firebase');
         const { onMessage } = await import('firebase/messaging');
+        const messaging = await getFirebaseMessaging();
         if (!messaging) return;
 
         unsubscribe = onMessage(messaging, (payload) => {

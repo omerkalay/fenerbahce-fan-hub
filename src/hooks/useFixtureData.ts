@@ -6,6 +6,8 @@ import type { FixtureMatch, FixtureData, MatchSummaryData } from '../types';
 import { getCurrentSeasonStartYear, getRecentSeasonOptions, isHistoricalSeason } from '../utils/seasons';
 
 import { localizeTeamName } from '../utils/localize';
+import { useDataSource } from '../contexts/dataSourceContextDef';
+import { readCachedFixtures } from '../services/api/data-source';
 
 const getMatchTimestamp = (match: FixtureMatch): number => {
     const value = new Date(match?.date).getTime();
@@ -15,6 +17,7 @@ const getMatchTimestamp = (match: FixtureMatch): number => {
 // ─── Hook ────────────────────────────────────────────────
 
 export function useFixtureData() {
+    const { modes } = useDataSource();
     const [fixtureData, setFixtureData] = useState<FixtureData | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -54,10 +57,12 @@ export function useFixtureData() {
             setError(null);
             setWarning(null);
 
-            const data = await fetchFenerbahceFixtures(selectedSeasonStartYear);
+            const data = modes.fixtures === 'cache'
+                ? await readCachedFixtures(selectedSeasonStartYear)
+                : await fetchFenerbahceFixtures(selectedSeasonStartYear);
             if (!isMounted) return;
 
-            if (data?.error) {
+            if (!data || data.error) {
                 setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
             }
             setWarning(data?.warning ?? null);
@@ -71,14 +76,16 @@ export function useFixtureData() {
         return () => {
             isMounted = false;
         };
-    }, [selectedSeasonStartYear]);
+    }, [modes.fixtures, selectedSeasonStartYear]);
 
     const refreshAction = async () => {
         setError(null);
         setWarning(null);
         setIsRefreshing(true);
-        const data = await fetchFenerbahceFixtures(selectedSeasonStartYear);
-        if (data?.error) {
+        const data = modes.fixtures === 'cache'
+            ? await readCachedFixtures(selectedSeasonStartYear, true)
+            : await fetchFenerbahceFixtures(selectedSeasonStartYear, { force: true });
+        if (!data || data.error) {
             setError('Fikstür verisi alınamadı. Lütfen tekrar dene.');
         }
         setWarning(data?.warning ?? null);

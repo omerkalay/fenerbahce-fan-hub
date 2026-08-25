@@ -39,4 +39,35 @@ describe('StartingXIModal simulation presentation', () => {
         expect(screen.getByTestId('lineup-mode')).toHaveTextContent('false:true');
         expect(screen.queryByText('Kaynak: ESPN')).not.toBeInTheDocument();
     });
+
+    it('labels a one-sided manual Fenerbahce lineup without naming the missing opponent lineup', () => {
+        render(
+            <StartingXIModal
+                visible
+                data={{
+                    ...data,
+                    homeTeam: { id: '167', name: 'Olympique Lyonnais', logo: '' },
+                    awayTeam: { id: '3052', name: 'Fenerbahçe', logo: '' },
+                    lineups: {
+                        home: null,
+                        away: {
+                            teamId: '3052',
+                            teamName: 'Fenerbahçe',
+                            formation: '4-2-3-1',
+                            formationSource: 'manual',
+                            starters: [],
+                            bench: [],
+                            substitutions: []
+                        }
+                    },
+                    sources: { home: 'espn', away: 'manual' }
+                }}
+                onClose={vi.fn()}
+            />
+        );
+
+        expect(screen.getByText('Fenerbahçe İlk 11’i')).toBeInTheDocument();
+        expect(screen.getByText('Kaynak: Yönetim paneli')).toBeInTheDocument();
+        expect(screen.queryByText(/Olympique Lyonnais/)).not.toBeInTheDocument();
+    });
 });

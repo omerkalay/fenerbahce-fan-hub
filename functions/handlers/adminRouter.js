@@ -8,6 +8,11 @@ const {
     sendStartingLineupPush
 } = require('../services/lineupPublishing');
 const { isFenerbahceName } = require('../utils/lineupAutomation');
+const {
+    DATA_RESOURCES,
+    DEFAULT_DATA_SOURCE_MODES,
+    refreshDataSnapshots
+} = require('../services/dataSnapshots');
 
 const MATCH_ID_PATTERN = /^\d{5,20}$/;
 const ALLOWED_FORMATIONS = new Set(['4-3-3', '4-4-2', '4-2-3-1', '4-1-4-1', '3-5-2', '4-1-2-1-2 Diamond']);
@@ -19,11 +24,27 @@ const PLAYER_STATUS_SOURCES = new Set(['squad', 'manual']);
 const PLAYER_STATUS_MAX_ENTRIES = 40;
 const PLAYER_STATUS_LOCK_TTL_MS = 30 * 1000;
 const PLAYER_STATUS_ENTRY_KEYS = new Set(['playerId', 'source', 'name', 'status', 'detail', 'returnDate']);
+const DATA_SOURCE_MODES = new Set(['espn', 'cache']);
+const DATA_REFRESH_RESOURCES = new Set([...DATA_RESOURCES, 'all']);
 
 const hasOnlyKeys = (value, allowedKeys) => (
     value && typeof value === 'object' && !Array.isArray(value)
     && Object.keys(value).every((key) => allowedKeys.has(key))
 );
+
+const normalizeDataSourceUpdate = (body) => {
+    if (!hasOnlyKeys(body, new Set(['resource', 'mode']))) return null;
+    if (!DATA_RESOURCES.includes(body.resource) || !DATA_SOURCE_MODES.has(body.mode)) return null;
+    return { resource: body.resource, mode: body.mode };
+};
+
+const normalizeDataRefreshRequest = (body) => {
+    if (!hasOnlyKeys(body, new Set(['resource', 'seasonStartYear']))) return null;
+    const seasonStartYear = Number(body.seasonStartYear);
+    if (!DATA_REFRESH_RESOURCES.has(body.resource)) return null;
+    if (!Number.isInteger(seasonStartYear) || seasonStartYear < 2000 || seasonStartYear > 2100) return null;
+    return { resource: body.resource, seasonStartYear };
+};
 
 const validateMatchId = (value) => {
     const matchId = String(value || '').trim();
@@ -462,14 +483,17 @@ const summarizeUefaJourney = (value) => {
 };
 
 const handleOverview = async (_req, res, _claims, database = db) => {
-    const [lastUpdate, nextMatch, uefaJourney, health, settings, pending, cleanup] = await Promise.all([
+    const [lastUpdate, nextMatch, uefaJourney, health, settings, pending, cleanup, dataSourceModes, season, dataSnapshots] = await Promise.all([
         database.ref('cache/lastUpdate').once('value'),
         database.ref('cache/nextMatch').once('value'),
         database.ref('cache/uefaJourney').once('value'),
         database.ref('ops/health').once('value'),
         getLineupSettings(database),
         database.ref('notifications').orderByChild('topicSync/allFans/pending').equalTo(true).once('value'),
-        database.ref('notifications').orderByChild('topicSync/allFans/oldTokenToCleanup').startAt('').once('value')
+        database.ref('notifications').orderByChild('topicSync/allFans/oldTokenToCleanup').startAt('').once('value'),
+        database.ref('cache/dataSourceModes').once('value'),
+        database.ref('cache/season').once('value'),
+        database.ref('cache/dataSnapshots').once('value')
     ]);
     const nextMatchValue = nextMatch.val() || null;
     const nextMatchId = validateMatchId(nextMatchValue?.id);
@@ -484,6 +508,11 @@ const handleOverview = async (_req, res, _claims, database = db) => {
         uefaJourney: summarizeUefaJourney(uefaJourney.val()),
         health: health.val() || {},
         settings,
+        dataSources: {
+            modes: { ...DEFAULT_DATA_SOURCE_MODES, ...(dataSourceModes.val() || {}) },
+            seasonStartYear: Number(season.val()?.startYear || 0) || null,
+            snapshots: dataSnapshots.val() || {}
+        },
         topicSync: {
             pending: pending.numChildren(),
             cleanupPending: cleanup.numChildren()
@@ -495,6 +524,35 @@ const handleOverview = async (_req, res, _claims, database = db) => {
             errorCode: startingLineupPush.errorCode || null
         } : null
     });
+};
+
+const handleDataSourcePut = async (req, res, claims, database = db) => {
+    const update = normalizeDataSourceUpdate(req.body);
+    if (!update) return res.status(400).json({ error: 'Invalid data source update' });
+    await database.ref(`cache/dataSourceModes/${update.resource}`).set(update.mode);
+    await writeAudit(claims.uid, 'data_source.updated', update, database);
+    const snapshot = await database.ref('cache/dataSourceModes').once('value');
+    return res.json({
+        success: true,
+        modes: { ...DEFAULT_DATA_SOURCE_MODES, ...(snapshot.val() || {}) }
+    });
+};
+
+const handleDataRefresh = async (req, res, claims, database = db, refreshSnapshots = refreshDataSnapshots) => {
+    const request = normalizeDataRefreshRequest(req.body);
+    if (!request) return res.status(400).json({ error: 'Invalid data refresh request' });
+    const resources = request.resource === 'all' ? 'all' : [request.resource];
+    const results = await refreshSnapshots({
+        resources,
+        seasonStartYear: request.seasonStartYear,
+        database
+    });
+    await writeAudit(claims.uid, 'data_cache.refreshed', {
+        resource: request.resource,
+        seasonStartYear: request.seasonStartYear,
+        results
+    }, database);
+    return res.json({ success: true, results });
 };
 
 const handleLineupGet = async (_req, res, claims, matchId, match, database = db) => {
@@ -567,7 +625,10 @@ const handlePublish = async (req, res, claims, matchId, match, database = db, me
             }
             const detected = detectedSnapshot.val();
             const published = publishedSnapshot.val();
-            const base = detected || published || {};
+            const candidateBase = detected || published || {};
+            const base = !candidateBase.matchId || String(candidateBase.matchId) === String(matchId)
+                ? candidateBase
+                : {};
             const homeIsFenerbahce = isFenerbahceName(match.homeTeam?.name);
             const awayIsFenerbahce = isFenerbahceName(match.awayTeam?.name);
             if (homeIsFenerbahce === awayIsFenerbahce) {
@@ -579,8 +640,8 @@ const handlePublish = async (req, res, claims, matchId, match, database = db, me
             payload = {
                 ...base,
                 matchId,
-                homeTeam: base.homeTeam || match.homeTeam,
-                awayTeam: base.awayTeam || match.awayTeam,
+                homeTeam: match.homeTeam,
+                awayTeam: match.awayTeam,
                 lineups: {
                     ...(base.lineups || {}),
                     [fenerSide]: draftToTeamLineup(draft, team),
@@ -641,6 +702,31 @@ const handleRelease = async (req, res, claims, matchId, _match, database = db) =
         await releaseLineupWriteLock(database, matchId, operationId);
     }
     return res.json({ success: true, manualLocked: false });
+};
+
+const handleUnpublish = async (req, res, claims, matchId, _match, database = db) => {
+    if (!hasOnlyKeys(req.body || {}, new Set())) return res.status(400).json({ error: 'Invalid unpublish request' });
+
+    const now = Date.now();
+    const operationId = crypto.randomUUID();
+    const acquired = await acquireLineupWriteLock(database, matchId, operationId, now);
+    if (!acquired) return res.status(409).json({ error: 'Another lineup operation is in progress' });
+
+    try {
+        const publishedSnapshot = await database.ref(`cache/matchLineups/${matchId}`).once('value');
+        await database.ref().update({
+            [`cache/matchLineups/${matchId}`]: null,
+            [`ops/lineups/${matchId}/manualLocked`]: true
+        });
+        await writeAudit(claims.uid, 'lineup.unpublished', {
+            matchId,
+            operationId,
+            hadPublishedLineup: Boolean(publishedSnapshot.val())
+        }, database);
+    } finally {
+        await releaseLineupWriteLock(database, matchId, operationId);
+    }
+    return res.json({ success: true, published: null, manualLocked: true });
 };
 
 const handleSettings = async (req, res, claims, database = db) => {
@@ -723,6 +809,7 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
     const database = dependencies.database || db;
     const messaging = dependencies.messaging || admin.messaging();
     const authenticate = dependencies.requireAdminClaims || requireAdminClaims;
+    const refreshSnapshots = dependencies.refreshDataSnapshots || refreshDataSnapshots;
     const claims = await authenticate(req, res);
     if (!claims) return;
 
@@ -731,6 +818,12 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
         if (resource === 'session' && segments.length === 1 && req.method === 'GET') return handleSession(req, res, claims);
         if (resource === 'overview' && segments.length === 1 && req.method === 'GET') return handleOverview(req, res, claims, database);
         if (resource === 'settings' && segments.length === 1 && req.method === 'PUT') return handleSettings(req, res, claims, database);
+        if (resource === 'data-source' && segments.length === 1 && req.method === 'PUT') {
+            return handleDataSourcePut(req, res, claims, database);
+        }
+        if (resource === 'data-refresh' && segments.length === 1 && req.method === 'POST') {
+            return handleDataRefresh(req, res, claims, database, refreshSnapshots);
+        }
         if (resource === 'player-status') {
             if (segments.length === 1 && req.method === 'GET') {
                 return handlePlayerStatusGet(req, res, claims, database);
@@ -762,6 +855,7 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
         if (action === 'draft' && segments.length === 3 && req.method === 'PUT') return handleDraftPut(req, res, claims, matchId, match, database);
         if (action === 'publish' && segments.length === 3 && req.method === 'POST') return handlePublish(req, res, claims, matchId, match, database, messaging);
         if (action === 'release' && segments.length === 3 && req.method === 'POST') return handleRelease(req, res, claims, matchId, match, database);
+        if (action === 'unpublish' && segments.length === 3 && req.method === 'POST') return handleUnpublish(req, res, claims, matchId, match, database);
         return res.status(405).json({ error: 'Method not allowed' });
     } catch (error) {
         console.error('Admin request failed:', error?.code || error?.message || 'unknown');
@@ -774,6 +868,8 @@ module.exports = {
     validateMatchId,
     normalizeDraft,
     normalizeNotification,
+    normalizeDataSourceUpdate,
+    normalizeDataRefreshRequest,
     normalizePlayerStatusDraft,
     normalizePublishedPlayerStatuses,
     notificationHash,

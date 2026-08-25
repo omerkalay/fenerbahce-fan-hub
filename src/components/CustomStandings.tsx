@@ -4,6 +4,8 @@ import { localizeTeamName } from '../utils/localize';
 import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
 import type { StandingsData, StandingsRow } from '../types';
+import { useDataSource } from '../contexts/dataSourceContextDef';
+import { readCachedStandings } from '../services/api/data-source';
 
 interface CustomStandingsProps {
     league: string;
@@ -51,6 +53,7 @@ const CustomStandings = ({
     standingsData
 }: CustomStandingsProps) => {
     const { theme } = useTheme();
+    const { modes } = useDataSource();
     const [standings, setStandings] = useState<StandingsRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -64,7 +67,9 @@ const CustomStandings = ({
             setError(null);
 
             const leagueId = league === 'superlig' ? 'super-lig' : 'europa-league';
-            const data = await fetchEspnStandings(leagueId, seasonStartYear);
+            const data = modes.standings === 'cache'
+                ? await readCachedStandings(seasonStartYear)
+                : await fetchEspnStandings(leagueId, seasonStartYear);
 
             if (cancelled) return;
 
@@ -78,7 +83,7 @@ const CustomStandings = ({
 
         load();
         return () => { cancelled = true; };
-    }, [externallyManaged, league, seasonStartYear]);
+    }, [externallyManaged, league, modes.standings, seasonStartYear]);
 
     const displayedStandings = externallyManaged ? standingsData?.rows ?? [] : standings;
     const displayedLoading = externallyManaged ? false : loading;

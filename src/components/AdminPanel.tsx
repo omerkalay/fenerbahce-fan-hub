@@ -10,11 +10,14 @@ import {
     publishAdminPlayerStatus,
     publishAdminLineup,
     releaseAdminLineup,
+    unpublishAdminLineup,
     saveAdminPlayerStatusDraft,
     saveAdminLineupDraft,
     sendAdminNotificationBroadcast,
     sendAdminNotificationTest,
     updateAdminSettings,
+    updateAdminDataSource,
+    refreshAdminDataCache,
     type AdminLineupDetail,
     type AdminNotificationPayload,
     type AdminOverview,
@@ -22,8 +25,11 @@ import {
     type AdminPlayerStatusState
 } from '../services/admin';
 import { fetchPlayerStatus, fetchSquad } from '../services/api';
-import type { AdminLineupSettings, FormationDraft, MatchData, Player, PublishedMatchLineups } from '../types';
+import type { AdminLineupSettings, DataSourceMode, DataSourceResource, FormationDraft, MatchData, Player, PublishedMatchLineups } from '../types';
 import { ADMIN_STATUS_PREVIEW_MODE } from '../utils/adminStatusPreview';
+import SeasonSelector from './SeasonSelector';
+import { getCurrentSeasonStartYear, getRecentSeasonOptions } from '../utils/seasons';
+import { normalizePublishedLineups } from '../utils/lineupData';
 
 interface AdminPanelProps {
     visible: boolean;
@@ -39,6 +45,14 @@ const DEFAULT_NOTIFICATION: AdminNotificationPayload = {
     url: 'https://omerkalay.com/fenerbahce-fan-hub/'
 };
 
+const DATA_RESOURCE_LABELS: Record<DataSourceResource, string> = {
+    fixtures: 'Fikstür',
+    standings: 'Puan durumu',
+    statistics: 'Gol, asist ve form'
+};
+
+const LINEUP_ACTION_BUTTON_CLASS = 'min-h-12 w-full rounded-xl px-4 py-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+
 const formatDateTime = (value: unknown): string => {
     const timestamp = Number(value);
     if (!Number.isFinite(timestamp) || timestamp <= 0) return 'Henüz yok';
@@ -50,7 +64,7 @@ const formatDateTime = (value: unknown): string => {
 };
 
 const findLineupPreview = (detail: AdminLineupDetail | null): PublishedMatchLineups | null => (
-    detail?.published || detail?.detection?.payload || null
+    normalizePublishedLineups(detail?.published || detail?.detection?.payload || null)
 );
 
 const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
@@ -61,13 +75,16 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     const [playerStatusState, setPlayerStatusState] = useState<AdminPlayerStatusState | null>(null);
     const [squad, setSquad] = useState<Player[]>([]);
     const [draft, setDraft] = useState<FormationDraft | null>(null);
+    const [lineupEditorOpen, setLineupEditorOpen] = useState(false);
     const [notification, setNotification] = useState<AdminNotificationPayload>(DEFAULT_NOTIFICATION);
     const [testId, setTestId] = useState<string | null>(null);
+    const [dataSeasonStartYear, setDataSeasonStartYear] = useState(() => getCurrentSeasonStartYear());
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const lineupRequestRef = useRef(0);
     const playerStatusRequestRef = useRef(0);
+    const dataSeasonOptions = useMemo(() => getRecentSeasonOptions(), []);
 
     const uniqueMatches = useMemo(() => {
         const seen = new Set<number>();
@@ -81,6 +98,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     const loadOverview = useCallback(async () => {
         const data = await fetchAdminOverview();
         setOverview(data);
+        if (data.dataSources?.seasonStartYear) setDataSeasonStartYear(data.dataSources.seasonStartYear);
     }, []);
 
     const loadLineup = useCallback(async (matchId: string) => {
@@ -90,6 +108,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         if (requestId !== lineupRequestRef.current) return;
         setLineupDetail(data);
         setDraft(data.draft);
+        setLineupEditorOpen((current) => findLineupPreview(data) ? current : true);
     }, []);
 
     const loadPlayerStatuses = useCallback(async () => {
@@ -170,6 +189,10 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     }, [loadLineup, selectedMatchId, visible]);
 
     useEffect(() => {
+        setLineupEditorOpen(false);
+    }, [selectedMatchId]);
+
+    useEffect(() => {
         if (!visible || tab !== 'player-status') return;
         let cancelled = false;
         setBusy(true);
@@ -200,6 +223,48 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         setNotice(null);
     }, [visible]);
 
+    useEffect(() => {
+        if (!visible) return;
+
+        const root = document.documentElement;
+        const body = document.body;
+        const scrollY = window.scrollY;
+        const previous = {
+            rootOverflow: root.style.overflow,
+            rootOverscrollBehavior: root.style.overscrollBehavior,
+            bodyOverflow: body.style.overflow,
+            bodyOverscrollBehavior: body.style.overscrollBehavior,
+            bodyPosition: body.style.position,
+            bodyTop: body.style.top,
+            bodyLeft: body.style.left,
+            bodyRight: body.style.right,
+            bodyWidth: body.style.width
+        };
+
+        root.style.overflow = 'hidden';
+        root.style.overscrollBehavior = 'none';
+        body.style.overflow = 'hidden';
+        body.style.overscrollBehavior = 'none';
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.left = '0';
+        body.style.right = '0';
+        body.style.width = '100%';
+
+        return () => {
+            root.style.overflow = previous.rootOverflow;
+            root.style.overscrollBehavior = previous.rootOverscrollBehavior;
+            body.style.overflow = previous.bodyOverflow;
+            body.style.overscrollBehavior = previous.bodyOverscrollBehavior;
+            body.style.position = previous.bodyPosition;
+            body.style.top = previous.bodyTop;
+            body.style.left = previous.bodyLeft;
+            body.style.right = previous.bodyRight;
+            body.style.width = previous.bodyWidth;
+            if (scrollY > 0) window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
+        };
+    }, [visible]);
+
     const runAction = async (action: () => Promise<void>, successMessage: string) => {
         setBusy(true);
         setError(null);
@@ -222,6 +287,28 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         }, 'Otomasyon ayarları güncellendi.');
     };
 
+    const updateDataSource = async (resource: DataSourceResource, mode: DataSourceMode) => {
+        const snapshot = overview?.dataSources?.snapshots?.[String(dataSeasonStartYear)]?.[resource];
+        if (mode === 'cache' && !snapshot?.data) {
+            setError(`${DATA_RESOURCE_LABELS[resource]} için ${dataSeasonStartYear}/${String(dataSeasonStartYear + 1).slice(-2)} cache’i henüz hazır değil.`);
+            return;
+        }
+        await runAction(async () => {
+            const result = await updateAdminDataSource(resource, mode);
+            setOverview((current) => current?.dataSources ? {
+                ...current,
+                dataSources: { ...current.dataSources, modes: result.modes }
+            } : current);
+        }, `${DATA_RESOURCE_LABELS[resource]} kaynağı ${mode === 'espn' ? 'ESPN' : 'Cache'} olarak ayarlandı.`);
+    };
+
+    const refreshDataCache = async (resource: DataSourceResource | 'all') => {
+        await runAction(async () => {
+            await refreshAdminDataCache(resource, dataSeasonStartYear);
+            await loadOverview();
+        }, resource === 'all' ? 'Tüm veri cache’leri yenilendi.' : `${DATA_RESOURCE_LABELS[resource]} cache’i yenilendi.`);
+    };
+
     const saveDraft = async () => {
         if (!selectedMatchId || !draft) return;
         await runAction(async () => {
@@ -236,6 +323,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         await runAction(async () => {
             await publishAdminLineup(selectedMatchId, mode);
             await loadLineup(selectedMatchId);
+            setLineupEditorOpen(false);
         }, mode === 'detected' ? 'ESPN kadrosu yayınlandı.' : 'Manuel kadro yayınlandı ve kilitlendi.');
     };
 
@@ -245,6 +333,17 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
             await releaseAdminLineup(selectedMatchId);
             await loadLineup(selectedMatchId);
         }, 'Manuel kilit kaldırıldı; kadro yeniden ESPN otomasyonuna bırakıldı.');
+    };
+
+    const unpublish = async () => {
+        if (!selectedMatchId) return;
+        const confirmed = window.confirm('Yayınlanan İlk 11’i kaldırmak istediğine emin misin? Kadro taraftar ekranından hemen kaldırılır; taslağın silinmez ve bildirim gönderilmez.');
+        if (!confirmed) return;
+        await runAction(async () => {
+            await unpublishAdminLineup(selectedMatchId);
+            await loadLineup(selectedMatchId);
+            setLineupEditorOpen(true);
+        }, 'Yayınlanan İlk 11 kaldırıldı. ESPN otomasyonu bu maç için duraklatıldı; taslağın korundu.');
     };
 
     const savePlayerStatuses = async (entries: AdminPlayerStatusEntry[]) => {
@@ -308,6 +407,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     if (!visible) return null;
 
     const preview = findLineupPreview(lineupDetail);
+    const publishedPreview = normalizePublishedLineups(lineupDetail?.published || null);
     const settings = lineupDetail?.settings || overview?.settings || {
         autoPublishLineups: false,
         autoPushLineups: false
@@ -362,7 +462,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                     </div>
                 )}
 
-                <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
                     {busy && <p className="mb-3 text-xs text-yellow-300">İşlem yapılıyor…</p>}
 
                     {tab === 'overview' && (
@@ -388,6 +488,71 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                                 <HealthCard title="Bildirim görevi" data={overview?.health.notificationScheduler} />
                                 <HealthCard title="İlk 11 otomasyonu" data={overview?.health.lineupAutomation} />
                             </div>
+                            <section className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-sm font-black text-white">ESPN / Cache Kontrolü</p>
+                                        <p className="mt-1 text-[11px] text-slate-400">Bölümler bağımsız çalışır; sürekli yenileme yapılmaz.</p>
+                                    </div>
+                                    <SeasonSelector
+                                        value={dataSeasonStartYear}
+                                        options={dataSeasonOptions}
+                                        onChange={setDataSeasonStartYear}
+                                        minimal
+                                    />
+                                </div>
+
+                                <div className="mt-4 space-y-3">
+                                    {(Object.keys(DATA_RESOURCE_LABELS) as DataSourceResource[]).map((resource) => {
+                                        const mode = overview?.dataSources?.modes?.[resource] || 'espn';
+                                        const snapshot = overview?.dataSources?.snapshots?.[String(dataSeasonStartYear)]?.[resource];
+                                        const hasCache = Boolean(snapshot?.data);
+                                        return (
+                                            <div key={resource} className="rounded-xl border border-white/10 bg-slate-950/40 p-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-white">{DATA_RESOURCE_LABELS[resource]}</p>
+                                                        <p className={`mt-1 text-[10px] ${snapshot?.status === 'error' ? 'text-rose-300' : 'text-slate-500'}`}>
+                                                            {hasCache
+                                                                ? `Son cache: ${formatDateTime(snapshot?.fetchedAt)}${snapshot?.status === 'error' ? ' · son deneme hatalı' : ''}`
+                                                                : 'Bu sezon için cache yok'}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex rounded-lg bg-white/5 p-0.5">
+                                                        {(['espn', 'cache'] as DataSourceMode[]).map((value) => (
+                                                            <button
+                                                                key={value}
+                                                                type="button"
+                                                                disabled={busy || (value === 'cache' && !hasCache)}
+                                                                onClick={() => updateDataSource(resource, value)}
+                                                                className={`rounded-md px-3 py-1.5 text-[10px] font-black disabled:cursor-not-allowed disabled:opacity-30 ${mode === value ? 'bg-yellow-400 text-slate-950' : 'text-slate-400'}`}
+                                                            >
+                                                                {value === 'espn' ? 'ESPN' : 'Cache'}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    disabled={busy}
+                                                    onClick={() => refreshDataCache(resource)}
+                                                    className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-bold text-slate-200 disabled:opacity-40"
+                                                >
+                                                    Cache’i şimdi yenile
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={busy}
+                                    onClick={() => refreshDataCache('all')}
+                                    className="mt-3 w-full rounded-lg bg-yellow-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-40"
+                                >
+                                    Tüm cache’leri yenile
+                                </button>
+                            </section>
                         </div>
                     )}
 
@@ -397,6 +562,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                                 value={selectedMatchId}
                                 onChange={(event) => {
                                     setSelectedMatchId(event.target.value);
+                                    setLineupEditorOpen(false);
                                 }}
                                 className="w-full rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-sm text-white"
                             >
@@ -426,31 +592,60 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
                                 <p>ESPN durumu: <strong className="text-white">{lineupDetail?.detection?.status || 'henüz veri yok'}</strong></p>
                                 <p className="mt-1">İlk görülme: {formatDateTime(lineupDetail?.detection?.firstSeenAt)}</p>
-                                <p className="mt-1">Manuel kilit: {lineupDetail?.manualLocked ? 'Açık' : 'Kapalı'}</p>
+                                <p className="mt-1">Yayın: <strong className={publishedPreview ? 'text-emerald-300' : 'text-slate-400'}>{publishedPreview ? 'Yayında' : 'Yayında değil'}</strong></p>
+                                <p className="mt-1">ESPN otomasyonu: {lineupDetail?.manualLocked ? 'Bu maç için duraklatıldı' : 'Etkin'}</p>
                                 <p className="mt-1">İlk 11 push: {lineupDetail?.notification?.status || 'henüz gönderilmedi'}</p>
                             </div>
 
-                            {preview?.lineups && (
-                                <MatchLineups
-                                    lineups={preview.lineups}
-                                    homeTeamName={preview.homeTeam.name}
-                                    awayTeamName={preview.awayTeam.name}
-                                    matchId={preview.matchId}
-                                />
+                            {preview?.lineups && !lineupEditorOpen && (
+                                <section className="space-y-3 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.04] p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-black text-white">{publishedPreview ? 'Yayınlanan İlk 11' : 'ESPN İlk 11 önizlemesi'}</p>
+                                            <p className="mt-1 text-[11px] text-slate-400">{publishedPreview ? 'Taraftar ekranında görünen kadro' : 'Henüz taraftar ekranında yayınlanmadı'}</p>
+                                        </div>
+                                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${publishedPreview ? 'bg-emerald-400/15 text-emerald-300' : 'bg-blue-400/15 text-blue-200'}`}>
+                                            {publishedPreview ? 'YAYINDA' : 'ÖNİZLEME'}
+                                        </span>
+                                    </div>
+                                    <MatchLineups
+                                        lineups={preview.lineups}
+                                        homeTeamName={preview.homeTeam.name}
+                                        awayTeamName={preview.awayTeam.name}
+                                        matchId={preview.matchId}
+                                    />
+                                </section>
                             )}
 
-                            <div className="flex flex-wrap gap-2">
-                                <button type="button" disabled={busy || lineupDetail?.detection?.status !== 'ready'} onClick={() => publish('detected')} className="rounded-lg bg-blue-500/20 px-3 py-2 text-xs font-bold text-blue-200 disabled:opacity-40">ESPN kadrosunu yayınla</button>
-                                {lineupDetail?.manualLocked && <button type="button" disabled={busy} onClick={release} className="rounded-lg bg-amber-500/20 px-3 py-2 text-xs font-bold text-amber-200">ESPN’e geri dön</button>}
-                            </div>
-
-                            <div className="border-t border-white/10 pt-4">
-                                <FormationBuilder adminMode initialDraft={lineupDetail?.draft || null} onDraftChange={setDraft} />
-                                <div className="mt-3 flex gap-2">
-                                    <button type="button" disabled={busy || !draft} onClick={saveDraft} className="flex-1 rounded-lg bg-white/10 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Taslağı kaydet</button>
-                                    <button type="button" disabled={busy || draft?.players.length !== 11} onClick={() => publish('manual')} className="flex-1 rounded-lg bg-yellow-400 px-3 py-2 text-xs font-black text-slate-950 disabled:opacity-40">Manuel yayınla</button>
+                            <section className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+                                <p className="text-xs font-black text-white">Kadro işlemleri</p>
+                                <p className="mt-1 text-[11px] text-slate-400">Önizleme ve manuel düzenleme aynı anda açılmaz.</p>
+                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                    {preview && !lineupEditorOpen && (
+                                        <button type="button" disabled={busy} onClick={() => setLineupEditorOpen(true)} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-slate-800 text-slate-100 hover:bg-slate-700`}>Manuel düzenle</button>
+                                    )}
+                                    {preview && lineupEditorOpen && (
+                                        <button type="button" disabled={busy} onClick={() => setLineupEditorOpen(false)} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-slate-800 text-slate-100 hover:bg-slate-700`}>{publishedPreview ? 'Yayınlanan kadroya dön' : 'ESPN önizlemesine dön'}</button>
+                                    )}
+                                    <button type="button" disabled={busy || lineupDetail?.detection?.status !== 'ready'} onClick={() => publish('detected')} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-blue-500/20 text-blue-200 hover:bg-blue-500/30`}>ESPN kadrosunu yayınla</button>
+                                    {lineupDetail?.manualLocked && <button type="button" disabled={busy} onClick={release} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-amber-500/20 text-amber-200 hover:bg-amber-500/30`}>ESPN otomasyonuna dön</button>}
+                                    {publishedPreview && <button type="button" disabled={busy} onClick={unpublish} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-red-500/20 text-red-200 hover:bg-red-500/30`}>Yayınlanan İlk 11’i Kaldır</button>}
                                 </div>
-                            </div>
+                            </section>
+
+                            {lineupEditorOpen && (
+                                <section className="rounded-xl border border-yellow-400/20 bg-yellow-400/[0.03] p-3">
+                                    <div className="mb-3">
+                                        <p className="text-sm font-black text-white">Manuel Fenerbahçe kadrosu</p>
+                                        <p className="mt-1 text-[11px] text-slate-400">Oyuncuları yerleştir, taslağı kaydet ve hazır olduğunda yayınla.</p>
+                                    </div>
+                                    <FormationBuilder adminMode initialDraft={lineupDetail?.draft || null} onDraftChange={setDraft} />
+                                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                        <button type="button" disabled={busy || !draft} onClick={saveDraft} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-slate-800 text-slate-100 hover:bg-slate-700`}>Taslağı kaydet</button>
+                                        <button type="button" disabled={busy || draft?.players.length !== 11} onClick={() => publish('manual')} className={`${LINEUP_ACTION_BUTTON_CLASS} bg-yellow-400 text-slate-950 hover:bg-yellow-300`}>Manuel yayınla</button>
+                                    </div>
+                                </section>
+                            )}
                         </div>
                     )}
 

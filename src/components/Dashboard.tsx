@@ -14,6 +14,7 @@ import { useTheme } from '../contexts/themeContextDef';
 import { resolveTeamCrest } from '../theme/teamCrest';
 import { getCurrentSeasonStartYear } from '../utils/seasons';
 import type { LiveMatchData, LiveMatchState, MatchData, PublishedMatchLineups, SeasonMeta, SeasonState } from '../types';
+import { normalizePublishedLineups } from '../utils/lineupData';
 
 interface DashboardProps {
     matchData: MatchData | null;
@@ -68,9 +69,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         const unsubscribe = onValue(
             startingXIRef,
             (snapshot) => {
-                const value = snapshot.val() as PublishedMatchLineups | null;
-                const hasLineup = Boolean(value?.lineups?.home || value?.lineups?.away);
-                setStartingXI(value && String(value.matchId) === String(matchData.id) && hasLineup ? value : null);
+                const value = normalizePublishedLineups(snapshot.val() as PublishedMatchLineups | null);
+                setStartingXI(value && String(value.matchId) === String(matchData.id) ? value : null);
             },
             (loadError) => {
                 console.error('Starting XI could not be loaded from RTDB:', loadError);
@@ -142,6 +142,20 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const isFenerbahceHome = matchData.homeTeam.id === 3052;
     const opponent = isFenerbahceHome ? matchData.awayTeam : matchData.homeTeam;
+    const lineupSides = resolvedStartingXI
+        ? (['home', 'away'] as const)
+            .filter((side) => Boolean(resolvedStartingXI.lineups[side]))
+            .map((side) => ({
+                side,
+                lineup: resolvedStartingXI.lineups[side]!,
+                team: side === 'home' ? resolvedStartingXI.homeTeam : resolvedStartingXI.awayTeam,
+                matchTeam: side === 'home' ? matchData.homeTeam : matchData.awayTeam,
+                source: resolvedStartingXI.sources?.[side] || null,
+            }))
+        : [];
+    const singleManualFenerLineup = lineupSides.length === 1
+        && lineupSides[0].source === 'manual'
+        && Number(lineupSides[0].matchTeam.id) === 3052;
 
     return (
         <div className="min-h-screen pb-20">
@@ -162,31 +176,24 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div className="min-w-0 flex-1">
                         <div className="mb-2 flex items-center gap-2.5">
                             <span className="text-base font-bold text-white">
-                                {safeMode ? 'Simülasyon İlk 11’i' : 'İlk 11’ler Açıklandı'}
+                                {safeMode ? 'Simülasyon İlk 11’i' : singleManualFenerLineup ? 'Fenerbahçe İlk 11’i' : 'İlk 11’ler Açıklandı'}
                             </span>
                             <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-emerald-300">
                                 {safeMode ? 'Yerel' : 'Yeni'}
                             </span>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-[11px]">
-                            <div className="min-w-0 rounded-lg bg-white/5 px-2.5 py-2">
-                                <div className="flex items-center gap-2">
-                                    <TeamLogo teamId={matchData.homeTeam.id} name={resolvedStartingXI.homeTeam.name} logoUrl={resolvedStartingXI.homeTeam.logo} wrapperClassName="h-7 w-7 shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="truncate font-semibold text-slate-200">{resolvedStartingXI.homeTeam.name}</p>
-                                        <p className="mt-0.5 font-black text-slate-400">{resolvedStartingXI.lineups.home?.formation || 'Diziliş hazır'}</p>
+                        <div className={`grid gap-2 text-[11px] ${lineupSides.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                            {lineupSides.map(({ side, lineup, team, matchTeam }) => (
+                                <div key={side} className="min-w-0 rounded-lg bg-white/5 px-2.5 py-2">
+                                    <div className="flex items-center gap-2">
+                                        <TeamLogo teamId={matchTeam.id} name={team.name} logoUrl={team.logo} wrapperClassName="h-7 w-7 shrink-0" />
+                                        <div className="min-w-0">
+                                            <p className="truncate font-semibold text-slate-200">{team.name}</p>
+                                            <p className="mt-0.5 font-black text-slate-400">{lineup.formation || 'Diziliş hazır'}</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                            <div className="min-w-0 rounded-lg bg-white/5 px-2.5 py-2">
-                                <div className="flex items-center gap-2">
-                                    <TeamLogo teamId={matchData.awayTeam.id} name={resolvedStartingXI.awayTeam.name} logoUrl={resolvedStartingXI.awayTeam.logo} wrapperClassName="h-7 w-7 shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="truncate font-semibold text-slate-200">{resolvedStartingXI.awayTeam.name}</p>
-                                        <p className="mt-0.5 font-black text-slate-400">{resolvedStartingXI.lineups.away?.formation || 'Kadro bekleniyor'}</p>
-                                    </div>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
                     <span className="ml-2 text-slate-500" aria-hidden="true">→</span>

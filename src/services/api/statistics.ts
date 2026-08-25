@@ -2,9 +2,9 @@ import { database } from '../../firebase';
 import { ref, get, onValue } from 'firebase/database';
 import { localizePlayerName } from '../../utils/playerDisplay';
 import type { PlayerStat, FormResult, PlayerStatusEntry } from '../../types';
-import { fetchEspnFenerbahceFixtures } from './espn-fixtures';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
+import { ESPN_FIXTURE_COMPETITIONS, fetchEspnFenerbahceFixtures } from './espn-fixtures';
 import { getCurrentSeasonStartYear } from '../../utils/seasons';
+import { fetchWithSingleRetry, runSessionRequest, settleWithConcurrency } from './request-policy';
 
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
@@ -46,7 +46,7 @@ const fetchRosterFromLeague = async (leagueSlug: string, seasonStartYear: number
     const map: RosterStatsMap = new Map<string, { name: string; goals: number; assists: number; appearances: number }>();
     try {
         const url = `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/roster?season=${seasonStartYear}`;
-        const response = await fetchWithTimeout(url);
+        const response = await fetchWithSingleRetry(url);
         if (!response.ok) {
             return { players: map, ok: false };
         }
@@ -68,25 +68,43 @@ const fetchRosterFromLeague = async (leagueSlug: string, seasonStartYear: number
     }
 };
 
-export const fetchPlayerStats = async (
+const loadPlayerStats = async (
     seasonStartYear = getCurrentSeasonStartYear()
 ): Promise<PlayerStat[]> => {
     try {
-        const [league, europa] = await Promise.all([
-            fetchRosterFromLeague('tur.1', seasonStartYear),
-            fetchRosterFromLeague('uefa.europa', seasonStartYear),
-        ]);
+        const competitionSlugs = ESPN_FIXTURE_COMPETITIONS.map((competition) => competition.slug);
+        const settled = await settleWithConcurrency(
+            competitionSlugs,
+            3,
+            (slug) => fetchRosterFromLeague(slug, seasonStartYear)
+        );
+        const results = settled.map((result) => result.status === 'fulfilled'
+            ? result.value
+            : { players: new Map(), ok: false });
+        const league = results[competitionSlugs.indexOf('tur.1')];
+        const european = results.filter((_, index) => competitionSlugs[index] !== 'tur.1');
 
-        if (!league.ok && !europa.ok) {
-            throw new Error('Both ESPN player stats sources failed.');
+        if (!league.ok && european.every((result) => !result.ok)) {
+            throw new Error('All ESPN player stats sources failed.');
         }
 
-        const allIds = new Set([...league.players.keys(), ...europa.players.keys()]);
+        const europeanPlayers = new Map<string, { name: string; goals: number; assists: number; appearances: number }>();
+        european.forEach((result) => {
+            result.players.forEach((player, id) => {
+                const current = europeanPlayers.get(id) || { name: player.name, goals: 0, assists: 0, appearances: 0 };
+                current.goals += player.goals;
+                current.assists += player.assists;
+                current.appearances += player.appearances;
+                europeanPlayers.set(id, current);
+            });
+        });
+
+        const allIds = new Set([...league.players.keys(), ...europeanPlayers.keys()]);
         const players: PlayerStat[] = [];
 
         for (const id of allIds) {
             const lg = league.players.get(id);
-            const eu = europa.players.get(id);
+            const eu = europeanPlayers.get(id);
             const name = lg?.name || eu?.name || '';
             const leagueGoals = lg?.goals ?? 0;
             const leagueAssists = lg?.assists ?? 0;
@@ -113,6 +131,15 @@ export const fetchPlayerStats = async (
         throw new Error('Player stats fetch failed.');
     }
 };
+
+export const fetchPlayerStats = (
+    seasonStartYear = getCurrentSeasonStartYear(),
+    options: { force?: boolean } = {}
+): Promise<PlayerStat[]> => runSessionRequest(
+    `espn-player-stats:${seasonStartYear}`,
+    () => loadPlayerStats(seasonStartYear),
+    options.force === true
+);
 
 const RESULT_CODE_MAP: Record<string, FormResult['result']> = { G: 'W', M: 'L', B: 'D' };
 

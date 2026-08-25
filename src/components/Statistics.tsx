@@ -7,8 +7,11 @@ import SkeletonCard from './statistics/SkeletonCard';
 import PlayerStatusSection from './statistics/PlayerStatusSection';
 import SeasonSelector from './SeasonSelector';
 import { getCurrentSeasonStartYear, getRecentSeasonOptions } from '../utils/seasons';
+import { useDataSource } from '../contexts/dataSourceContextDef';
+import { readCachedStatistics } from '../services/api/data-source';
 
 const Statistics: React.FC = () => {
+    const { modes } = useDataSource();
     const [selectedSeasonStartYear, setSelectedSeasonStartYear] = useState<number>(() => getCurrentSeasonStartYear());
     const seasonOptions = useMemo(() => getRecentSeasonOptions(), []);
 
@@ -39,8 +42,11 @@ const Statistics: React.FC = () => {
             setAssisters([]);
 
             try {
-                const stats = await fetchPlayerStats(selectedSeasonStartYear);
+                const stats = modes.statistics === 'cache'
+                    ? (await readCachedStatistics(selectedSeasonStartYear))?.players ?? null
+                    : await fetchPlayerStats(selectedSeasonStartYear);
                 if (cancelled) return;
+                if (!stats) throw new Error('Cached statistics are unavailable.');
                 setScorers(stats);
                 setAssisters(stats);
             } catch {
@@ -59,14 +65,17 @@ const Statistics: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, [selectedSeasonStartYear]);
+    }, [modes.statistics, selectedSeasonStartYear]);
 
     useEffect(() => {
         let cancelled = false;
         const load = async () => {
             try {
-                const results = await fetchFormResults();
+                const results = modes.statistics === 'cache'
+                    ? (await readCachedStatistics(selectedSeasonStartYear))?.form ?? null
+                    : await fetchFormResults();
                 if (cancelled) return;
+                if (!results) throw new Error('Cached form is unavailable.');
                 setFormError(null);
                 setForm(results);
             } catch {
@@ -79,7 +88,7 @@ const Statistics: React.FC = () => {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [modes.statistics, selectedSeasonStartYear]);
 
     useEffect(() => {
         const unsubscribe = subscribePlayerStatus(

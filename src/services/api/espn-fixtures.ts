@@ -5,8 +5,8 @@ import type {
     FixtureCompetitionGroup,
 } from '../../types';
 import { localizeCompetitionName } from '../../utils/localize';
-import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 import { getCurrentSeasonStartYear, isDateInSeason } from '../../utils/seasons';
+import { fetchWithSingleRetry, runSessionRequest, settleWithConcurrency } from './request-policy';
 
 const ESPN_FENERBAHCE_TEAM_ID = '436';
 const ESPN_SITE_API_ROOT = 'https://site.api.espn.com/apis/site/v2/sports/soccer';
@@ -31,6 +31,12 @@ const buildEspnTeamScheduleUrl = (leagueSlug: string, params: Record<string, str
     const searchParams = new URLSearchParams(params);
     return `${ESPN_SITE_API_ROOT}/${leagueSlug}/teams/${ESPN_FENERBAHCE_TEAM_ID}/schedule?${searchParams.toString()}`;
 };
+
+interface EspnScheduleRequest {
+  competition: EspnFixtureCompetition;
+  kind: 'results' | 'fixtures';
+  url: string;
+}
 
 interface EspnCompetitorRaw {
   team?: {
@@ -144,35 +150,50 @@ const normalizeEspnMatch = (event: EspnEventRaw, sourceCompetition: EspnFixtureC
     };
 };
 
-export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSeasonStartYear()): Promise<EspnFixtureData> => {
+const loadEspnFenerbahceFixtures = async (seasonStartYear: number): Promise<EspnFixtureData> => {
     try {
-        const perCompetitionResults = await Promise.all(
-            ESPN_FIXTURE_COMPETITIONS.map(async (competition) => {
-                const [resultsResponse, fixturesResponse] = await Promise.all([
-                    fetchWithTimeout(buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear) })),
-                    fetchWithTimeout(buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear), fixture: 'true' }))
-                ]);
+        const requests: EspnScheduleRequest[] = ESPN_FIXTURE_COMPETITIONS.flatMap((competition) => [
+            {
+                competition,
+                kind: 'results',
+                url: buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear) })
+            },
+            {
+                competition,
+                kind: 'fixtures',
+                url: buildEspnTeamScheduleUrl(competition.slug, { season: String(seasonStartYear), fixture: 'true' })
+            }
+        ]);
+        const settled = await settleWithConcurrency(requests, 4, async (request) => {
+            const response = await fetchWithSingleRetry(request.url);
+            if (!response.ok) throw new Error(`ESPN schedule failed: ${response.status}`);
+            return response.json();
+        });
+        const byCompetition = new Map<string, {
+          competition: EspnFixtureCompetition;
+          resultsJson: Record<string, unknown>;
+          fixturesJson: Record<string, unknown>;
+        }>();
+        let failedRequestCount = 0;
 
-                if (!resultsResponse.ok && !fixturesResponse.ok) {
-                    return {
-                        competition,
-                        resultsJson: {} as Record<string, unknown>,
-                        fixturesJson: {} as Record<string, unknown>
-                    };
-                }
+        settled.forEach((result, index) => {
+            const request = requests[index];
+            const current = byCompetition.get(request.competition.slug) || {
+                competition: request.competition,
+                resultsJson: {},
+                fixturesJson: {}
+            };
+            if (result.status === 'fulfilled') {
+                if (request.kind === 'results') current.resultsJson = result.value;
+                else current.fixturesJson = result.value;
+            } else {
+                failedRequestCount += 1;
+                console.warn(`ESPN ${request.kind} request failed for ${request.competition.slug}:`, result.reason);
+            }
+            byCompetition.set(request.competition.slug, current);
+        });
 
-                const [resultsJson, fixturesJson] = await Promise.all([
-                    resultsResponse.ok ? resultsResponse.json() : Promise.resolve({}),
-                    fixturesResponse.ok ? fixturesResponse.json() : Promise.resolve({})
-                ]);
-
-                return {
-                    competition,
-                    resultsJson,
-                    fixturesJson
-                };
-            })
-        );
+        const perCompetitionResults = Array.from(byCompetition.values());
 
         const mergedEvents = perCompetitionResults.flatMap(({ competition, resultsJson, fixturesJson }) => {
             const resultEvents = Array.isArray(resultsJson?.events) ? resultsJson.events : [];
@@ -214,7 +235,10 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
             seasonStartYear,
             season: firstAvailable?.fixturesJson?.season ?? firstAvailable?.resultsJson?.season ?? null,
             team: firstAvailable?.fixturesJson?.team ?? firstAvailable?.resultsJson?.team ?? null,
-            matches
+            matches,
+            warning: failedRequestCount > 0
+                ? 'Bazı ESPN kulvarları geçici olarak alınamadı; erişilebilen maçlar gösteriliyor.'
+                : null
         };
     } catch (error) {
         console.error('Error fetching ESPN Fenerbahce fixtures:', error);
@@ -228,3 +252,12 @@ export const fetchEspnFenerbahceFixtures = async (seasonStartYear = getCurrentSe
         };
     }
 };
+
+export const fetchEspnFenerbahceFixtures = (
+    seasonStartYear = getCurrentSeasonStartYear(),
+    options: { force?: boolean } = {}
+): Promise<EspnFixtureData> => runSessionRequest(
+    `espn-fixtures:${seasonStartYear}`,
+    () => loadEspnFenerbahceFixtures(seasonStartYear),
+    options.force === true
+);

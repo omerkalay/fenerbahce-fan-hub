@@ -31,8 +31,9 @@ const VAPID_KEY = 'BL36u1e0V4xvIyP8n_Nh1Uc_EZTquN1vNv58E3wm_q3IsQ916MfhsbF1NATwf
 
 /** Try getToken; on AbortError clear stale push subscription and retry once. */
 export const acquireFcmToken = async (): Promise<string | null> => {
-    const { messaging } = await import('../firebase');
+    const { getFirebaseMessaging } = await import('../firebase');
     const { getToken } = await import('firebase/messaging');
+    const messaging = await getFirebaseMessaging();
     if (!messaging) return null;
 
     const registration = await navigator.serviceWorker.ready;

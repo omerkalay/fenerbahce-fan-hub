@@ -11,6 +11,7 @@ const {
     shouldFetchCupResults
 } = require('../utils/cupFixtures');
 const { refreshUefaJourneyCache } = require('../services/uefaJourney');
+const { refreshDataSnapshots } = require('../services/dataSnapshots');
 
 async function handleHealth(req, res) {
     const cacheSnapshot = await db.ref('cache/lastUpdate').once('value');
@@ -82,6 +83,11 @@ async function handleRefresh(req, res) {
         const cacheUpdates = { ...cache };
         delete cacheUpdates.uefaJourney;
         await db.ref('cache').update(cacheUpdates);
+        const dataSnapshots = await refreshDataSnapshots({
+            resources: 'all',
+            seasonStartYear: cache.season.startYear,
+            now
+        });
         let uefaJourney = null;
         try {
             uefaJourney = await refreshUefaJourneyCache(cache.season.startYear, { now });
@@ -98,6 +104,7 @@ async function handleRefresh(req, res) {
                 matches: cache.next3Matches.length,
                 squad: cache.squad.length,
                 uefaJourney: uefaJourney?.participation?.state || null,
+                dataSnapshots,
                 images: imageStats
             }
         });

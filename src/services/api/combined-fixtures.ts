@@ -4,10 +4,11 @@ import { fetchCupFixtures } from './cup-fixtures';
 import { fetchEspnFenerbahceFixtures } from './espn-fixtures';
 
 export const fetchFenerbahceFixtures = async (
-    seasonStartYear = getCurrentSeasonStartYear()
+    seasonStartYear = getCurrentSeasonStartYear(),
+    options: { force?: boolean } = {}
 ): Promise<FixtureData> => {
     const [espnData, cupData] = await Promise.all([
-        fetchEspnFenerbahceFixtures(seasonStartYear),
+        fetchEspnFenerbahceFixtures(seasonStartYear, options),
         fetchCupFixtures(seasonStartYear)
     ]);
 
@@ -24,7 +25,7 @@ export const fetchFenerbahceFixtures = async (
     const cupFailed = Boolean(cupData.error);
     const hasUsableData = !espnFailed || (!cupFailed && cupData.matches.length > 0);
 
-    let warning: string | null = null;
+    let warning: string | null = espnData.warning ?? null;
     if (cupFailed && !espnFailed) {
         warning = 'Türkiye Kupası verisi şu anda yenilenemedi; lig ve Avrupa maçları gösteriliyor.';
     } else if (espnFailed && cupData.matches.length > 0) {
