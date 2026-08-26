@@ -338,6 +338,41 @@ describe('buildPresetRows', () => {
         expect(findRow(50)?.slots.map((slot) => slot.player.name)).toEqual(['Ismail Yuksek', 'Matteo Guendouzi', 'Ngolo Kante']);
         expect(findRow(79)?.slots.map((slot) => slot.player.name)).toEqual(['Munir Mercan', 'Jayden Oosterwolde', 'Yigit Demir', 'Mert Muldur']);
     });
+
+    it('keeps explicit manual slots even when player positions and array order are misleading', () => {
+        const starters: LineupPlayer[] = [
+            makePlayer({ name: 'Greenwood', position: 'Forward', formationSlot: 'RAM', order: 0 }),
+            makePlayer({ name: 'Ederson', position: 'Midfielder', formationSlot: 'GK', order: 1 }),
+            makePlayer({ name: 'Aydin', position: 'Midfielder', formationSlot: 'LAM', order: 2 }),
+            makePlayer({ name: 'Talisca', position: 'Midfielder', formationSlot: 'CAM', order: 3 }),
+            makePlayer({ name: 'Muriqi', position: 'Forward', formationSlot: 'ST', order: 4 }),
+            makePlayer({ name: 'Kante', position: 'Midfielder', formationSlot: 'CDM1', order: 5 }),
+            makePlayer({ name: 'Guendouzi', position: 'Midfielder', formationSlot: 'CDM2', order: 6 }),
+            makePlayer({ name: 'Brown', position: 'Defender', formationSlot: 'LB', order: 7 }),
+            makePlayer({ name: 'Ake', position: 'Defender', formationSlot: 'CB1', order: 8 }),
+            makePlayer({ name: 'Skriniar', position: 'Defender', formationSlot: 'CB2', order: 9 }),
+            makePlayer({ name: 'Semedo', position: 'Defender', formationSlot: 'RB', order: 10 }),
+        ];
+
+        const result = buildRows('4-2-3-1', starters);
+        const playerAt = (y: number, x: number) => result.rows
+            .find((row) => row.y === y)
+            ?.slots.find((slot) => slot.x === x)
+            ?.player.name;
+
+        expect(result.strategy).toBe('preset');
+        expect(playerAt(15, 50)).toBe('Muriqi');
+        expect(playerAt(35, 15)).toBe('Aydin');
+        expect(playerAt(32, 50)).toBe('Talisca');
+        expect(playerAt(35, 85)).toBe('Greenwood');
+        expect(playerAt(60, 35)).toBe('Kante');
+        expect(playerAt(60, 65)).toBe('Guendouzi');
+        expect(playerAt(78, 12)).toBe('Brown');
+        expect(playerAt(78, 35)).toBe('Ake');
+        expect(playerAt(78, 65)).toBe('Skriniar');
+        expect(playerAt(78, 88)).toBe('Semedo');
+        expect(playerAt(93, 50)).toBe('Ederson');
+    });
 });
 
 // ─── buildNumericFormationRows ───────────────────────────

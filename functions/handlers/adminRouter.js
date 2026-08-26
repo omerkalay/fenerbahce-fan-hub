@@ -16,7 +16,15 @@ const {
 const { version: APP_VERSION } = require('../package.json');
 
 const MATCH_ID_PATTERN = /^\d{5,20}$/;
-const ALLOWED_FORMATIONS = new Set(['4-3-3', '4-4-2', '4-2-3-1', '4-1-4-1', '3-5-2', '4-1-2-1-2 Diamond']);
+const FORMATION_PLACE_SLOTS = Object.freeze({
+    '4-3-3': ['GK', 'RB', 'LB', 'CM2', 'CB2', 'CB1', 'CM3', 'CM1', 'ST', 'RW', 'LW'],
+    '4-4-2': ['GK', 'RB', 'LB', 'CM1', 'CB2', 'CB1', 'RM', 'CM2', 'ST2', 'ST1', 'LM'],
+    '4-2-3-1': ['GK', 'RB', 'LB', 'CDM1', 'CB2', 'CB1', 'RAM', 'CDM2', 'ST', 'CAM', 'LAM'],
+    '4-1-4-1': ['GK', 'RB', 'LB', 'CDM', 'CB2', 'CB1', 'RM', 'CM2', 'ST', 'CM1', 'LM'],
+    '3-5-2': ['GK', 'RWB', 'LWB', 'CB1', 'CB2', 'CB3', 'CM2', 'CM1', 'ST1', 'ST2', 'CM3'],
+    '4-1-2-1-2 Diamond': ['GK', 'RB', 'LB', 'CDM', 'CB2', 'CB1', 'CM2', 'CM1', 'ST2', 'CAM', 'ST1']
+});
+const ALLOWED_FORMATIONS = new Set(Object.keys(FORMATION_PLACE_SLOTS));
 const ALLOWED_PLAYER_KEYS = new Set(['slot', 'id', 'name', 'position', 'number']);
 const APP_URL = 'https://omerkalay.com/fenerbahce-fan-hub/';
 const NOTIFICATION_TEST_TTL_MS = 10 * 60 * 1000;
@@ -81,6 +89,7 @@ const normalizeDraft = (body) => {
         return null;
     }
 
+    const allowedSlots = new Set(FORMATION_PLACE_SLOTS[body.formation]);
     const players = [];
     const slots = new Set();
     const names = new Set();
@@ -109,6 +118,7 @@ const normalizeDraft = (body) => {
             || !position
             || position.length > 40
         ) return null;
+        if (!allowedSlots.has(slot)) return null;
         if (!Number.isInteger(number) || number < 1 || number > 999 || numbers.has(number)) return null;
         if (!Number.isInteger(id) || id <= 0 || slots.has(slot) || names.has(nameKey) || ids.has(id)) return null;
         slots.add(slot);
@@ -129,22 +139,27 @@ const classifyPosition = (position = '') => {
     return 'MID';
 };
 
-const draftToTeamLineup = (draft, team) => ({
-    teamId: String(team.id || ''),
-    teamName: String(team.name || ''),
-    formation: draft.formation,
-    formationSource: 'manual',
-    starters: draft.players.map((player, order) => ({
-        name: player.name,
-        jersey: String(player.number),
-        position: player.position,
-        positionCode: '',
-        positionGroup: classifyPosition(player.position),
-        order
-    })),
-    bench: [],
-    substitutions: []
-});
+const draftToTeamLineup = (draft, team) => {
+    const formationSlots = FORMATION_PLACE_SLOTS[draft.formation];
+    return {
+        teamId: String(team.id || ''),
+        teamName: String(team.name || ''),
+        formation: draft.formation,
+        formationSource: 'manual',
+        starters: draft.players.map((player, order) => ({
+            name: player.name,
+            jersey: String(player.number),
+            position: player.position,
+            positionCode: player.slot,
+            formationSlot: player.slot,
+            formationPlace: formationSlots.indexOf(player.slot) + 1,
+            positionGroup: classifyPosition(player.position),
+            order
+        })),
+        bench: [],
+        substitutions: []
+    };
+};
 
 const sanitizeLineupState = ({ detection, published, draft, settings, manualLocked, notification }) => ({
     detection: detection ? {

@@ -353,6 +353,16 @@ const getFormationPlaceSlotKey = (formation: string | null, player: LineupPlayer
     return FORMATION_PLACE_SLOT_MAPS[presetFormation]?.[formationPlace] || null;
 };
 
+const getExplicitFormationSlotKey = (formation: string | null, player: LineupPlayer): SlotKey | null => {
+    const presetFormation = getPresetFormation(formation);
+    const formationSlot = String(player.formationSlot || '').trim();
+    if (!presetFormation || !formationSlot) return null;
+
+    const isKnownSlot = MATCH_PRESET_LAYOUTS[presetFormation]
+        ?.some((slot) => slot.key === formationSlot);
+    return isKnownSlot ? formationSlot as SlotKey : null;
+};
+
 const getSlotAssignmentRank = (slotKey: string): number => {
     const index = (SLOT_ASSIGNMENT_PRIORITY as string[]).indexOf(slotKey);
     return index === -1 ? SLOT_ASSIGNMENT_PRIORITY.length : index;
@@ -450,6 +460,13 @@ export const buildPresetRows = (formation: string | null, starters: LineupPlayer
     const remainingPlayers = [...starters];
 
     remainingPlayers.forEach((player) => {
+        const explicitSlotKey = getExplicitFormationSlotKey(formation, player);
+        if (explicitSlotKey && !assigned.has(explicitSlotKey)) {
+            assigned.set(explicitSlotKey, player);
+            placeMappedPlayers.add(player);
+            return;
+        }
+
         const slotKey = getFormationPlaceSlotKey(formation, player);
         if (!slotKey || assigned.has(slotKey)) return;
         const fitScore = getSlotFitScore(player, slotKey, formation);

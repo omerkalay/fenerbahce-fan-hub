@@ -307,6 +307,13 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     const publish = async (mode: 'detected' | 'manual') => {
         if (!selectedMatchId) return;
         await runAction(async () => {
+            if (mode === 'manual') {
+                if (!draft || draft.players.length !== 11) {
+                    throw new Error('Manuel kadro tam 11 oyuncu içermeli.');
+                }
+                const result = await saveAdminLineupDraft(selectedMatchId, draft);
+                setDraft(result.draft);
+            }
             await publishAdminLineup(selectedMatchId, mode);
             await loadLineup(selectedMatchId);
             setLineupEditorOpen(false);

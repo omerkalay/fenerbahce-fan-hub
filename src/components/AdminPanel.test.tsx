@@ -2,7 +2,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminPanel from './AdminPanel';
-import type { MatchData, PublishedMatchLineups } from '../types';
+import type { FormationDraft, MatchData, PublishedMatchLineups } from '../types';
 
 const mocks = vi.hoisted(() => ({
     fetchAdminSession: vi.fn(),
@@ -56,6 +56,18 @@ const publishedLineup: PublishedMatchLineups = {
     updatedAt: 1_800_000_000_000
 };
 
+const manualDraft: FormationDraft = {
+    formation: '4-2-3-1',
+    players: ['GK', 'LB', 'CB1', 'CB2', 'RB', 'CDM1', 'CDM2', 'LAM', 'CAM', 'RAM', 'ST']
+        .map((slot, index) => ({
+            slot,
+            id: index + 1,
+            name: `Player ${index + 1}`,
+            position: index === 0 ? 'Goalkeeper' : 'Midfielder',
+            number: index + 1
+        }))
+};
+
 describe('AdminPanel notices', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -81,6 +93,8 @@ describe('AdminPanel notices', () => {
             modes: { fixtures: 'cache', standings: 'espn', statistics: 'espn' }
         });
         mocks.refreshAdminDataCache.mockResolvedValue({ success: true, results: [] });
+        mocks.saveAdminLineupDraft.mockResolvedValue({ success: true, draft: manualDraft });
+        mocks.publishAdminLineup.mockResolvedValue({ success: true, published: publishedLineup });
         mocks.unpublishAdminLineup.mockResolvedValue({ success: true, published: null, manualLocked: true });
     });
 
@@ -208,5 +222,26 @@ describe('AdminPanel notices', () => {
         expect(screen.getByText('Formation builder')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Yayınlanan İlk 11’i Kaldır' })).not.toBeInTheDocument();
         expect(confirmSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('saves the current editor draft before manually publishing it', async () => {
+        mocks.fetchAdminLineup.mockResolvedValue({
+            detection: null,
+            published: null,
+            draft: manualDraft,
+            settings: { autoPublishLineups: false, autoPushLineups: false },
+            manualLocked: true,
+            notification: null
+        });
+        render(<AdminPanel visible matches={matches} onClose={vi.fn()} />);
+
+        await screen.findByText('Canlı sürüm');
+        fireEvent.click(screen.getByRole('button', { name: 'İlk 11' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Manuel yayınla' }));
+
+        await waitFor(() => expect(mocks.publishAdminLineup).toHaveBeenCalledWith('12345', 'manual'));
+        expect(mocks.saveAdminLineupDraft).toHaveBeenCalledWith('12345', manualDraft);
+        expect(mocks.saveAdminLineupDraft.mock.invocationCallOrder[0])
+            .toBeLessThan(mocks.publishAdminLineup.mock.invocationCallOrder[0]);
     });
 });

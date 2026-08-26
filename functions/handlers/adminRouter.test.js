@@ -105,6 +105,7 @@ describe('admin route validation', () => {
         expect(normalizeDraft(valid)?.players).toHaveLength(1);
         expect(normalizeDraft({ ...valid, admin: true })).toBeNull();
         expect(normalizeDraft({ ...valid, players: [{ ...valid.players[0], slot: '../GK' }] })).toBeNull();
+        expect(normalizeDraft({ ...valid, players: [{ ...valid.players[0], slot: 'ST3' }] })).toBeNull();
         expect(normalizeDraft({ ...valid, players: [{ ...valid.players[0], id: '1' }] })).toBeNull();
         expect(normalizeDraft({ ...valid, players: [{ ...valid.players[0], number: 0 }] })).toBeNull();
         expect(normalizeDraft({ ...valid, players: [valid.players[0], { ...valid.players[0], slot: 'RB', id: 2 }] })).toBeNull();
@@ -318,6 +319,60 @@ describe('admin route validation', () => {
                 details: expect.objectContaining({ matchId: '401888314', hadPublishedLineup: true })
             })
         ]));
+    });
+
+    it('publishes the exact manual formation slots independently of draft array order', async () => {
+        const slotPlayers = [
+            ['RAM', 'Greenwood', 'Forward'],
+            ['GK', 'Ederson', 'Midfielder'],
+            ['LAM', 'Aydin', 'Midfielder'],
+            ['CAM', 'Talisca', 'Midfielder'],
+            ['ST', 'Muriqi', 'Forward'],
+            ['CDM1', 'Kante', 'Midfielder'],
+            ['CDM2', 'Guendouzi', 'Midfielder'],
+            ['LB', 'Brown', 'Defender'],
+            ['CB1', 'Ake', 'Defender'],
+            ['CB2', 'Skriniar', 'Defender'],
+            ['RB', 'Semedo', 'Defender']
+        ];
+        const draft = {
+            formation: '4-2-3-1',
+            players: slotPlayers.map(([slot, name, position], index) => ({
+                slot,
+                name,
+                position,
+                id: index + 1,
+                number: index + 1
+            }))
+        };
+        const database = createMemoryDatabase({
+            cache: {
+                nextMatch: {
+                    id: 401888314,
+                    startTimestamp: 1_800_000_000,
+                    homeTeam: { id: 436, name: 'Fenerbahçe' },
+                    awayTeam: { id: 100, name: 'Opponent' }
+                },
+                next3Matches: []
+            },
+            ops: { adminDrafts: { 'admin-uid': { '401888314': draft } } }
+        });
+        const res = makeRes();
+
+        await handleAdminRoute(makeReq('POST', { mode: 'manual' }), res, ['lineups', '401888314', 'publish'], {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            messaging: { send: vi.fn() }
+        });
+
+        expect(res.statusCode).toBe(200);
+        const starters = database.state.cache.matchLineups['401888314'].lineups.home.starters;
+        const byName = (name) => starters.find((player) => player.name === name);
+        expect(byName('Muriqi')).toMatchObject({ formationSlot: 'ST', formationPlace: 9, positionCode: 'ST' });
+        expect(byName('Greenwood')).toMatchObject({ formationSlot: 'RAM', formationPlace: 7, positionCode: 'RAM' });
+        expect(byName('Ederson')).toMatchObject({ formationSlot: 'GK', formationPlace: 1, positionCode: 'GK' });
+        expect(database.state.ops.lineups['401888314'].manualLocked).toBe(true);
+        expect(res.body.published.sources).toEqual({ home: 'manual', away: null });
     });
 
     it('lets an authenticated admin save and atomically publish a revisioned status draft', async () => {
