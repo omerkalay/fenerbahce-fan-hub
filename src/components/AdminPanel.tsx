@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormationBuilder from './FormationBuilder';
 import MatchLineups from './MatchLineups';
 import AdminPlayerStatusManager from './admin/AdminPlayerStatusManager';
+import AdminNotificationManager from './admin/AdminNotificationManager';
 import {
     fetchAdminLineup,
     fetchAdminOverview,
@@ -13,13 +14,10 @@ import {
     unpublishAdminLineup,
     saveAdminPlayerStatusDraft,
     saveAdminLineupDraft,
-    sendAdminNotificationBroadcast,
-    sendAdminNotificationTest,
     updateAdminSettings,
     updateAdminDataSource,
     refreshAdminDataCache,
     type AdminLineupDetail,
-    type AdminNotificationPayload,
     type AdminOverview,
     type AdminPlayerStatusEntry,
     type AdminPlayerStatusState
@@ -38,12 +36,6 @@ interface AdminPanelProps {
 }
 
 type AdminTab = 'overview' | 'lineups' | 'player-status' | 'notifications';
-
-const DEFAULT_NOTIFICATION: AdminNotificationPayload = {
-    title: '',
-    body: '',
-    url: 'https://omerkalay.com/fenerbahce-fan-hub/'
-};
 
 const DATA_RESOURCE_LABELS: Record<DataSourceResource, string> = {
     fixtures: 'Fikstür',
@@ -76,8 +68,6 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     const [squad, setSquad] = useState<Player[]>([]);
     const [draft, setDraft] = useState<FormationDraft | null>(null);
     const [lineupEditorOpen, setLineupEditorOpen] = useState(false);
-    const [notification, setNotification] = useState<AdminNotificationPayload>(DEFAULT_NOTIFICATION);
-    const [testId, setTestId] = useState<string | null>(null);
     const [dataSeasonStartYear, setDataSeasonStartYear] = useState(() => getCurrentSeasonStartYear());
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -206,10 +196,6 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
             });
         return () => { cancelled = true; };
     }, [loadPlayerStatuses, tab, visible]);
-
-    useEffect(() => {
-        setTestId(null);
-    }, [notification]);
 
     useEffect(() => {
         if (!notice) return;
@@ -385,23 +371,6 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                 lastPublishedAt: result.lastPublishedAt
             });
         }, ADMIN_STATUS_PREVIEW_MODE ? 'Yerel yayın önizlemesi güncellendi; Firebase’e yazılmadı.' : 'Oyuncu durumları yayınlandı. Bildirim gönderilmedi.');
-    };
-
-    const testNotification = async () => {
-        await runAction(async () => {
-            const result = await sendAdminNotificationTest(notification);
-            setTestId(result.testId);
-        }, 'Test bildirimi yalnızca kendi kayıtlı cihazına gönderildi.');
-    };
-
-    const broadcastNotification = async () => {
-        if (!testId) return;
-        const confirmed = window.confirm('Test ettiğin aynı bildirimi all_fans abonelerine göndermek istediğine emin misin?');
-        if (!confirmed) return;
-        await runAction(async () => {
-            await sendAdminNotificationBroadcast(notification, testId);
-            setTestId(null);
-        }, 'Firebase toplu bildirimi kabul etti.');
     };
 
     if (!visible) return null;
@@ -667,26 +636,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                     )}
 
                     {tab === 'notifications' && (
-                        <div className="mx-auto max-w-xl space-y-4">
-                            <label className="block text-xs font-semibold text-slate-300">Başlık
-                                <input value={notification.title} maxLength={60} onChange={(event) => setNotification((value) => ({ ...value, title: event.target.value }))} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-white" />
-                            </label>
-                            <label className="block text-xs font-semibold text-slate-300">Mesaj
-                                <textarea value={notification.body} maxLength={180} rows={4} onChange={(event) => setNotification((value) => ({ ...value, body: event.target.value }))} className="mt-1 w-full resize-none rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-white" />
-                            </label>
-                            <label className="block text-xs font-semibold text-slate-300">Uygulama bağlantısı
-                                <input value={notification.url} onChange={(event) => setNotification((value) => ({ ...value, url: event.target.value }))} className="mt-1 w-full rounded-lg border border-white/10 bg-slate-900 px-3 py-2 text-white" />
-                            </label>
-                            <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-4">
-                                <p className="text-sm font-black text-white">{notification.title || 'Bildirim başlığı'}</p>
-                                <p className="mt-1 text-xs text-slate-300">{notification.body || 'Bildirim mesajı burada görünür.'}</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <button type="button" disabled={busy || !notification.title.trim() || !notification.body.trim()} onClick={testNotification} className="flex-1 rounded-lg bg-blue-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">Önce bana test gönder</button>
-                                <button type="button" disabled={busy || !testId} onClick={broadcastNotification} className="flex-1 rounded-lg bg-red-500 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">all_fans gönder</button>
-                            </div>
-                            <p className="text-[11px] text-slate-500">İçerik değişirse test onayı otomatik olarak geçersiz olur. Topic gönderiminde yalnızca Firebase’in kabul sonucu gösterilir.</p>
-                        </div>
+                        <AdminNotificationManager />
                     )}
                 </div>
             </div>

@@ -6,20 +6,22 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.16.1-blue)
+![Version](https://img.shields.io/badge/version-2.17.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.16.1
+## What's New in v2.17.0
 
-- **Cross-Platform Formation Builder Scrolling** - The Starting XI builder now uses one continuous page scroll instead of a non-scrollable nested player region, restoring swipe and wheel access on Android, narrow web layouts, and iPhone while keeping the final player row above the fixed navigation
-- **Synchronized Release Version** - Frontend, lockfile, Cloud Functions, API, and administration-panel version metadata now agree on `2.16.1`; the panel displays the compiled live application version instead of a stale backend string
+- **Protected Recipient Targeting** - Administrators can select eligible users from a masked, on-demand directory or save revision-protected recipient groups without exposing device tokens
+- **Verified Delivery Workflow** - Self-testing is required for the exact content and audience before one-time topic, user, or group delivery, with aggregate results and invalid-token cleanup
+- **Trusted Social Destinations** - Notifications can safely open the Fan Hub, official Fenerbahçe X posts, or supported Instagram profiles and posts
 
 <details>
-<summary>Previous: v2.14.0 – v2.16.0</summary>
+<summary>Previous: v2.14.0 – v2.16.1</summary>
 
+- **Cross-Platform Builder Reliability** - Continuous page scrolling restored Android, narrow-web, and iPhone access to every player while synchronized release metadata fixed the administration-panel version display
 - **Operational Data Resilience** - Independent ESPN/cache controls, 06:00 last-known-good snapshots, bounded browser requests, transient retries, partial competition success, and explicit administrator fallback improved fixture, standings, and statistics reliability
 - **Lineup and European Coverage** - Statistics now combine every European competition, verified lineups remain bound to the selected fixture, and administrators can remove a public Starting XI without losing its draft, ESPN detection, or paused automation state
 - **Protected Player Status Publishing** - Claim-protected drafts, revision-safe publishing, audit records, manual-player fallback, status presets, and local-only review mode replaced the legacy Starting XI administration path without exposing private operations
@@ -261,7 +263,7 @@ This small public read-only node is published from the claim-protected administr
 | Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
 | Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
 | Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
-| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, ESPN/cache controls, lineup/player-status draft constraints, revision conflicts, generated manual IDs, and notification URLs |
+| Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, ESPN/cache controls, lineup/player-status draft constraints, masked recipient pages, revision-safe notification groups, verified targeted delivery, and trusted notification URLs |
 | Shared lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away tabs, incomplete provider sides, and mobile touch editing |
 | Player-status UI and realtime parsing | `src/components/admin/AdminPlayerStatusManager.test.tsx`, `src/components/AdminPanel.preview.test.tsx`, `src/services/api/statistics.player-status.test.ts` | Mobile squad/manual editing, stale warnings, local-only writes, legacy/modern data parsing, and realtime updates |
 | Realtime Database rules | `rules/database.rules.spec.mjs` | Public read-only sports cache/status data, owner isolation, private `ops`, denied direct writes, and the closed legacy `admin/startingXI` path |
@@ -382,8 +384,8 @@ fenerbahce-fan-hub/
 ├── src/
 │   ├── components/
 │   │   ├── Dashboard.tsx              # Main dashboard (orchestrator, helpers in utils/)
-│   │   ├── AdminPanel.tsx             # Private operations, lineup, player-status and notification UI
-│   │   ├── admin/                      # Mobile player-status draft and publish workflow
+│   │   ├── AdminPanel.tsx             # Private operations shell for data, lineup, status, and notifications
+│   │   ├── admin/                      # Player-status workflow and protected notification targeting UI
 │   │   ├── match-lineups/             # Post-match lineup viewer (split module)
 │   │   │   ├── formation-engine.ts    # Pure formation/row-building logic
 │   │   │   ├── MiniPitch.tsx          # SVG pitch visualization
@@ -585,12 +587,13 @@ firebase deploy --only database
 
 ### Administration Notification Center
 
-1. Prepare and preview an immediate notification in **Yönetim → Bildirim**
-2. Send it to the administrator's own registered device
-3. If any content changes, repeat the device test
-4. Confirm the identical payload once for the server-fixed `all_fans` topic
+1. Prepare and preview an immediate notification in **Yönetim → Bildirim**, then choose `all_fans`, a one-time recipient selection, or a saved recipient group
+2. Load the protected user directory only when needed; it returns masked account details and eligibility status without exposing FCM device tokens
+3. Save frequently used selections as administrator-owned groups with revision-safe update and deletion controls
+4. Send the exact content and audience to the administrator's registered device; changing either invalidates the test approval
+5. Confirm the one-time delivery. Topic sends report Firebase acceptance, while targeted sends report only aggregate accepted, failed, and skipped counts
 
-The panel reports only whether Firebase accepted or failed the topic submission; it does not invent a delivery count. User-entered tokens, topics, and scheduled custom broadcasts are intentionally unsupported.
+The backend rechecks account state, notification preferences, current device tokens, and saved-group revision immediately before targeted delivery. Invalid current tokens are cleared with compare-and-delete semantics. Notification destinations are limited to the Fan Hub and supported official Fenerbahçe X or Instagram links.
 
 ### Fixture System
 - **Default Flow**: Frontend Fixture Tab → bounded direct ESPN Team Schedule requests + cached SofaScore `cup-fixtures` supplement
@@ -657,4 +660,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.16.1** | August 2026
+**v2.17.0** | August 2026

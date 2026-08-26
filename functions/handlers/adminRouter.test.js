@@ -10,6 +10,10 @@ const {
     validateMatchId,
     normalizeDraft,
     normalizeNotification,
+    normalizeNotificationAudience,
+    normalizeNotificationUrl,
+    normalizeNotificationGroup,
+    maskEmail,
     normalizeDataSourceUpdate,
     normalizeDataRefreshRequest,
     normalizePlayerStatusDraft,
@@ -18,7 +22,7 @@ const {
     handleAdminRoute
 } = await import('./adminRouter.js');
 
-const makeReq = (method = 'GET', body = {}) => ({ method, body, headers: {} });
+const makeReq = (method = 'GET', body = {}, query = {}) => ({ method, body, headers: {}, query });
 const makeRes = () => {
     const res = {
         statusCode: 200,
@@ -120,14 +124,36 @@ describe('admin route validation', () => {
         expect(normalizeDataRefreshRequest({ resource: 'unknown', seasonStartYear: 2026 })).toBeNull();
     });
 
-    it('restricts notification content and internal URLs', () => {
+    it('restricts notification content, audiences, and trusted destinations', () => {
         const valid = normalizeNotification({ title: 'Test', body: 'Message', url: '/fenerbahce-fan-hub/' });
         expect(valid?.url).toBe('https://omerkalay.com/fenerbahce-fan-hub/');
+        expect(valid?.audience).toEqual({ type: 'topic', topic: 'all_fans' });
+        expect(normalizeNotificationUrl('https://x.com/Fenerbahce/status/123456')).toBe('https://x.com/Fenerbahce/status/123456');
+        expect(normalizeNotificationUrl('https://www.instagram.com/p/ABC_123/')).toBe('https://www.instagram.com/p/ABC_123/');
         expect(normalizeNotification({ title: 'Test', body: 'Message', url: 'https://attacker.example/' })).toBeNull();
+        expect(normalizeNotificationUrl('https://x.com/attacker/status/123456')).toBeNull();
+        expect(normalizeNotificationUrl('https://instagram.com.evil.example/p/ABC/')).toBeNull();
         expect(normalizeNotification({ title: 'x'.repeat(61), body: 'Message' })).toBeNull();
         expect(normalizeNotification({ title: 'Test', body: 'x'.repeat(181) })).toBeNull();
-        expect(normalizeNotification({ title: 'Test', body: 'Message', url: `/fenerbahce-fan-hub/${'x'.repeat(250)}` })).toBeNull();
+        expect(normalizeNotification({ title: 'Test', body: 'Message', url: `/fenerbahce-fan-hub/${'x'.repeat(300)}` })).toBeNull();
         expect(normalizeNotification({ title: 'Test', body: 'Message', uid: 'fake-admin' })).toBeNull();
+        expect(normalizeNotificationAudience({ type: 'users', userUids: ['friend-b', 'friend-a', 'friend-a'] })).toEqual({
+            type: 'users',
+            userUids: ['friend-a', 'friend-b']
+        });
+        expect(normalizeNotificationAudience({ type: 'users', userUids: [] })).toBeNull();
+        expect(normalizeNotificationAudience({ type: 'users', userUids: [123] })).toBeNull();
+        expect(normalizeNotificationAudience({ type: 'topic', topic: 'other' })).toBeNull();
+        expect(normalizeNotificationAudience({ type: 'group', groupId: '550e8400-e29b-41d4-a716-446655440000', revision: 2 })).toEqual({
+            type: 'group',
+            groupId: '550e8400-e29b-41d4-a716-446655440000',
+            revision: 2
+        });
+        expect(normalizeNotificationGroup({ name: ' Arkadaşlar ', userUids: ['friend-b', 'friend-a'] })).toEqual({
+            name: 'Arkadaşlar',
+            userUids: ['friend-a', 'friend-b']
+        });
+        expect(maskEmail('omer@example.com')).toBe('o***@example.com');
         expect(notificationHash(valid)).toHaveLength(64);
     });
 
@@ -192,6 +218,11 @@ describe('admin route validation', () => {
             { method: 'POST', segments: ['lineups', '401888314', 'publish'] },
             { method: 'POST', segments: ['lineups', '401888314', 'release'] },
             { method: 'POST', segments: ['lineups', '401888314', 'unpublish'] },
+            { method: 'GET', segments: ['users'] },
+            { method: 'GET', segments: ['notification-groups'] },
+            { method: 'POST', segments: ['notification-groups'] },
+            { method: 'PUT', segments: ['notification-groups', '550e8400-e29b-41d4-a716-446655440000'] },
+            { method: 'DELETE', segments: ['notification-groups', '550e8400-e29b-41d4-a716-446655440000'] },
             { method: 'POST', segments: ['notifications', 'test'] },
             { method: 'POST', segments: ['notifications', 'send'] }
         ];
@@ -395,6 +426,158 @@ describe('admin route validation', () => {
         });
         expect(res.statusCode).toBe(400);
         expect(database.state.ops.playerStatus.drafts).toBeUndefined();
+    });
+
+    it('returns a paginated, masked notification directory without exposing device tokens', async () => {
+        const database = createMemoryDatabase({
+            notifications: {
+                'friend-a': { fcmToken: 'secret-token-a', generalNotifications: true },
+                'friend-b': { fcmToken: 'secret-token-b', generalNotifications: false }
+            }
+        });
+        const authService = {
+            listUsers: vi.fn().mockResolvedValue({
+                users: [
+                    { uid: 'friend-a', displayName: 'Ali', email: 'ali@example.com', photoURL: 'https://images.example/ali.png', disabled: false },
+                    { uid: 'friend-b', displayName: '', email: 'b@example.com', photoURL: 'javascript:alert(1)', disabled: false },
+                    { uid: 'invalid uid', displayName: 'Unsupported', email: 'unsupported@example.com', disabled: false }
+                ],
+                pageToken: 'next-page'
+            })
+        };
+        const res = makeRes();
+
+        await handleAdminRoute(makeReq('GET', {}, { limit: '50', pageToken: 'current-page' }), res, ['users'], {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            authService,
+            messaging: { send: vi.fn() }
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(authService.listUsers).toHaveBeenCalledWith(50, 'current-page');
+        expect(res.body.nextPageToken).toBe('next-page');
+        expect(res.body.users).toEqual([
+            expect.objectContaining({ id: 'friend-a', displayName: 'Ali', maskedEmail: 'a***@example.com', notificationStatus: 'eligible', eligible: true }),
+            expect.objectContaining({ id: 'friend-b', displayName: 'İsimsiz kullanıcı', maskedEmail: 'b***@example.com', photoURL: null, notificationStatus: 'opted_out', eligible: false }),
+            expect.objectContaining({ id: 'invalid uid', notificationStatus: 'unsupported', eligible: false })
+        ]);
+        expect(JSON.stringify(res.body)).not.toContain('secret-token');
+    });
+
+    it('creates, revision-updates, lists, and deletes private saved notification groups', async () => {
+        const database = createMemoryDatabase({
+            notifications: {
+                'friend-a': { fcmToken: 'token-a', generalNotifications: true },
+                'friend-b': { fcmToken: 'token-b', generalNotifications: true }
+            }
+        });
+        const users = [
+            { uid: 'friend-a', disabled: false },
+            { uid: 'friend-b', disabled: false }
+        ];
+        const dependencies = {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            authService: { getUsers: vi.fn().mockResolvedValue({ users, notFound: [] }) },
+            messaging: { send: vi.fn() }
+        };
+
+        const createRes = makeRes();
+        await handleAdminRoute(makeReq('POST', { name: 'Yakın arkadaşlar', userUids: ['friend-b', 'friend-a'] }), createRes, ['notification-groups'], dependencies);
+        expect(createRes.statusCode).toBe(201);
+        expect(createRes.body.group).toMatchObject({ name: 'Yakın arkadaşlar', userUids: ['friend-a', 'friend-b'], revision: 1 });
+        const groupId = createRes.body.group.id;
+        expect(database.state.ops.adminNotificationGroups['admin-uid'][groupId].updatedBy).toBe('admin-uid');
+
+        const updateRes = makeRes();
+        await handleAdminRoute(makeReq('PUT', { name: 'Maç ekibi', userUids: ['friend-a'], baseRevision: 1 }), updateRes, ['notification-groups', groupId], dependencies);
+        expect(updateRes.statusCode).toBe(200);
+        expect(updateRes.body.group).toMatchObject({ name: 'Maç ekibi', userUids: ['friend-a'], revision: 2 });
+
+        const listRes = makeRes();
+        await handleAdminRoute(makeReq('GET'), listRes, ['notification-groups'], dependencies);
+        expect(listRes.body.groups).toEqual([expect.objectContaining({ id: groupId, name: 'Maç ekibi', revision: 2 })]);
+
+        const staleDeleteRes = makeRes();
+        await handleAdminRoute(makeReq('DELETE', { baseRevision: 1 }), staleDeleteRes, ['notification-groups', groupId], dependencies);
+        expect(staleDeleteRes.statusCode).toBe(409);
+
+        const deleteRes = makeRes();
+        await handleAdminRoute(makeReq('DELETE', { baseRevision: 2 }), deleteRes, ['notification-groups', groupId], dependencies);
+        expect(deleteRes.statusCode).toBe(200);
+        expect(database.state.ops.adminNotificationGroups?.['admin-uid']?.[groupId]).toBeUndefined();
+    });
+
+    it('requires an exact self-test before targeted delivery and clears only invalid current tokens', async () => {
+        const database = createMemoryDatabase({
+            notifications: {
+                'admin-uid': { fcmToken: 'admin-token', generalNotifications: true },
+                'friend-a': { fcmToken: 'invalid-token-a', generalNotifications: true },
+                'friend-b': { fcmToken: 'token-b', generalNotifications: false }
+            }
+        });
+        const messaging = {
+            send: vi.fn().mockResolvedValue('self-test-message'),
+            sendEachForMulticast: vi.fn().mockResolvedValue({
+                successCount: 0,
+                failureCount: 1,
+                responses: [{ success: false, error: { code: 'messaging/registration-token-not-registered' } }]
+            })
+        };
+        const authService = {
+            getUsers: vi.fn().mockResolvedValue({
+                users: [
+                    { uid: 'friend-a', disabled: false },
+                    { uid: 'friend-b', disabled: false }
+                ],
+                notFound: []
+            })
+        };
+        const dependencies = {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            authService,
+            messaging
+        };
+        const payload = {
+            title: 'Maç başladı',
+            body: 'Resmî paylaşımı aç.',
+            url: 'https://x.com/Fenerbahce/status/123456',
+            audience: { type: 'users', userUids: ['friend-a', 'friend-b'] }
+        };
+
+        const untestedRes = makeRes();
+        await handleAdminRoute(makeReq('POST', { ...payload, testId: '550e8400-e29b-41d4-a716-446655440000' }), untestedRes, ['notifications', 'send'], dependencies);
+        expect(untestedRes.statusCode).toBe(409);
+        expect(messaging.sendEachForMulticast).not.toHaveBeenCalled();
+
+        const testRes = makeRes();
+        await handleAdminRoute(makeReq('POST', payload), testRes, ['notifications', 'test'], dependencies);
+        expect(testRes.statusCode).toBe(200);
+        expect(messaging.send).toHaveBeenCalledWith(expect.objectContaining({
+            token: 'admin-token',
+            data: expect.objectContaining({ url: payload.url, type: 'adminTest' })
+        }));
+
+        const changedRes = makeRes();
+        await handleAdminRoute(makeReq('POST', { ...payload, body: 'Değişti', testId: testRes.body.testId }), changedRes, ['notifications', 'send'], dependencies);
+        expect(changedRes.statusCode).toBe(409);
+        expect(messaging.sendEachForMulticast).not.toHaveBeenCalled();
+
+        const sendRes = makeRes();
+        await handleAdminRoute(makeReq('POST', { ...payload, testId: testRes.body.testId }), sendRes, ['notifications', 'send'], dependencies);
+        expect(sendRes.statusCode).toBe(200);
+        expect(sendRes.body.delivery).toEqual({ requested: 2, eligible: 1, accepted: 0, failed: 1, skipped: 1 });
+        expect(messaging.sendEachForMulticast).toHaveBeenCalledWith({
+            tokens: ['invalid-token-a'],
+            data: expect.objectContaining({ type: 'adminTargeted', url: payload.url })
+        });
+        expect(database.state.notifications['friend-a']).toMatchObject({
+            fcmToken: null,
+            tokenInvalidCode: 'messaging/registration-token-not-registered'
+        });
+        expect(database.state.notifications['friend-b'].fcmToken).toBe('token-b');
     });
 
     it('returns an admin session only after the shared gate succeeds', async () => {

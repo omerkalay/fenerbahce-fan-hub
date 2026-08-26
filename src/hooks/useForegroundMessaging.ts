@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { resolveNotificationTarget } from '../utils/notificationLinks';
 
 export function useForegroundMessaging(enabled = true) {
   useEffect(() => {
@@ -18,11 +19,20 @@ export function useForegroundMessaging(enabled = true) {
           const title = payload.notification?.title || payload.data?.title;
           const body = payload.notification?.body || payload.data?.body || '';
           if (title) {
-            new Notification(title, {
+            const notification = new Notification(title, {
               body,
               icon: 'https://media.api-sports.io/football/teams/611.png',
               data: payload.data
             });
+            notification.onclick = () => {
+              notification.close();
+              const target = resolveNotificationTarget(payload.data?.url, window.location.origin);
+              if (target.external) {
+                window.open(target.url, '_blank', 'noopener,noreferrer');
+              } else {
+                window.location.assign(target.url);
+              }
+            };
           }
         });
       } catch (err) {

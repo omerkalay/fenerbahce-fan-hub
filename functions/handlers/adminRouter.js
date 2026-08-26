@@ -20,6 +20,16 @@ const ALLOWED_FORMATIONS = new Set(['4-3-3', '4-4-2', '4-2-3-1', '4-1-4-1', '3-5
 const ALLOWED_PLAYER_KEYS = new Set(['slot', 'id', 'name', 'position', 'number']);
 const APP_URL = 'https://omerkalay.com/fenerbahce-fan-hub/';
 const NOTIFICATION_TEST_TTL_MS = 10 * 60 * 1000;
+const NOTIFICATION_GROUP_MAX_MEMBERS = 25;
+const NOTIFICATION_GROUP_NAME_MAX_LENGTH = 40;
+const NOTIFICATION_USER_PAGE_SIZE = 100;
+const NOTIFICATION_URL_MAX_LENGTH = 300;
+const NOTIFICATION_GROUP_ID_PATTERN = /^[0-9a-f-]{36}$/i;
+const NOTIFICATION_USER_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
+const INVALID_NOTIFICATION_TOKEN_CODES = new Set([
+    'messaging/invalid-registration-token',
+    'messaging/registration-token-not-registered'
+]);
 const PLAYER_STATUS_VALUES = new Set(['injured', 'suspended', 'doubtful', 'card-risk']);
 const PLAYER_STATUS_SOURCES = new Set(['squad', 'manual']);
 const PLAYER_STATUS_MAX_ENTRIES = 40;
@@ -156,39 +166,170 @@ const sanitizeLineupState = ({ detection, published, draft, settings, manualLock
     } : null
 });
 
+const normalizeNotificationAudience = (value) => {
+    if (value === undefined) return { type: 'topic', topic: 'all_fans' };
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+    if (value.type === 'topic') {
+        if (!hasOnlyKeys(value, new Set(['type', 'topic'])) || value.topic !== 'all_fans') return null;
+        return { type: 'topic', topic: 'all_fans' };
+    }
+
+    if (value.type === 'users') {
+        if (!hasOnlyKeys(value, new Set(['type', 'userUids'])) || !Array.isArray(value.userUids)) return null;
+        if (value.userUids.some((uid) => typeof uid !== 'string')) return null;
+        const userUids = [...new Set(value.userUids.map((uid) => String(uid || '').trim()))].sort();
+        if (
+            userUids.length < 1
+            || userUids.length > NOTIFICATION_GROUP_MAX_MEMBERS
+            || userUids.some((uid) => !NOTIFICATION_USER_ID_PATTERN.test(uid))
+        ) return null;
+        return { type: 'users', userUids };
+    }
+
+    if (value.type === 'group') {
+        if (!hasOnlyKeys(value, new Set(['type', 'groupId', 'revision']))) return null;
+        const groupId = String(value.groupId || '').trim();
+        if (!NOTIFICATION_GROUP_ID_PATTERN.test(groupId) || !Number.isInteger(value.revision) || value.revision < 1) {
+            return null;
+        }
+        return { type: 'group', groupId, revision: value.revision };
+    }
+
+    return null;
+};
+
+const normalizeNotificationUrl = (value) => {
+    const raw = String(value || APP_URL).trim();
+    if (!raw || raw.length > NOTIFICATION_URL_MAX_LENGTH) return null;
+
+    let url;
+    try {
+        url = new URL(raw, APP_URL);
+    } catch {
+        return null;
+    }
+
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    const hostname = url.hostname.toLowerCase();
+    const segments = url.pathname.split('/').filter(Boolean);
+
+    if (hostname === 'omerkalay.com' && url.pathname.startsWith('/fenerbahce-fan-hub/')) {
+        return url.toString();
+    }
+
+    if (new Set(['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com']).has(hostname)) {
+        if (segments[0]?.toLowerCase() !== 'fenerbahce') return null;
+        if (segments.length === 1) return url.toString();
+        if (segments.length === 3 && segments[1]?.toLowerCase() === 'status' && /^\d+$/.test(segments[2])) {
+            return url.toString();
+        }
+        return null;
+    }
+
+    if (new Set(['instagram.com', 'www.instagram.com']).has(hostname)) {
+        const first = segments[0]?.toLowerCase();
+        if (first === 'fenerbahce' && segments.length === 1) return url.toString();
+        if (segments.length === 2 && new Set(['p', 'reel', 'tv']).has(first) && /^[A-Za-z0-9_-]+$/.test(segments[1] || '')) {
+            return url.toString();
+        }
+    }
+
+    return null;
+};
+
 const normalizeNotification = (body) => {
-    if (!hasOnlyKeys(body, new Set(['title', 'body', 'url', 'testId']))) return null;
+    if (!hasOnlyKeys(body, new Set(['title', 'body', 'url', 'audience', 'testId']))) return null;
     if (
         typeof body.title !== 'string'
         || typeof body.body !== 'string'
         || (body.url !== undefined && typeof body.url !== 'string')
+        || (body.audience !== undefined && (typeof body.audience !== 'object' || body.audience === null))
         || (body.testId !== undefined && typeof body.testId !== 'string')
     ) return null;
     const title = body.title.trim();
     const messageBody = body.body.trim();
     if (!title || title.length > 60 || !messageBody || messageBody.length > 180) return null;
-
-    let url;
-    try {
-        if ((body.url || APP_URL).length > 240) return null;
-        url = new URL(body.url || APP_URL, APP_URL);
-    } catch {
-        return null;
-    }
-    if (url.origin !== 'https://omerkalay.com' || !url.pathname.startsWith('/fenerbahce-fan-hub/')) return null;
+    const url = normalizeNotificationUrl(body.url);
+    const audience = normalizeNotificationAudience(body.audience);
+    if (!url || !audience) return null;
 
     return {
         title,
         body: messageBody,
-        url: url.toString(),
+        url,
+        audience,
         ...(body.testId ? { testId: String(body.testId) } : {})
     };
 };
 
 const notificationHash = (payload) => crypto
     .createHash('sha256')
-    .update(JSON.stringify({ title: payload.title, body: payload.body, url: payload.url }))
+    .update(JSON.stringify({
+        title: payload.title,
+        body: payload.body,
+        url: payload.url,
+        audience: payload.audience || { type: 'topic', topic: 'all_fans' }
+    }))
     .digest('hex');
+
+const notificationData = (payload, type) => ({
+    title: payload.title,
+    body: payload.body,
+    url: payload.url,
+    type
+});
+
+const normalizeNotificationGroup = (body, requireRevision = false) => {
+    const allowedKeys = requireRevision
+        ? new Set(['name', 'userUids', 'baseRevision'])
+        : new Set(['name', 'userUids']);
+    if (!hasOnlyKeys(body, allowedKeys)) return null;
+    const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+    if (!Array.isArray(body.userUids) || body.userUids.some((uid) => typeof uid !== 'string')) return null;
+    const userUids = Array.isArray(body.userUids)
+        ? [...new Set(body.userUids.map((uid) => String(uid || '').trim()))].sort()
+        : [];
+    if (
+        name.length < 2
+        || name.length > NOTIFICATION_GROUP_NAME_MAX_LENGTH
+        || !/[\p{L}\p{N}]/u.test(name)
+        || userUids.length < 1
+        || userUids.length > NOTIFICATION_GROUP_MAX_MEMBERS
+        || userUids.some((uid) => !NOTIFICATION_USER_ID_PATTERN.test(uid))
+    ) return null;
+    if (requireRevision && (!Number.isInteger(body.baseRevision) || body.baseRevision < 1)) return null;
+    return {
+        name,
+        userUids,
+        ...(requireRevision ? { baseRevision: body.baseRevision } : {})
+    };
+};
+
+const normalizeGroupDelete = (body) => (
+    hasOnlyKeys(body, new Set(['baseRevision']))
+    && Number.isInteger(body.baseRevision)
+    && body.baseRevision >= 1
+        ? { baseRevision: body.baseRevision }
+        : null
+);
+
+const maskEmail = (email) => {
+    const value = String(email || '').trim();
+    const at = value.lastIndexOf('@');
+    if (at <= 0 || at === value.length - 1) return null;
+    const local = value.slice(0, at);
+    return `${local.slice(0, 1)}***@${value.slice(at + 1).toLowerCase()}`;
+};
+
+const sanitizePhotoUrl = (value) => {
+    try {
+        const url = new URL(String(value || ''));
+        return url.protocol === 'https:' && !url.username && !url.password ? url.toString() : null;
+    } catch {
+        return null;
+    }
+};
 
 const normalizePlayerStatusName = (value) => String(value || '')
     .trim()
@@ -749,14 +890,242 @@ const handleSettings = async (req, res, claims, database = db) => {
     return res.json({ success: true, settings });
 };
 
+const getNotificationEligibility = (user, notificationRecord) => {
+    if (user.disabled) return { status: 'disabled', eligible: false };
+    const token = typeof notificationRecord?.fcmToken === 'string' ? notificationRecord.fcmToken : '';
+    if (!token || token !== token.trim()) {
+        return { status: 'no_device', eligible: false };
+    }
+    if (notificationRecord.generalNotifications !== true) {
+        return { status: 'opted_out', eligible: false };
+    }
+    return { status: 'eligible', eligible: true };
+};
+
+const sanitizeAdminUser = (user, notificationRecord) => {
+    const eligibility = getNotificationEligibility(user, notificationRecord);
+    return {
+        id: user.uid,
+        displayName: String(user.displayName || '').trim() || 'İsimsiz kullanıcı',
+        maskedEmail: maskEmail(user.email),
+        photoURL: sanitizePhotoUrl(user.photoURL),
+        disabled: user.disabled === true,
+        notificationStatus: eligibility.status,
+        eligible: eligibility.eligible
+    };
+};
+
+const handleNotificationUsersList = async (req, res, database, authService) => {
+    const query = req.query || {};
+    if (!hasOnlyKeys(query, new Set(['limit', 'pageToken']))) {
+        return res.status(400).json({ error: 'Invalid user directory query' });
+    }
+    const limit = query.limit === undefined ? NOTIFICATION_USER_PAGE_SIZE : Number(query.limit);
+    const pageToken = query.pageToken === undefined ? undefined : String(query.pageToken);
+    if (!Number.isInteger(limit) || limit < 1 || limit > NOTIFICATION_USER_PAGE_SIZE) {
+        return res.status(400).json({ error: 'Invalid user directory limit' });
+    }
+    if (pageToken !== undefined && (!pageToken || pageToken.length > 2000)) {
+        return res.status(400).json({ error: 'Invalid user directory page token' });
+    }
+
+    const result = await authService.listUsers(limit, pageToken);
+    const users = await Promise.all(result.users.map(async (user) => {
+        if (!NOTIFICATION_USER_ID_PATTERN.test(user.uid)) {
+            return {
+                id: user.uid,
+                displayName: String(user.displayName || '').trim() || 'İsimsiz kullanıcı',
+                maskedEmail: maskEmail(user.email),
+                photoURL: sanitizePhotoUrl(user.photoURL),
+                disabled: user.disabled === true,
+                notificationStatus: 'unsupported',
+                eligible: false
+            };
+        }
+        const snapshot = await database.ref(`notifications/${user.uid}`).once('value');
+        return sanitizeAdminUser(user, snapshot.val() || {});
+    }));
+
+    return res.json({ users, nextPageToken: result.pageToken || null });
+};
+
+const sanitizeNotificationGroup = (groupId, value) => {
+    if (!NOTIFICATION_GROUP_ID_PATTERN.test(groupId) || !value || typeof value !== 'object') return null;
+    const normalized = normalizeNotificationGroup({ name: value.name, userUids: value.userUids });
+    const revision = Number(value.revision);
+    if (!normalized || !Number.isInteger(revision) || revision < 1) return null;
+    return {
+        id: groupId,
+        name: normalized.name,
+        userUids: normalized.userUids,
+        revision,
+        createdAt: Number(value.createdAt || 0),
+        updatedAt: Number(value.updatedAt || 0)
+    };
+};
+
+const loadNotificationGroup = async (database, uid, groupId) => {
+    const snapshot = await database.ref(`ops/adminNotificationGroups/${uid}/${groupId}`).once('value');
+    const value = snapshot.val();
+    return value ? sanitizeNotificationGroup(groupId, value) : null;
+};
+
+const loadEligibleRecipients = async (userUids, database, authService) => {
+    const authResult = await authService.getUsers(userUids.map((uid) => ({ uid })));
+    const usersByUid = new Map(authResult.users.map((user) => [user.uid, user]));
+    const seenTokens = new Set();
+    const recipients = [];
+
+    for (const uid of userUids) {
+        const user = usersByUid.get(uid);
+        if (!user || user.disabled) continue;
+        const snapshot = await database.ref(`notifications/${uid}`).once('value');
+        const notificationRecord = snapshot.val() || {};
+        const eligibility = getNotificationEligibility(user, notificationRecord);
+        const token = typeof notificationRecord.fcmToken === 'string' ? notificationRecord.fcmToken : '';
+        if (!eligibility.eligible || !token || seenTokens.has(token)) continue;
+        seenTokens.add(token);
+        recipients.push({ uid, token });
+    }
+
+    return {
+        requested: userUids.length,
+        eligible: recipients.length,
+        skipped: userUids.length - recipients.length,
+        recipients
+    };
+};
+
+const validateGroupMembers = async (userUids, database, authService) => {
+    const authResult = await authService.getUsers(userUids.map((uid) => ({ uid })));
+    const usersByUid = new Map(authResult.users.map((user) => [user.uid, user]));
+    const eligibility = await Promise.all(userUids.map(async (uid) => {
+        const user = usersByUid.get(uid);
+        if (!user || user.disabled) return false;
+        const snapshot = await database.ref(`notifications/${uid}`).once('value');
+        return getNotificationEligibility(user, snapshot.val() || {}).eligible;
+    }));
+    return eligibility.every(Boolean);
+};
+
+const handleNotificationGroupsList = async (_req, res, claims, database) => {
+    const snapshot = await database.ref(`ops/adminNotificationGroups/${claims.uid}`).once('value');
+    const rawGroups = snapshot.val() || {};
+    const groups = Object.entries(rawGroups)
+        .map(([groupId, value]) => sanitizeNotificationGroup(groupId, value || {}))
+        .filter(Boolean)
+        .sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name, 'tr'));
+    return res.json({ groups });
+};
+
+const handleNotificationGroupCreate = async (req, res, claims, database, authService) => {
+    const input = normalizeNotificationGroup(req.body);
+    if (!input) return res.status(400).json({ error: 'Invalid notification group' });
+    if (!await validateGroupMembers(input.userUids, database, authService)) {
+        return res.status(409).json({ error: 'Every group member must have active general notifications' });
+    }
+    const now = Date.now();
+    const groupId = crypto.randomUUID();
+    const group = {
+        name: input.name,
+        userUids: input.userUids,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+        updatedBy: claims.uid
+    };
+    await database.ref(`ops/adminNotificationGroups/${claims.uid}/${groupId}`).set(group);
+    await writeAudit(claims.uid, 'notification.group.created', {
+        groupId,
+        memberCount: group.userUids.length
+    }, database);
+    return res.status(201).json({ success: true, group: sanitizeNotificationGroup(groupId, group) });
+};
+
+const handleNotificationGroupUpdate = async (req, res, claims, groupId, database, authService) => {
+    if (!NOTIFICATION_GROUP_ID_PATTERN.test(groupId)) {
+        return res.status(400).json({ error: 'Invalid notification group ID' });
+    }
+    const input = normalizeNotificationGroup(req.body, true);
+    if (!input) return res.status(400).json({ error: 'Invalid notification group' });
+    if (!await validateGroupMembers(input.userUids, database, authService)) {
+        return res.status(409).json({ error: 'Every group member must have active general notifications' });
+    }
+    const groupRef = database.ref(`ops/adminNotificationGroups/${claims.uid}/${groupId}`);
+    const existingSnapshot = await groupRef.once('value');
+    if (!existingSnapshot.val()) return res.status(404).json({ error: 'Notification group not found' });
+    const now = Date.now();
+    const result = await groupRef.transaction((current) => {
+        if (!current || Number(current.revision || 1) !== input.baseRevision) return;
+        return {
+            ...current,
+            name: input.name,
+            userUids: input.userUids,
+            revision: input.baseRevision + 1,
+            updatedAt: now,
+            updatedBy: claims.uid
+        };
+    });
+    if (!result.committed) return res.status(409).json({ error: 'Notification group changed' });
+    const group = sanitizeNotificationGroup(groupId, result.snapshot.val());
+    await writeAudit(claims.uid, 'notification.group.updated', {
+        groupId,
+        revision: group.revision,
+        memberCount: group.userUids.length
+    }, database);
+    return res.json({ success: true, group });
+};
+
+const handleNotificationGroupDelete = async (req, res, claims, groupId, database) => {
+    if (!NOTIFICATION_GROUP_ID_PATTERN.test(groupId)) {
+        return res.status(400).json({ error: 'Invalid notification group ID' });
+    }
+    const input = normalizeGroupDelete(req.body);
+    if (!input) return res.status(400).json({ error: 'Invalid notification group deletion' });
+    const groupRef = database.ref(`ops/adminNotificationGroups/${claims.uid}/${groupId}`);
+    const existingSnapshot = await groupRef.once('value');
+    if (!existingSnapshot.val()) return res.status(404).json({ error: 'Notification group not found' });
+    const result = await groupRef.transaction((current) => {
+        if (!current || Number(current.revision || 1) !== input.baseRevision) return;
+        return null;
+    });
+    if (!result.committed) return res.status(409).json({ error: 'Notification group changed' });
+    await writeAudit(claims.uid, 'notification.group.deleted', { groupId }, database);
+    return res.json({ success: true });
+};
+
+const validateNotificationAudience = async (audience, claims, database) => {
+    if (audience.type !== 'group') return { valid: true, group: null };
+    const group = await loadNotificationGroup(database, claims.uid, audience.groupId);
+    return {
+        valid: Boolean(group && group.revision === audience.revision),
+        group
+    };
+};
+
+const clearInvalidNotificationToken = async (database, recipient, errorCode) => {
+    if (!INVALID_NOTIFICATION_TOKEN_CODES.has(errorCode)) return;
+    await database.ref(`notifications/${recipient.uid}`).transaction((current) => {
+        if (!current || current.fcmToken !== recipient.token) return;
+        return {
+            ...current,
+            fcmToken: null,
+            tokenInvalidAt: Date.now(),
+            tokenInvalidCode: errorCode
+        };
+    });
+};
+
 const handleNotificationTest = async (req, res, claims, database = db, messaging = admin.messaging()) => {
     const payload = normalizeNotification(req.body);
     if (!payload || payload.testId) return res.status(400).json({ error: 'Invalid notification payload' });
+    const audienceState = await validateNotificationAudience(payload.audience, claims, database);
+    if (!audienceState.valid) return res.status(409).json({ error: 'Notification group changed or was removed' });
     const tokenSnapshot = await database.ref(`notifications/${claims.uid}/fcmToken`).once('value');
     const token = tokenSnapshot.val();
     if (!token) return res.status(409).json({ error: 'No notification token is registered for this admin device' });
 
-    const messageId = await messaging.send({ token, data: { ...payload, type: 'adminTest' } });
+    const messageId = await messaging.send({ token, data: notificationData(payload, 'adminTest') });
     const testId = crypto.randomUUID();
     const testedAt = Date.now();
     await database.ref(`ops/adminNotificationTests/${claims.uid}/${testId}`).set({
@@ -770,9 +1139,24 @@ const handleNotificationTest = async (req, res, claims, database = db, messaging
     return res.json({ success: true, status: 'accepted', testId, expiresAt: testedAt + NOTIFICATION_TEST_TTL_MS });
 };
 
-const handleNotificationSend = async (req, res, claims, database = db, messaging = admin.messaging()) => {
+const summarizeNotificationAudience = (audience) => {
+    if (audience.type === 'topic') return { type: 'topic', topic: 'all_fans' };
+    if (audience.type === 'group') {
+        return { type: 'group', groupId: audience.groupId, revision: audience.revision };
+    }
+    return { type: 'users', recipientCount: audience.userUids.length };
+};
+
+const handleNotificationSend = async (
+    req,
+    res,
+    claims,
+    database = db,
+    messaging = admin.messaging(),
+    authService = admin.auth()
+) => {
     const payload = normalizeNotification(req.body);
-    if (!payload?.testId || !/^[0-9a-f-]{36}$/i.test(payload.testId)) {
+    if (!payload?.testId || !NOTIFICATION_GROUP_ID_PATTERN.test(payload.testId)) {
         return res.status(400).json({ error: 'A valid testId is required' });
     }
     const testSnapshot = await database.ref(`ops/adminNotificationTests/${claims.uid}/${payload.testId}`).once('value');
@@ -781,27 +1165,77 @@ const handleNotificationSend = async (req, res, claims, database = db, messaging
     if (!test || test.expiresAt < now || test.hash !== notificationHash(payload)) {
         return res.status(409).json({ error: 'The tested notification expired or its content changed' });
     }
+    const audienceState = await validateNotificationAudience(payload.audience, claims, database);
+    if (!audienceState.valid) return res.status(409).json({ error: 'Notification group changed or was removed' });
 
     const sendRef = database.ref(`ops/adminNotificationSends/${payload.testId}`);
     const lock = await sendRef.transaction((current) => current ? undefined : {
         status: 'sending',
         uid: claims.uid,
         startedAt: now,
-        payload: { title: payload.title, body: payload.body, url: payload.url }
+        payload: {
+            title: payload.title,
+            body: payload.body,
+            url: payload.url,
+            audience: summarizeNotificationAudience(payload.audience)
+        }
     });
     if (!lock.committed) return res.status(409).json({ error: 'This notification was already submitted' });
 
     try {
-        const messageId = await messaging.send({
-            topic: 'all_fans',
-            data: { title: payload.title, body: payload.body, url: payload.url, type: 'adminBroadcast' }
-        });
-        await sendRef.update({ status: 'accepted', acceptedAt: Date.now(), messageId });
-        await writeAudit(claims.uid, 'notification.broadcast.accepted', { testId: payload.testId }, database);
-        return res.json({ success: true, status: 'accepted' });
+        if (payload.audience.type === 'topic') {
+            const messageId = await messaging.send({
+                topic: 'all_fans',
+                data: notificationData(payload, 'adminBroadcast')
+            });
+            await sendRef.update({ status: 'accepted', acceptedAt: Date.now(), messageId });
+            await writeAudit(claims.uid, 'notification.broadcast.accepted', {
+                testId: payload.testId,
+                audience: { type: 'topic', topic: 'all_fans' }
+            }, database);
+            return res.json({ success: true, status: 'accepted', audience: { type: 'topic' } });
+        }
+
+        const userUids = payload.audience.type === 'group'
+            ? audienceState.group.userUids
+            : payload.audience.userUids;
+        const resolved = await loadEligibleRecipients(userUids, database, authService);
+        let accepted = 0;
+        let failed = 0;
+        if (resolved.recipients.length > 0) {
+            const multicastResult = await messaging.sendEachForMulticast({
+                tokens: resolved.recipients.map((recipient) => recipient.token),
+                data: notificationData(payload, 'adminTargeted')
+            });
+            accepted = Number(multicastResult.successCount || 0);
+            failed = Number(multicastResult.failureCount || 0);
+            await Promise.all((multicastResult.responses || []).map(async (response, index) => {
+                if (response.success) return;
+                const recipient = resolved.recipients[index];
+                if (!recipient) return;
+                await clearInvalidNotificationToken(database, recipient, response.error?.code || 'messaging/unknown');
+            }));
+        }
+        const delivery = {
+            requested: resolved.requested,
+            eligible: resolved.eligible,
+            accepted,
+            failed,
+            skipped: resolved.skipped
+        };
+        await sendRef.update({ status: 'accepted', acceptedAt: Date.now(), delivery });
+        await writeAudit(claims.uid, 'notification.targeted.accepted', {
+            testId: payload.testId,
+            audience: summarizeNotificationAudience(payload.audience),
+            delivery
+        }, database);
+        return res.json({ success: true, status: 'accepted', audience: { type: payload.audience.type }, delivery });
     } catch (error) {
         await sendRef.update({ status: 'failed', failedAt: Date.now(), errorCode: error?.code || 'messaging/unknown' });
-        await writeAudit(claims.uid, 'notification.broadcast.failed', { testId: payload.testId }, database);
+        await writeAudit(claims.uid, 'notification.send.failed', {
+            testId: payload.testId,
+            audience: summarizeNotificationAudience(payload.audience)
+        }, database);
         return res.status(502).json({ success: false, status: 'failed', error: 'Firebase rejected the notification' });
     }
 };
@@ -809,6 +1243,7 @@ const handleNotificationSend = async (req, res, claims, database = db, messaging
 async function handleAdminRoute(req, res, segments, dependencies = {}) {
     const database = dependencies.database || db;
     const messaging = dependencies.messaging || admin.messaging();
+    const authService = dependencies.authService || admin.auth();
     const authenticate = dependencies.requireAdminClaims || requireAdminClaims;
     const refreshSnapshots = dependencies.refreshDataSnapshots || refreshDataSnapshots;
     const claims = await authenticate(req, res);
@@ -824,6 +1259,24 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
         }
         if (resource === 'data-refresh' && segments.length === 1 && req.method === 'POST') {
             return handleDataRefresh(req, res, claims, database, refreshSnapshots);
+        }
+        if (resource === 'users' && segments.length === 1 && req.method === 'GET') {
+            return handleNotificationUsersList(req, res, database, authService);
+        }
+        if (resource === 'notification-groups') {
+            if (segments.length === 1 && req.method === 'GET') {
+                return handleNotificationGroupsList(req, res, claims, database);
+            }
+            if (segments.length === 1 && req.method === 'POST') {
+                return handleNotificationGroupCreate(req, res, claims, database, authService);
+            }
+            if (segments.length === 2 && req.method === 'PUT') {
+                return handleNotificationGroupUpdate(req, res, claims, rawMatchId, database, authService);
+            }
+            if (segments.length === 2 && req.method === 'DELETE') {
+                return handleNotificationGroupDelete(req, res, claims, rawMatchId, database);
+            }
+            return res.status(405).json({ error: 'Method not allowed' });
         }
         if (resource === 'player-status') {
             if (segments.length === 1 && req.method === 'GET') {
@@ -843,7 +1296,7 @@ async function handleAdminRoute(req, res, segments, dependencies = {}) {
         }
         if (resource === 'notifications' && rawMatchId === 'send' && req.method === 'POST') {
             if (segments.length !== 2) return res.status(404).json({ error: 'Admin endpoint not found' });
-            return handleNotificationSend(req, res, claims, database, messaging);
+            return handleNotificationSend(req, res, claims, database, messaging, authService);
         }
         if (resource !== 'lineups') return res.status(404).json({ error: 'Admin endpoint not found' });
 
@@ -869,6 +1322,10 @@ module.exports = {
     validateMatchId,
     normalizeDraft,
     normalizeNotification,
+    normalizeNotificationAudience,
+    normalizeNotificationUrl,
+    normalizeNotificationGroup,
+    maskEmail,
     normalizeDataSourceUpdate,
     normalizeDataRefreshRequest,
     normalizePlayerStatusDraft,

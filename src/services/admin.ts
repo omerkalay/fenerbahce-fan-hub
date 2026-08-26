@@ -58,10 +58,50 @@ export interface AdminLineupDetail {
     } | null;
 }
 
+export type AdminNotificationAudience =
+    | { type: 'topic'; topic: 'all_fans' }
+    | { type: 'users'; userUids: string[] }
+    | { type: 'group'; groupId: string; revision: number };
+
 export interface AdminNotificationPayload {
     title: string;
     body: string;
     url: string;
+    audience: AdminNotificationAudience;
+}
+
+export type AdminNotificationUserStatus = 'eligible' | 'no_device' | 'opted_out' | 'disabled' | 'unsupported';
+
+export interface AdminNotificationUser {
+    id: string;
+    displayName: string;
+    maskedEmail: string | null;
+    photoURL: string | null;
+    disabled: boolean;
+    notificationStatus: AdminNotificationUserStatus;
+    eligible: boolean;
+}
+
+export interface AdminNotificationUserPage {
+    users: AdminNotificationUser[];
+    nextPageToken: string | null;
+}
+
+export interface AdminNotificationGroup {
+    id: string;
+    name: string;
+    userUids: string[];
+    revision: number;
+    createdAt: number;
+    updatedAt: number;
+}
+
+export interface AdminNotificationDelivery {
+    requested: number;
+    eligible: number;
+    accepted: number;
+    failed: number;
+    skipped: number;
 }
 
 export type AdminPlayerStatus = 'injured' | 'suspended' | 'doubtful' | 'card-risk';
@@ -193,6 +233,37 @@ export const refreshAdminDataCache = (
     })
 );
 
+export const fetchAdminNotificationUsers = (pageToken?: string) => {
+    const params = new URLSearchParams({ limit: '100' });
+    if (pageToken) params.set('pageToken', pageToken);
+    return adminRequest<AdminNotificationUserPage>(`users?${params.toString()}`);
+};
+
+export const fetchAdminNotificationGroups = () => (
+    adminRequest<{ groups: AdminNotificationGroup[] }>('notification-groups')
+);
+
+export const createAdminNotificationGroup = (name: string, userUids: string[]) => (
+    adminRequest<{ success: true; group: AdminNotificationGroup }>('notification-groups', {
+        method: 'POST',
+        body: JSON.stringify({ name, userUids })
+    })
+);
+
+export const updateAdminNotificationGroup = (group: AdminNotificationGroup, name: string, userUids: string[]) => (
+    adminRequest<{ success: true; group: AdminNotificationGroup }>(`notification-groups/${group.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ name, userUids, baseRevision: group.revision })
+    })
+);
+
+export const deleteAdminNotificationGroup = (group: AdminNotificationGroup) => (
+    adminRequest<{ success: true }>(`notification-groups/${group.id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ baseRevision: group.revision })
+    })
+);
+
 export const sendAdminNotificationTest = (payload: AdminNotificationPayload) => (
     adminRequest<{ success: true; status: 'accepted'; testId: string; expiresAt: number }>('notifications/test', {
         method: 'POST',
@@ -201,7 +272,12 @@ export const sendAdminNotificationTest = (payload: AdminNotificationPayload) => 
 );
 
 export const sendAdminNotificationBroadcast = (payload: AdminNotificationPayload, testId: string) => (
-    adminRequest<{ success: true; status: 'accepted' }>('notifications/send', {
+    adminRequest<{
+        success: true;
+        status: 'accepted';
+        audience: { type: AdminNotificationAudience['type'] };
+        delivery?: AdminNotificationDelivery;
+    }>('notifications/send', {
         method: 'POST',
         body: JSON.stringify({ ...payload, testId })
     })
