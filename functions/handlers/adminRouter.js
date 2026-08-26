@@ -13,6 +13,7 @@ const {
     DEFAULT_DATA_SOURCE_MODES,
     refreshDataSnapshots
 } = require('../services/dataSnapshots');
+const { version: APP_VERSION } = require('../package.json');
 
 const MATCH_ID_PATTERN = /^\d{5,20}$/;
 const ALLOWED_FORMATIONS = new Set(['4-3-3', '4-4-2', '4-2-3-1', '4-1-4-1', '3-5-2', '4-1-2-1-2 Diamond']);
@@ -502,7 +503,7 @@ const handleOverview = async (_req, res, _claims, database = db) => {
         : null;
     const startingLineupPush = startingLineupPushSnapshot?.val() || null;
     return res.json({
-        version: '2.15.0',
+        version: APP_VERSION,
         lastCacheUpdate: lastUpdate.val() || null,
         nextMatch: nextMatchValue,
         uefaJourney: summarizeUefaJourney(uefaJourney.val()),

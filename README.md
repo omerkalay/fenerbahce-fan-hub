@@ -6,36 +6,24 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.16.0-blue)
+![Version](https://img.shields.io/badge/version-2.16.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.16.0
+## What's New in v2.16.1
 
-- **Administrator-Controlled Data Source** - Fixtures, Süper Lig standings, and player statistics each carry an independent ESPN or cache selection in the administration panel, backed by one last-known-good snapshot per resource under `cache/dataSnapshots/{seasonStartYear}/{resource}` that `dailyDataRefresh` writes at 06:00 Europe/Istanbul time and an administrator can refresh individually or together on demand
-- **Deliberate Fallback, Not Silent Failover** - A provider failure updates snapshot health metadata while preserving the previous payload, so a transient ESPN error stays visible in ESPN mode and switching to cached data remains an operational decision; public clients read these nodes but every browser write stays denied
-- **Resilient Direct ESPN Requests** - Browser requests keep ESPN as the default source but now use a preferred official hostname, bounded schedule and roster concurrency, one transient retry through the alternate official hostname, per-session deduplication of usable results only, and partial success when a single competition feed fails
-- **Complete European Statistics and Lineup Publication Control** - Player statistics combine every European competition instead of the Europa League alone, published lineups always bind to the selected fixture, and a new administration action removes a published Starting XI from the public cache while preserving its private draft, ESPN detection, and paused automation
+- **Cross-Platform Formation Builder Scrolling** - The Starting XI builder now uses one continuous page scroll instead of a non-scrollable nested player region, restoring swipe and wheel access on Android, narrow web layouts, and iPhone while keeping the final player row above the fixed navigation
+- **Synchronized Release Version** - Frontend, lockfile, Cloud Functions, API, and administration-panel version metadata now agree on `2.16.1`; the panel displays the compiled live application version instead of a stale backend string
 
 <details>
-<summary>Previous: v2.15.0</summary>
+<summary>Previous: v2.14.0 – v2.16.0</summary>
 
-- **Protected Player Status Operations** - The claim-protected administration panel now provides a mobile-first draft, preview, revision-safe publish, manual-player fallback, status-specific description presets, and estimated-return shortcuts for injuries, suspensions, doubts, and card risks without sending automatic notifications
-- **Atomic Public Status Publishing** - Strict server schemas, generated manual IDs, private drafts, revision conflict handling, operation locks, and audit records publish the small public `admin/playerStatus` node atomically while every browser write remains denied
-- **Legacy Starting XI Removal** - The former `admin/startingXI` RTDB trigger, public rule, normalizers, tests, and console workflow are removed; verified lineups now use only `cache/matchLineups/{matchId}` with private state under `ops/lineups/{matchId}`
-- **Safe Local Review Mode** - Development-only `adminStatusPreview` reads the live public status and squad data but keeps every edit and simulated publish in memory; production builds reject any leaked preview marker
-
-</details>
-
-<details>
-<summary>Previous: v2.14.x (v2.14.0 – v2.14.1)</summary>
-
-- **Unified Matchday Experience** - The mobile-first live dashboard and accessible Match Center now present score, match state, clock, side-aware events, comparison statistics, and shared lineups across live and completed fixtures without changing the backend contract
-- **Fixture Usability** - The compact season picker uses a clear `26/27` label, completed-match cards expose a touch-friendly details action, and finished fixtures reuse the same Match Center experience
-- **Dual-Theme Matchday Polish** - Live surfaces, timelines, statistics, and responsive lineup pitches now remain readable and consistent in both `Klasik Gece` and `Beyaz Forma`, from narrow phones to desktop dialogs
-- **Isolated Development Simulator** - Local Vite development can preview every match phase through `mockLive` while keeping Firebase writes, authentication, notifications, administration, and live-lineup writes disabled; production builds remove the simulator and reject leaked development markers automatically
+- **Operational Data Resilience** - Independent ESPN/cache controls, 06:00 last-known-good snapshots, bounded browser requests, transient retries, partial competition success, and explicit administrator fallback improved fixture, standings, and statistics reliability
+- **Lineup and European Coverage** - Statistics now combine every European competition, verified lineups remain bound to the selected fixture, and administrators can remove a public Starting XI without losing its draft, ESPN detection, or paused automation state
+- **Protected Player Status Publishing** - Claim-protected drafts, revision-safe publishing, audit records, manual-player fallback, status presets, and local-only review mode replaced the legacy Starting XI administration path without exposing private operations
+- **Unified Matchday Interface** - The responsive Match Center, completed-match details, compact season controls, dual themes, shared lineup pitches, and isolated development simulator standardized mobile and desktop behavior
 
 </details>
 
@@ -669,4 +657,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.16.0** | August 2026
+**v2.16.1** | August 2026

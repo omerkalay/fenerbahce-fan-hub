@@ -17,6 +17,7 @@ const { handlePollVote } = require('./polls');
 const { handleHealth, handleRefresh } = require('./admin');
 const { handleReminder, handleReminderPreferences } = require('./reminders');
 const { handleAdminRoute } = require('./adminRouter');
+const { version: APP_VERSION } = require('../package.json');
 
 // Main API - Express-style routing
 const api = onRequest({
@@ -107,7 +108,7 @@ const api = onRequest({
             default:
                 return res.json({
                     message: 'Fenerbahce Fan Hub API (Firebase)',
-                    version: '2.15.0',
+                    version: APP_VERSION,
                     endpoints: [
                         '/next-match',
                         '/next-3-matches',

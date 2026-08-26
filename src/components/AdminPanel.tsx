@@ -468,7 +468,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                     {tab === 'overview' && (
                         <div className="space-y-4">
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                <StatusCard label="Canlı sürüm" value={overview?.version || '—'} />
+                                <StatusCard label="Canlı sürüm" value={__APP_VERSION__} />
                                 <StatusCard
                                     label="UEFA yolu"
                                     value={`${formatDateTime(overview?.uefaJourney?.lastUpdate)}${overview?.uefaJourney?.stale ? ' · eski' : ''}`}
