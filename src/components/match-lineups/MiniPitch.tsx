@@ -38,7 +38,7 @@ export default function MiniPitch({
                 {rows.map((row, rowIndex) => (
                     row.slots.map((slot, slotIndex) => {
                         const { player, x } = slot;
-                        const photoUrl = isFenerbahceTeam ? findPlayerPhoto(player.name, player.jersey, photoMaps) : null;
+                        const photoUrl = isFenerbahceTeam ? findPlayerPhoto(player.name, photoMaps) : null;
                         const subOutMinute = subOutByPlayer.get(normalizeLookupKey(player.name));
                         const displayName = localizePlayerName(player.name);
                         const shortName = displayName.split(' ').pop() || displayName;

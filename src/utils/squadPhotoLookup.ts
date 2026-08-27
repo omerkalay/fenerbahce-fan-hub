@@ -29,27 +29,11 @@ const getRawLookupTokens = (value: string): string[] =>
         .filter((part) => part.length >= 3);
 
 export interface SquadPhotoMaps {
-    byJersey: Record<string, string>;
     byName: Record<string, string>;
     byAlias: Record<string, string>;
 }
 
 export function buildSquadPhotoMaps(squad: Player[]): SquadPhotoMaps {
-    const jerseyCounts = squad.reduce<Record<string, number>>((acc, player) => {
-        if (player.number != null && player.photo) {
-            const jersey = String(player.number);
-            acc[jersey] = (acc[jersey] || 0) + 1;
-        }
-        return acc;
-    }, {});
-
-    const byJersey = squad.reduce<Record<string, string>>((acc, player) => {
-        if (player.number != null && player.photo && jerseyCounts[String(player.number)] === 1) {
-            acc[String(player.number)] = player.photo;
-        }
-        return acc;
-    }, {});
-
     const byName = squad.reduce<Record<string, string>>((acc, player) => {
         if (player.name && player.photo) {
             acc[normalizeLookupKey(player.name)] = player.photo;
@@ -79,12 +63,11 @@ export function buildSquadPhotoMaps(squad: Player[]): SquadPhotoMaps {
         return acc;
     }, {});
 
-    return { byJersey, byName, byAlias };
+    return { byName, byAlias };
 }
 
 export function findPlayerPhoto(
     name: string,
-    jersey: string | number | null | undefined,
     maps: SquadPhotoMaps
 ): string | null {
     const exactKey = normalizeLookupKey(name);
@@ -105,10 +88,6 @@ export function findPlayerPhoto(
     const rawTokens = getRawLookupTokens(name).sort((a, b) => b.length - a.length);
     for (const token of rawTokens) {
         if (maps.byAlias[token]) return maps.byAlias[token];
-    }
-
-    if (jersey != null && maps.byJersey[String(jersey)]) {
-        return maps.byJersey[String(jersey)];
     }
 
     return null;

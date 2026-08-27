@@ -29,26 +29,6 @@ describe('buildSquadPhotoMaps', () => {
         { name: 'No Photo Player', number: 99, photo: '', position: 'MF' },
     ] as Player[];
 
-    it('builds byJersey map from number to photo', () => {
-        const maps = buildSquadPhotoMaps(squad);
-        expect(maps.byJersey['17']).toBe('/photos/dzeko.jpg');
-        expect(maps.byJersey['40']).toBe('/photos/livakovic.jpg');
-    });
-
-    it('excludes players without photo from byJersey', () => {
-        const maps = buildSquadPhotoMaps(squad);
-        expect(maps.byJersey['99']).toBeUndefined();
-    });
-
-    it('excludes duplicate jersey numbers from byJersey', () => {
-        const maps = buildSquadPhotoMaps([
-            { name: 'Vedat Muriqi', number: 19, photo: '/photos/muriqi.jpg', position: 'FW' },
-            { name: 'Yagiz Fikri Sen', number: 19, photo: '/photos/sen.jpg', position: 'FW' },
-        ] as Player[]);
-
-        expect(maps.byJersey['19']).toBeUndefined();
-    });
-
     it('builds byName map with normalized keys', () => {
         const maps = buildSquadPhotoMaps(squad);
         expect(maps.byName['edin dzeko']).toBe('/photos/dzeko.jpg');
@@ -65,7 +45,6 @@ describe('buildSquadPhotoMaps', () => {
 
     it('handles empty squad', () => {
         const maps = buildSquadPhotoMaps([]);
-        expect(Object.keys(maps.byJersey)).toHaveLength(0);
         expect(Object.keys(maps.byName)).toHaveLength(0);
         expect(Object.keys(maps.byAlias)).toHaveLength(0);
     });
@@ -80,25 +59,28 @@ describe('findPlayerPhoto', () => {
 
     const maps = buildSquadPhotoMaps(squad);
 
-    it('falls back to jersey number when the name is not found', () => {
-        expect(findPlayerPhoto('Wrong Name', 17, maps)).toBe('/photos/dzeko.jpg');
+    it('does not use a current squad photo when only the jersey number matches', () => {
+        expect(findPlayerPhoto('Former Player', maps)).toBeNull();
     });
 
     it('finds by exact name match', () => {
-        expect(findPlayerPhoto('Edin Dzeko', null, maps)).toBe('/photos/dzeko.jpg');
+        expect(findPlayerPhoto('Edin Dzeko', maps)).toBe('/photos/dzeko.jpg');
     });
 
     it('finds by alias token (partial name)', () => {
-        expect(findPlayerPhoto('Dzeko', null, maps)).toBe('/photos/dzeko.jpg');
+        expect(findPlayerPhoto('Dzeko', maps)).toBe('/photos/dzeko.jpg');
     });
 
     it('returns null when no match found', () => {
-        expect(findPlayerPhoto('Unknown Player', null, maps)).toBeNull();
+        expect(findPlayerPhoto('Unknown Player', maps)).toBeNull();
     });
 
-    it('prefers an exact name over the jersey number', () => {
-        // Jersey 17 = Dzeko, but name says Livakovic
-        expect(findPlayerPhoto('Dominik Livakovic', 17, maps)).toBe('/photos/livakovic.jpg');
+    it('does not confuse a departed player with the current holder of the same jersey', () => {
+        const currentSquadMaps = buildSquadPhotoMaps([
+            { name: 'Kerem Akturkoglu', number: 13, photo: '/photos/kerem.jpg', position: 'FW' },
+        ] as Player[]);
+
+        expect(findPlayerPhoto('Fred', currentSquadMaps)).toBeNull();
     });
 
     it('matches duplicate jersey holders by name', () => {
@@ -109,7 +91,7 @@ describe('findPlayerPhoto', () => {
             { name: 'Diego Carlos', number: 3, photo: '/photos/carlos.jpg', position: 'DF' },
         ] as Player[]);
 
-        expect(findPlayerPhoto('Vedat Muriqi', 19, duplicateJerseyMaps)).toBe('/photos/muriqi.jpg');
-        expect(findPlayerPhoto('Archie Brown', 3, duplicateJerseyMaps)).toBe('/photos/brown.jpg');
+        expect(findPlayerPhoto('Vedat Muriqi', duplicateJerseyMaps)).toBe('/photos/muriqi.jpg');
+        expect(findPlayerPhoto('Archie Brown', duplicateJerseyMaps)).toBe('/photos/brown.jpg');
     });
 });

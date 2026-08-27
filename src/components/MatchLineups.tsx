@@ -21,7 +21,7 @@ const isFenerbahce = (name: string): boolean => {
     return FENERBAHCE_NAMES.some((fb) => normalized.includes(fb));
 };
 
-const EMPTY_PHOTO_MAPS: SquadPhotoMaps = { byJersey: {}, byName: {}, byAlias: {} };
+const EMPTY_PHOTO_MAPS: SquadPhotoMaps = { byName: {}, byAlias: {} };
 
 interface MatchLineupsProps {
     lineups: MatchLineupsType;
@@ -43,7 +43,7 @@ function MatchLineups({ lineups, homeTeamName, awayTeamName, matchId, useSquadPh
     const defaultTab: 'home' | 'away' = homeIsFb ? 'home' : awayIsFb ? 'away' : 'home';
     const [activeTab, setActiveTab] = useState<'home' | 'away'>(defaultTab);
     const [photoMaps, setPhotoMaps] = useState<SquadPhotoMaps>(EMPTY_PHOTO_MAPS);
-    const hasPhotoMaps = Object.keys(photoMaps.byJersey).length > 0 || Object.keys(photoMaps.byName).length > 0 || Object.keys(photoMaps.byAlias).length > 0;
+    const hasPhotoMaps = Object.keys(photoMaps.byName).length > 0 || Object.keys(photoMaps.byAlias).length > 0;
 
     useEffect(() => {
         setActiveTab(defaultTab);
