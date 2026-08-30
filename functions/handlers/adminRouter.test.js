@@ -112,6 +112,20 @@ describe('admin route validation', () => {
         expect(normalizeDraft('{"formation":"4-2-3-1"}')).toBeNull();
     });
 
+    it('normalizes manual drafts into canonical formation-place order', () => {
+        const draft = normalizeDraft({
+            formation: '4-2-3-1',
+            players: [
+                { slot: 'ST', id: 1, name: 'Striker', position: 'Forward', number: 9 },
+                { slot: 'GK', id: 2, name: 'Goalkeeper', position: 'Goalkeeper', number: 1 },
+                { slot: 'RAM', id: 3, name: 'Right Attacker', position: 'Midfielder', number: 10 },
+                { slot: 'LB', id: 4, name: 'Left Back', position: 'Defender', number: 3 }
+            ]
+        });
+
+        expect(draft?.players.map((player) => player.slot)).toEqual(['GK', 'LB', 'RAM', 'ST']);
+    });
+
     it('strictly validates data source and cache refresh controls', () => {
         expect(normalizeDataSourceUpdate({ resource: 'fixtures', mode: 'cache' })).toEqual({ resource: 'fixtures', mode: 'cache' });
         expect(normalizeDataSourceUpdate({ resource: 'statistics', mode: 'espn' })).toEqual({ resource: 'statistics', mode: 'espn' });
@@ -368,6 +382,9 @@ describe('admin route validation', () => {
         expect(res.statusCode).toBe(200);
         const starters = database.state.cache.matchLineups['401888314'].lineups.home.starters;
         const byName = (name) => starters.find((player) => player.name === name);
+        expect(starters.map((player) => player.formationSlot)).toEqual([
+            'GK', 'RB', 'LB', 'CDM1', 'CB2', 'CB1', 'RAM', 'CDM2', 'ST', 'CAM', 'LAM'
+        ]);
         expect(byName('Muriqi')).toMatchObject({ formationSlot: 'ST', formationPlace: 9, positionCode: 'ST' });
         expect(byName('Greenwood')).toMatchObject({ formationSlot: 'RAM', formationPlace: 7, positionCode: 'RAM' });
         expect(byName('Ederson')).toMatchObject({ formationSlot: 'GK', formationPlace: 1, positionCode: 'GK' });

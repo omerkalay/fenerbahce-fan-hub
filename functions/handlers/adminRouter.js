@@ -128,6 +128,9 @@ const normalizeDraft = (body) => {
         players.push({ slot, id, name, position, number });
     }
 
+    const slotRank = new Map(FORMATION_PLACE_SLOTS[body.formation].map((slot, index) => [slot, index]));
+    players.sort((left, right) => slotRank.get(left.slot) - slotRank.get(right.slot));
+
     return { formation: body.formation, players };
 };
 
@@ -776,7 +779,11 @@ const handlePublish = async (req, res, claims, matchId, match, database = db, me
                 database.ref(`ops/lineups/${matchId}/detection/payload`).once('value'),
                 database.ref(`cache/matchLineups/${matchId}`).once('value')
             ]);
-            const draft = draftSnapshot.val();
+            const storedDraft = draftSnapshot.val();
+            const draft = storedDraft ? normalizeDraft({
+                formation: storedDraft.formation,
+                players: storedDraft.players
+            }) : null;
             if (!draft || !Array.isArray(draft.players) || draft.players.length !== 11) {
                 return res.status(409).json({ error: 'Manual lineup must contain exactly 11 players' });
             }

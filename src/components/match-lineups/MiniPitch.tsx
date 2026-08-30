@@ -19,7 +19,11 @@ export default function MiniPitch({
     photoMaps,
     subOutByPlayer
 }: MiniPitchProps) {
-    const { rows, confident, renderedFormation } = buildRows(lineup.formation, lineup.starters);
+    const { rows, confident, renderedFormation } = buildRows(
+        lineup.formation,
+        lineup.starters,
+        lineup.formationSource
+    );
     const formationLabel = lineup.formationSource === 'inferred'
         ? `${renderedFormation || 'Diziliş'} · Tahmini`
         : lineup.formationSource === 'manual'

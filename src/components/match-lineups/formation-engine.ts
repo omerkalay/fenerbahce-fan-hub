@@ -2,7 +2,7 @@
  * Pure formation / row-building engine.
  * All functions are side-effect free and unit-testable.
  */
-import { MATCH_PRESET_LAYOUTS } from '../../data/formations';
+import { FORMATION_PLACE_SLOTS, MATCH_PRESET_LAYOUTS } from '../../data/formations';
 import type { TeamLineup, LineupPlayer } from '../../types';
 
 // ─── Types ──────────────────────────────────────────────
@@ -93,18 +93,12 @@ export const FORMATION_ALIASES: Record<string, string> = {
     '3-4-1-2': '3-4-1-2'
 };
 
-export const FORMATION_PLACE_SLOT_MAPS: Record<string, Record<number, SlotKey>> = {
-    '4-2-3-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CDM1', 5: 'CB2', 6: 'CB1', 7: 'RAM', 8: 'CDM2', 9: 'ST', 10: 'CAM', 11: 'LAM' },
-    '4-3-1-2': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM2', 5: 'CB2', 6: 'CB1', 7: 'CM3', 8: 'CAM', 9: 'ST2', 10: 'ST1', 11: 'CM1' },
-    '4-3-2-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM2', 5: 'CB2', 6: 'CB1', 7: 'CM1', 8: 'CM3', 9: 'ST', 10: 'RAM', 11: 'LAM' },
-    '4-1-4-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CDM', 5: 'CB2', 6: 'CB1', 7: 'RM', 8: 'CM2', 9: 'ST', 10: 'CM1', 11: 'LM' },
-    '4-4-1-1': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM1', 5: 'CB2', 6: 'CB1', 7: 'RM', 8: 'CM2', 9: 'ST', 10: 'CAM', 11: 'LM' },
-    '4-4-2': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM1', 5: 'CB2', 6: 'CB1', 7: 'RM', 8: 'CM2', 9: 'ST2', 10: 'ST1', 11: 'LM' },
-    '4-3-3': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CM2', 5: 'CB2', 6: 'CB1', 7: 'CM3', 8: 'CM1', 9: 'ST', 10: 'RW', 11: 'LW' },
-    '3-5-2': { 1: 'GK', 2: 'RWB', 3: 'LWB', 4: 'CB1', 5: 'CB2', 6: 'CB3', 7: 'CM2', 8: 'CM1', 9: 'ST1', 10: 'ST2', 11: 'CM3' },
-    '3-4-1-2': { 1: 'GK', 2: 'RM', 3: 'LM', 4: 'CB1', 5: 'CB2', 6: 'CB3', 7: 'CM2', 8: 'CM1', 9: 'CAM', 10: 'ST2', 11: 'ST1' },
-    '4-1-2-1-2 Diamond': { 1: 'GK', 2: 'RB', 3: 'LB', 4: 'CDM', 5: 'CB2', 6: 'CB1', 7: 'CM2', 8: 'CM1', 9: 'ST2', 10: 'CAM', 11: 'ST1' }
-};
+export const FORMATION_PLACE_SLOT_MAPS: Record<string, Record<number, SlotKey>> = Object.fromEntries(
+    Object.entries(FORMATION_PLACE_SLOTS).map(([formation, slots]) => [
+        formation,
+        Object.fromEntries(slots.map((slot, index) => [index + 1, slot as SlotKey]))
+    ])
+);
 
 // ─── Utility functions ──────────────────────────────────
 
@@ -363,6 +357,19 @@ const getExplicitFormationSlotKey = (formation: string | null, player: LineupPla
     return isKnownSlot ? formationSlot as SlotKey : null;
 };
 
+const getLegacyManualOrderSlotKey = (
+    formation: string | null,
+    player: LineupPlayer,
+    formationSource: TeamLineup['formationSource']
+): SlotKey | null => {
+    if (formationSource !== 'manual') return null;
+
+    const presetFormation = getPresetFormation(formation);
+    const order = Number(player.order);
+    if (!presetFormation || !Number.isInteger(order) || order < 0) return null;
+    return FORMATION_PLACE_SLOT_MAPS[presetFormation]?.[order + 1] || null;
+};
+
 const getSlotAssignmentRank = (slotKey: string): number => {
     const index = (SLOT_ASSIGNMENT_PRIORITY as string[]).indexOf(slotKey);
     return index === -1 ? SLOT_ASSIGNMENT_PRIORITY.length : index;
@@ -448,7 +455,11 @@ export const getEffectiveFormation = (formation: string | null, starters: Lineup
 
 // ─── Row builders ───────────────────────────────────────
 
-export const buildPresetRows = (formation: string | null, starters: LineupPlayer[]): FormationRow[] | null => {
+export const buildPresetRows = (
+    formation: string | null,
+    starters: LineupPlayer[],
+    formationSource?: TeamLineup['formationSource']
+): FormationRow[] | null => {
     const presetFormation = getPresetFormation(formation);
     if (!presetFormation) return null;
 
@@ -468,11 +479,20 @@ export const buildPresetRows = (formation: string | null, starters: LineupPlayer
         }
 
         const slotKey = getFormationPlaceSlotKey(formation, player);
-        if (!slotKey || assigned.has(slotKey)) return;
-        const fitScore = getSlotFitScore(player, slotKey, formation);
-        if (fitScore < 0) return;
-        assigned.set(slotKey, player);
-        placeMappedPlayers.add(player);
+        if (slotKey && !assigned.has(slotKey)) {
+            const fitScore = getSlotFitScore(player, slotKey, formation);
+            if (fitScore >= 0) {
+                assigned.set(slotKey, player);
+                placeMappedPlayers.add(player);
+                return;
+            }
+        }
+
+        const legacyManualSlotKey = getLegacyManualOrderSlotKey(formation, player, formationSource);
+        if (legacyManualSlotKey && !assigned.has(legacyManualSlotKey)) {
+            assigned.set(legacyManualSlotKey, player);
+            placeMappedPlayers.add(player);
+        }
     });
 
     for (let i = remainingPlayers.length - 1; i >= 0; i -= 1) {
@@ -727,10 +747,14 @@ export const buildFormationFallbackRows = (formation: string | null, starters: L
 
 // ─── Main buildRows orchestrator ────────────────────────
 
-export const buildRows = (formation: string | null, starters: TeamLineup['starters']): BuildRowsResult => {
+export const buildRows = (
+    formation: string | null,
+    starters: TeamLineup['starters'],
+    formationSource?: TeamLineup['formationSource']
+): BuildRowsResult => {
     const effectiveFormation = getEffectiveFormation(formation, starters);
 
-    const presetRows = buildPresetRows(effectiveFormation, starters);
+    const presetRows = buildPresetRows(effectiveFormation, starters, formationSource);
     if (presetRows) {
         return { rows: presetRows, strategy: 'preset', renderedFormation: effectiveFormation, confident: true };
     }

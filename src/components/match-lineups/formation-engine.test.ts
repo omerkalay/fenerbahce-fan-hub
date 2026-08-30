@@ -373,6 +373,40 @@ describe('buildPresetRows', () => {
         expect(playerAt(78, 88)).toBe('Semedo');
         expect(playerAt(93, 50)).toBe('Ederson');
     });
+
+    it('restores canonical manual order emitted by the legacy API', () => {
+        const legacyStarters: LineupPlayer[] = [
+            makePlayer({ name: 'Ederson', position: 'G', positionCode: '', order: 0 }),
+            makePlayer({ name: 'Semedo', position: 'D', positionCode: '', order: 1 }),
+            makePlayer({ name: 'Brown', position: 'D', positionCode: '', order: 2 }),
+            makePlayer({ name: 'Guendouzi', position: 'M', positionCode: '', order: 3 }),
+            makePlayer({ name: 'Skriniar', position: 'D', positionCode: '', order: 4 }),
+            makePlayer({ name: 'Ake', position: 'D', positionCode: '', order: 5 }),
+            makePlayer({ name: 'Kahveci', position: 'M', positionCode: '', order: 6 }),
+            makePlayer({ name: 'Kante', position: 'M', positionCode: '', order: 7 }),
+            makePlayer({ name: 'Muriqi', position: 'F', positionCode: '', order: 8 }),
+            makePlayer({ name: 'Greenwood', position: 'F', positionCode: '', order: 9 }),
+            makePlayer({ name: 'Aydin', position: 'M', positionCode: '', order: 10 })
+        ];
+
+        const result = buildRows('4-2-3-1', legacyStarters, 'manual');
+        const playerAt = (y: number, x: number) => result.rows
+            .find((row) => row.y === y)
+            ?.slots.find((slot) => slot.x === x)
+            ?.player.name;
+
+        expect(playerAt(15, 50)).toBe('Muriqi');
+        expect(playerAt(35, 15)).toBe('Aydin');
+        expect(playerAt(32, 50)).toBe('Greenwood');
+        expect(playerAt(35, 85)).toBe('Kahveci');
+        expect(playerAt(60, 35)).toBe('Guendouzi');
+        expect(playerAt(60, 65)).toBe('Kante');
+        expect(playerAt(78, 12)).toBe('Brown');
+        expect(playerAt(78, 35)).toBe('Ake');
+        expect(playerAt(78, 65)).toBe('Skriniar');
+        expect(playerAt(78, 88)).toBe('Semedo');
+        expect(playerAt(93, 50)).toBe('Ederson');
+    });
 });
 
 // ─── buildNumericFormationRows ───────────────────────────

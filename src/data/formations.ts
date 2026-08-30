@@ -92,6 +92,22 @@ export const formations: Formations = {
     }
 };
 
+// ESPN's formationPlace numbering is also the canonical wire order for manual
+// drafts. Keeping this order stable lets older API revisions preserve exact
+// manual slots through their legacy zero-based `order` field.
+export const FORMATION_PLACE_SLOTS: Record<string, readonly string[]> = {
+    '4-2-3-1': ['GK', 'RB', 'LB', 'CDM1', 'CB2', 'CB1', 'RAM', 'CDM2', 'ST', 'CAM', 'LAM'],
+    '4-3-1-2': ['GK', 'RB', 'LB', 'CM2', 'CB2', 'CB1', 'CM3', 'CAM', 'ST2', 'ST1', 'CM1'],
+    '4-3-2-1': ['GK', 'RB', 'LB', 'CM2', 'CB2', 'CB1', 'CM1', 'CM3', 'ST', 'RAM', 'LAM'],
+    '4-1-4-1': ['GK', 'RB', 'LB', 'CDM', 'CB2', 'CB1', 'RM', 'CM2', 'ST', 'CM1', 'LM'],
+    '4-4-1-1': ['GK', 'RB', 'LB', 'CM1', 'CB2', 'CB1', 'RM', 'CM2', 'ST', 'CAM', 'LM'],
+    '4-4-2': ['GK', 'RB', 'LB', 'CM1', 'CB2', 'CB1', 'RM', 'CM2', 'ST2', 'ST1', 'LM'],
+    '4-3-3': ['GK', 'RB', 'LB', 'CM2', 'CB2', 'CB1', 'CM3', 'CM1', 'ST', 'RW', 'LW'],
+    '3-5-2': ['GK', 'RWB', 'LWB', 'CB1', 'CB2', 'CB3', 'CM2', 'CM1', 'ST1', 'ST2', 'CM3'],
+    '3-4-1-2': ['GK', 'RM', 'LM', 'CB1', 'CB2', 'CB3', 'CM2', 'CM1', 'CAM', 'ST2', 'ST1'],
+    '4-1-2-1-2 Diamond': ['GK', 'RB', 'LB', 'CDM', 'CB2', 'CB1', 'CM2', 'CM1', 'ST2', 'CAM', 'ST1']
+};
+
 // Additional formations for match lineup rendering (not in FormationBuilder)
 const matchOnlyFormations: Record<string, Record<string, { top: string; left: string }>> = {
     '4-4-1-1': {

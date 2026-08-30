@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchSquad } from '../services/api';
 import { toPng } from 'html-to-image';
-import { PITCH_SVG, formations, getPositionFamily } from '../data/formations';
+import { FORMATION_PLACE_SLOTS, PITCH_SVG, formations, getPositionFamily } from '../data/formations';
 import PlayerSelectionModal from './PlayerSelectionModal';
 import PlayerImage from './PlayerImage';
 import PlayerPool from './PlayerPool';
@@ -183,17 +183,25 @@ const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChang
 
     useEffect(() => {
         if (!onDraftChange) return;
+        const slotRank = new Map(
+            (FORMATION_PLACE_SLOTS[formation] || Object.keys(currentPositions))
+                .map((slot, index) => [slot, index])
+        );
         onDraftChange({
             formation,
             players: Object.entries(pitchPlayers)
                 .filter(([slot]) => Object.prototype.hasOwnProperty.call(currentPositions, slot))
+                .sort(([leftSlot], [rightSlot]) => (
+                    (slotRank.get(leftSlot) ?? Number.MAX_SAFE_INTEGER)
+                    - (slotRank.get(rightSlot) ?? Number.MAX_SAFE_INTEGER)
+                ))
                 .map(([slot, player]) => ({
-                slot,
-                id: player.id,
-                name: player.name,
-                position: player.position,
-                number: Number(player.number || 0)
-            }))
+                    slot,
+                    id: player.id,
+                    name: player.name,
+                    position: player.position,
+                    number: Number(player.number || 0)
+                }))
         });
     }, [currentPositions, formation, onDraftChange, pitchPlayers]);
 
