@@ -1,5 +1,5 @@
 const { db } = require('../config');
-const { fetchEspnSummaryForMatch } = require('../services/espn');
+const { fetchEspnSummaryForMatch, MATCH_SUMMARY_SCHEMA_VERSION } = require('../services/espn');
 const { buildSeasonMeta, getSeasonStartYear, resolveLegacySeasonState } = require('../utils/seasonState');
 const { isSameMatch } = require('../utils/matchIdentity');
 const {
@@ -218,20 +218,33 @@ async function handleMatchSummary(req, res, matchId) {
         const snapshot = await db.ref(`cache/matchSummaries/${normalizedMatchId}`).once('value');
         const cachedSummary = snapshot.val();
         if (cachedSummary) {
-            // Lazy enrichment: backfill or refresh stale lineup payloads in cached summaries
-            if (lineupsNeedRefresh(cachedSummary.lineups)) {
+            const shouldRefreshLineups = lineupsNeedRefresh(cachedSummary.lineups);
+            const shouldRefreshSummarySchema = Number(cachedSummary.schemaVersion || 0) < MATCH_SUMMARY_SCHEMA_VERSION;
+
+            // Lazy enrichment: backfill stale lineups and normalized event/stat payloads.
+            if (shouldRefreshLineups || shouldRefreshSummarySchema) {
                 try {
                     const enriched = await fetchEspnSummaryForMatch(normalizedMatchId);
-                    if (enriched?.lineups) {
-                        cachedSummary.lineups = enriched.lineups;
-                        cachedSummary.updatedAt = Date.now();
-                        await db.ref(`cache/matchSummaries/${normalizedMatchId}`).update({
-                            lineups: enriched.lineups,
-                            updatedAt: cachedSummary.updatedAt
-                        });
+                    if (enriched) {
+                        const updates = {
+                            updatedAt: enriched.updatedAt || Date.now()
+                        };
+
+                        if (shouldRefreshLineups && enriched.lineups) {
+                            updates.lineups = enriched.lineups;
+                        }
+
+                        if (shouldRefreshSummarySchema) {
+                            updates.schemaVersion = MATCH_SUMMARY_SCHEMA_VERSION;
+                            updates.events = Array.isArray(enriched.events) ? enriched.events : [];
+                            updates.stats = Array.isArray(enriched.stats) ? enriched.stats : [];
+                        }
+
+                        Object.assign(cachedSummary, updates);
+                        await db.ref(`cache/matchSummaries/${normalizedMatchId}`).update(updates);
                     }
                 } catch (enrichErr) {
-                    console.warn(`Lineup enrichment skipped for ${normalizedMatchId}:`, enrichErr.message);
+                    console.warn(`Match summary enrichment skipped for ${normalizedMatchId}:`, enrichErr.message);
                 }
             }
             return res.json(cachedSummary);

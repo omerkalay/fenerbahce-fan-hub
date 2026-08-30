@@ -3,6 +3,8 @@ import {
     normalizeEventFlags,
     normalizeSummaryEvents,
     parseSummaryKeyEvent,
+    mergeEspnCardEvents,
+    countAttributedCards,
     pickOrderedSummaryStats
 } from './espn-helpers.js';
 
@@ -108,6 +110,30 @@ describe('parseSummaryKeyEvent', () => {
         expect(result.isGoal).toBe(false);
     });
 
+    it('does not mistake the raw card label for a person name', () => {
+        const result = parseSummaryKeyEvent({
+            type: { type: 'yellow-card', text: 'Yellow Card' },
+            clock: { displayValue: "25'" },
+            team: { id: '11429', displayName: 'Samsunspor' },
+            shortText: 'Yellow Card',
+        });
+
+        expect(result.player).toBe('');
+        expect(result.isYellowCard).toBe(true);
+    });
+
+    it('recovers a carded person name from ESPN text when participants are absent', () => {
+        const result = parseSummaryKeyEvent({
+            type: { type: 'yellow-card', text: 'Yellow Card' },
+            clock: { displayValue: "25'" },
+            team: { id: '11429', displayName: 'Samsunspor' },
+            text: "Thomas Reis (Samsunspor) Yellow Card at 25'",
+            shortText: 'Thomas Reis Yellow Card',
+        });
+
+        expect(result.player).toBe('Thomas Reis');
+    });
+
     it('parses a red card event', () => {
         const item = {
             type: { type: 'red-card', text: 'Red Card' },
@@ -156,6 +182,58 @@ describe('parseSummaryKeyEvent', () => {
         const result = parseSummaryKeyEvent(item);
         expect(result.isGoal).toBe(true);
         expect(result.assist).toBe('Assister');
+    });
+});
+
+describe('mergeEspnCardEvents', () => {
+    it('enriches a uniquely matching anonymous scoreboard card despite minute drift', () => {
+        const result = mergeEspnCardEvents(
+            [{ clock: "11'", team: '995', type: 'Yellow Card', player: '', isYellowCard: true }],
+            [{ clock: "10'", team: '995', type: 'Yellow Card', player: 'Mahamadou Susoho', isYellowCard: true }]
+        );
+
+        expect(result).toHaveLength(1);
+        expect(result[0].player).toBe('Mahamadou Susoho');
+        expect(result[0].clock).toBe("11'");
+    });
+
+    it('keeps an unmatched team card anonymous without dropping it', () => {
+        const result = mergeEspnCardEvents(
+            [
+                { clock: "25'", team: '11429', type: 'Yellow Card', player: '', isYellowCard: true },
+                { clock: "70'", team: '436', type: 'Yellow Card', player: 'Romelu Lukaku', isYellowCard: true },
+            ],
+            [{ clock: "70'", team: '436', type: 'Yellow Card', player: 'Romelu Lukaku', isYellowCard: true }]
+        );
+
+        expect(result).toHaveLength(2);
+        expect(result[0]).toMatchObject({ team: '11429', player: '', isYellowCard: true });
+        expect(result[1]).toMatchObject({ team: '436', player: 'Romelu Lukaku', isYellowCard: true });
+    });
+
+    it('does not guess when two anonymous candidates are equally close', () => {
+        const result = mergeEspnCardEvents(
+            [
+                { clock: "24'", team: '11429', player: '', isYellowCard: true },
+                { clock: "26'", team: '11429', player: '', isYellowCard: true },
+            ],
+            [{ clock: "25'", team: '11429', player: 'Named Person', isYellowCard: true }]
+        );
+
+        expect(result).toHaveLength(3);
+        expect(result.filter((event) => event.player === '')).toHaveLength(2);
+    });
+});
+
+describe('countAttributedCards', () => {
+    it('excludes anonymous technical-area cards from player card totals', () => {
+        const events = [
+            { team: '11429', player: '', isYellowCard: true },
+            { team: '436', player: 'Romelu Lukaku', isYellowCard: true },
+        ];
+
+        expect(countAttributedCards(events, '11429', 'yellow')).toBe(0);
+        expect(countAttributedCards(events, '436', 'yellow')).toBe(1);
     });
 });
 

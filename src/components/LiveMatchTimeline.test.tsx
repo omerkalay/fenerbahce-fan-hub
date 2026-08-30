@@ -30,6 +30,29 @@ describe('LiveMatchTimeline', () => {
         expect(screen.getByText(/Maç olayı henüz paylaşılmadı/)).toBeInTheDocument();
     });
 
+    it('uses the team name for unattributed cards and never exposes raw card labels', () => {
+        render(
+            <LiveMatchTimeline
+                compact
+                homeTeamId="11429"
+                awayTeamId="436"
+                homeTeamName="Samsunspor"
+                awayTeamName="Fenerbahçe"
+                events={[
+                    { clock: '25', player: '', team: '11429', type: 'Yellow Card', isYellowCard: true },
+                    { clock: '70', player: 'Romelu Lukaku', team: '436', type: 'Yellow Card', isYellowCard: true },
+                ]}
+            />
+        );
+
+        expect(screen.getByText('Samsunspor')).toBeInTheDocument();
+        expect(screen.getByText('Romelu Lukaku')).toBeInTheDocument();
+        expect(screen.queryByText('Yellow Card')).not.toBeInTheDocument();
+        expect(screen.queryByText('Sarı kart')).not.toBeInTheDocument();
+        expect(screen.getByLabelText(/Samsunspor, Sarı kart/)).toBeInTheDocument();
+        expect(screen.getByLabelText(/Fenerbahçe, Romelu Lukaku, Sarı kart/)).toBeInTheDocument();
+    });
+
     it('shows only the outgoing player name with a rose tone for substitutions', () => {
         render(
             <LiveMatchTimeline

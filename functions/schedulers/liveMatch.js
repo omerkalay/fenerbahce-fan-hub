@@ -1,7 +1,15 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { db } = require('../config');
 const { getEspnLeaguesForMatch } = require('../constants/espnCompetitions');
-const { normalizeEventFlags, parseSummaryKeyEvent, extractLineupsFromSummary, buildSummaryPayloadFromLiveData } = require('../services/espn');
+const {
+    normalizeEventFlags,
+    parseSummaryKeyEvent,
+    extractLineupsFromSummary,
+    buildSummaryPayloadFromLiveData,
+    getEspnEventClockValue,
+    mergeEspnCardEvents,
+    countAttributedCards
+} = require('../services/espn');
 const { fetchWithTimeout } = require('../utils/fetchWithTimeout');
 const { isSameMatch } = require('../utils/matchIdentity');
 const { buildFinalMatchCachePlan, shouldStopFinalPolling } = require('../utils/finalMatchCache');
@@ -276,6 +284,22 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         const effectiveLineups = mergePublishedWithLiveLineups(publishedLineup?.lineups, summaryLineups);
 
         const scoreboardEvents = rawDetails.map(buildScoreboardEvent);
+        const summaryCardEvents = summaryKeyEvents
+            .map((item, index) => {
+                const event = parseSummaryKeyEvent(item);
+                if (!event?.isYellowCard && !event?.isRedCard) return null;
+                return {
+                    ...event,
+                    sourceOrder: rawDetails.length + index
+                };
+            })
+            .filter(Boolean);
+        const mergedCardEvents = mergeEspnCardEvents(
+            scoreboardEvents.filter((event) => event.isYellowCard || event.isRedCard),
+            summaryCardEvents
+        );
+        const scoreboardNonCardEvents = scoreboardEvents
+            .filter((event) => !event.isYellowCard && !event.isRedCard);
         const summarySubstitutionEvents = summaryKeyEvents
             .filter((item) => item?.type?.type === 'substitution')
             .map(buildSummarySubstitutionEvent)
@@ -295,11 +319,11 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             event.isSubstitution ? 'sub' : ''
         ].join('|'));
 
-        const events = [...scoreboardEvents, ...summarySubstitutionEvents]
+        const events = [...scoreboardNonCardEvents, ...mergedCardEvents, ...summarySubstitutionEvents]
             .map((event) => normalizeEventFlags(event))
             .sort((a, b) => {
-                const aClock = Number.isFinite(a.clockValue) ? a.clockValue : Number.POSITIVE_INFINITY;
-                const bClock = Number.isFinite(b.clockValue) ? b.clockValue : Number.POSITIVE_INFINITY;
+                const aClock = getEspnEventClockValue(a);
+                const bClock = getEspnEventClockValue(b);
                 if (aClock !== bClock) return aClock - bClock;
                 return (a.sourceOrder || 0) - (b.sourceOrder || 0);
             })
@@ -323,14 +347,6 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             awayValue: awayStatMap.get(name) || '0'
         }));
 
-        const countCards = (teamId, cardType) => rawDetails.filter((detail) => {
-            const detailTeamId = String(detail.team?.id || '');
-            if (detailTeamId !== teamId) return false;
-            return cardType === 'yellow'
-                ? Boolean(detail.yellowCard)
-                : Boolean(detail.redCard);
-        }).length;
-
         const upsertStat = (name, homeValue, awayValue) => {
             const existingIndex = stats.findIndex((stat) => stat.name === name);
             const payload = {
@@ -346,8 +362,16 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
             }
         };
 
-        upsertStat('yellowCards', countCards(homeTeamId, 'yellow'), countCards(awayTeamId, 'yellow'));
-        upsertStat('redCards', countCards(homeTeamId, 'red'), countCards(awayTeamId, 'red'));
+        upsertStat(
+            'yellowCards',
+            countAttributedCards(events, homeTeamId, 'yellow'),
+            countAttributedCards(events, awayTeamId, 'yellow')
+        );
+        upsertStat(
+            'redCards',
+            countAttributedCards(events, homeTeamId, 'red'),
+            countAttributedCards(events, awayTeamId, 'red')
+        );
 
         // Build the shared live payload.
         const liveData = {

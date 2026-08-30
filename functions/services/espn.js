@@ -2,9 +2,14 @@ const { ESPN_LEAGUES, SUMMARY_STAT_GROUPS } = require('../config');
 const {
     normalizeEventFlags,
     normalizeSummaryEvents,
+    getEspnEventClockValue,
+    mergeEspnCardEvents,
+    countAttributedCards,
     pickOrderedSummaryStats: _pickOrderedSummaryStats,
     parseSummaryKeyEvent,
 } = require('./espn-helpers');
+
+const MATCH_SUMMARY_SCHEMA_VERSION = 2;
 
 // Bind config into the parameterized helper
 const pickOrderedSummaryStats = (homeStatMap, awayStatMap) =>
@@ -15,10 +20,10 @@ const buildSummaryPayloadFromLiveData = (liveData, now, source = 'live-post') =>
     const awayStatMap = new Map((liveData.stats || []).map((stat) => [stat.name, stat.awayValue]));
 
     const events = normalizeSummaryEvents(liveData.events || []);
-    const homeYellowCards = events.filter((event) => event.isYellowCard && event.team === String(liveData.homeTeam?.id || '')).length;
-    const awayYellowCards = events.filter((event) => event.isYellowCard && event.team === String(liveData.awayTeam?.id || '')).length;
-    const homeRedCards = events.filter((event) => event.isRedCard && event.team === String(liveData.homeTeam?.id || '')).length;
-    const awayRedCards = events.filter((event) => event.isRedCard && event.team === String(liveData.awayTeam?.id || '')).length;
+    const homeYellowCards = countAttributedCards(events, liveData.homeTeam?.id, 'yellow');
+    const awayYellowCards = countAttributedCards(events, liveData.awayTeam?.id, 'yellow');
+    const homeRedCards = countAttributedCards(events, liveData.homeTeam?.id, 'red');
+    const awayRedCards = countAttributedCards(events, liveData.awayTeam?.id, 'red');
 
     if (!homeStatMap.has('yellowCards')) homeStatMap.set('yellowCards', String(homeYellowCards));
     if (!awayStatMap.has('yellowCards')) awayStatMap.set('yellowCards', String(awayYellowCards));
@@ -26,6 +31,7 @@ const buildSummaryPayloadFromLiveData = (liveData, now, source = 'live-post') =>
     if (!awayStatMap.has('redCards')) awayStatMap.set('redCards', String(awayRedCards));
 
     return {
+        schemaVersion: MATCH_SUMMARY_SCHEMA_VERSION,
         matchId: String(liveData.matchId),
         league: liveData.league || null,
         matchState: liveData.matchState || 'post',
@@ -199,7 +205,13 @@ const extractTeamStatMap = (summaryJson, teamId, fallbackStats = []) => {
     return new Map(statsArray.map((stat) => [stat.name, stat.displayValue ?? stat.value ?? '0']));
 };
 
-const buildSummaryPayloadFromEspnSummary = (summaryJson, league, now, source = 'espn-summary') => {
+const buildSummaryPayloadFromEspnSummary = (
+    summaryJson,
+    league,
+    now,
+    source = 'espn-summary',
+    scoreboardEvent = null
+) => {
     const competition = summaryJson?.header?.competitions?.[0];
     if (!competition) return null;
 
@@ -216,37 +228,53 @@ const buildSummaryPayloadFromEspnSummary = (summaryJson, league, now, source = '
     const homeStatMap = extractTeamStatMap(summaryJson, homeTeamId, homeCompetitor?.statistics || []);
     const awayStatMap = extractTeamStatMap(summaryJson, awayTeamId, awayCompetitor?.statistics || []);
 
-    let events = (summaryJson?.keyEvents || [])
+    const summaryEvents = (summaryJson?.keyEvents || [])
         .map(parseSummaryKeyEvent)
         .filter(Boolean);
+    const scoreboardDetails = scoreboardEvent?.competitions?.[0]?.details;
+    const detailEvents = (Array.isArray(scoreboardDetails)
+        ? scoreboardDetails
+        : (Array.isArray(competition.details) ? competition.details : []))
+        .map((detail, index) => {
+            const playerName = detail?.athletesInvolved?.[0]?.displayName
+                || detail?.participants?.[0]?.athlete?.displayName
+                || '';
+            const assistCandidate = detail?.athletesInvolved?.[1]?.displayName
+                || detail?.participants?.[1]?.athlete?.displayName
+                || '';
+            const isOwnGoal = Boolean(detail?.ownGoal);
+            return normalizeEventFlags({
+                clock: detail?.clock?.displayValue || '',
+                clockValue: Number.isFinite(Number(detail?.clock?.value)) ? Number(detail.clock.value) : null,
+                sourceOrder: index,
+                team: String(detail?.team?.id || ''),
+                type: detail?.type?.text || '',
+                player: playerName,
+                assist: !isOwnGoal && assistCandidate && assistCandidate !== playerName ? assistCandidate : '',
+                isGoal: Boolean(detail?.scoringPlay),
+                isPenalty: Boolean(detail?.penaltyKick),
+                isOwnGoal,
+                isYellowCard: Boolean(detail?.yellowCard),
+                isRedCard: Boolean(detail?.redCard)
+            });
+        })
+        .filter((event) => event.isGoal || event.isYellowCard || event.isRedCard);
 
-    if (events.length === 0) {
-        const detailEvents = Array.isArray(competition.details) ? competition.details : [];
-        events = detailEvents
-            .map((detail) => {
-                const playerName = detail?.athletesInvolved?.[0]?.displayName || '';
-                const assistCandidate = detail?.athletesInvolved?.[1]?.displayName || '';
-                const isOwnGoal = Boolean(detail?.ownGoal);
-                return normalizeEventFlags({
-                    clock: detail?.clock?.displayValue || '',
-                    team: String(detail?.team?.id || ''),
-                    type: detail?.type?.text || '',
-                    player: playerName,
-                    assist: !isOwnGoal && assistCandidate && assistCandidate !== playerName ? assistCandidate : '',
-                    isGoal: Boolean(detail?.scoringPlay),
-                    isPenalty: Boolean(detail?.penaltyKick),
-                    isOwnGoal,
-                    isYellowCard: Boolean(detail?.yellowCard),
-                    isRedCard: Boolean(detail?.redCard)
-                });
-            })
-            .filter((event) => event.isGoal || event.isYellowCard || event.isRedCard);
-    }
+    const summaryGoals = summaryEvents.filter((event) => event.isGoal);
+    const detailGoals = detailEvents.filter((event) => event.isGoal);
+    const mergedCards = mergeEspnCardEvents(
+        detailEvents.filter((event) => event.isYellowCard || event.isRedCard),
+        summaryEvents.filter((event) => event.isYellowCard || event.isRedCard)
+    );
+    const events = [
+        ...(summaryGoals.length > 0 ? summaryGoals : detailGoals),
+        ...mergedCards
+    ].sort((a, b) => getEspnEventClockValue(a) - getEspnEventClockValue(b));
 
-    const homeYellowCards = events.filter((event) => event.isYellowCard && event.team === homeTeamId).length;
-    const awayYellowCards = events.filter((event) => event.isYellowCard && event.team === awayTeamId).length;
-    const homeRedCards = events.filter((event) => event.isRedCard && event.team === homeTeamId).length;
-    const awayRedCards = events.filter((event) => event.isRedCard && event.team === awayTeamId).length;
+    const homeYellowCards = countAttributedCards(events, homeTeamId, 'yellow');
+    const awayYellowCards = countAttributedCards(events, awayTeamId, 'yellow');
+    const homeRedCards = countAttributedCards(events, homeTeamId, 'red');
+    const awayRedCards = countAttributedCards(events, awayTeamId, 'red');
 
     if (!homeStatMap.has('yellowCards')) homeStatMap.set('yellowCards', String(homeYellowCards));
     if (!awayStatMap.has('yellowCards')) awayStatMap.set('yellowCards', String(awayYellowCards));
@@ -261,6 +289,7 @@ const buildSummaryPayloadFromEspnSummary = (summaryJson, league, now, source = '
     );
 
     return {
+        schemaVersion: MATCH_SUMMARY_SCHEMA_VERSION,
         matchId: String(competition?.id || summaryJson?.header?.id || ''),
         league: league || null,
         matchState: competition?.status?.type?.state || 'post',
@@ -293,7 +322,32 @@ const fetchEspnSummaryForMatch = async (matchId) => {
             const response = await fetch(summaryUrl);
             if (!response.ok) continue;
             const summaryJson = await response.json();
-            const payload = buildSummaryPayloadFromEspnSummary(summaryJson, league, Date.now(), 'espn-summary-on-demand');
+            const competition = summaryJson?.header?.competitions?.[0];
+            const eventDate = new Date(competition?.date || summaryJson?.header?.date || '');
+            let scoreboardEvent = null;
+
+            if (Number.isFinite(eventDate.getTime())) {
+                try {
+                    const dateParam = eventDate.toISOString().slice(0, 10).replace(/-/g, '');
+                    const scoreboardUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/scoreboard?dates=${dateParam}`;
+                    const scoreboardResponse = await fetch(scoreboardUrl);
+                    if (scoreboardResponse.ok) {
+                        const scoreboardJson = await scoreboardResponse.json();
+                        scoreboardEvent = (scoreboardJson?.events || [])
+                            .find((event) => String(event?.id || '') === String(matchId)) || null;
+                    }
+                } catch (scoreboardError) {
+                    console.warn(`⚠️ ESPN scoreboard enrichment failed for ${matchId} (${league}):`, scoreboardError.message);
+                }
+            }
+
+            const payload = buildSummaryPayloadFromEspnSummary(
+                summaryJson,
+                league,
+                Date.now(),
+                'espn-summary-on-demand',
+                scoreboardEvent
+            );
             if (payload && payload.matchId) {
                 return payload;
             }
@@ -305,8 +359,12 @@ const fetchEspnSummaryForMatch = async (matchId) => {
 };
 
 module.exports = {
+    MATCH_SUMMARY_SCHEMA_VERSION,
     normalizeEventFlags,
     normalizeSummaryEvents,
+    getEspnEventClockValue,
+    mergeEspnCardEvents,
+    countAttributedCards,
     pickOrderedSummaryStats,
     buildSummaryPayloadFromLiveData,
     buildSummaryPayloadFromEspnSummary,

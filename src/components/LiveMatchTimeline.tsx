@@ -32,9 +32,12 @@ const localizeVarDecision = (event: MatchEvent): string => {
     return 'Pozisyon incelendi';
 };
 
-const getEventTitle = (event: MatchEvent): string => {
+const getEventTitle = (event: MatchEvent, fallbackTeamName = ''): string => {
     if (isVarEvent(event)) return event.player || 'VAR incelemesi';
-    return localizePlayerName(event.player || '') || event.type || 'Maç olayı';
+    const playerName = localizePlayerName(event.player || '');
+    if (playerName) return playerName;
+    if (event.isYellowCard || event.isRedCard) return fallbackTeamName;
+    return event.type || 'Maç olayı';
 };
 
 const getEventDetail = (event: MatchEvent): string => {
@@ -49,9 +52,14 @@ const getEventDetail = (event: MatchEvent): string => {
     if (event.isSubstitution) {
         return event.playerOut ? localizePlayerName(event.playerOut) : 'Oyuncu değişikliği';
     }
+    if (event.isRedCard || event.isYellowCard) return '';
+    return event.type || 'Maç olayı';
+};
+
+const getAccessibleEventDetail = (event: MatchEvent): string => {
     if (event.isRedCard) return 'Kırmızı kart';
     if (event.isYellowCard) return 'Sarı kart';
-    return event.type || 'Maç olayı';
+    return getEventDetail(event);
 };
 
 const getEventTone = (event: MatchEvent): string => {
@@ -81,16 +89,29 @@ const EventVisual = ({ event }: { event: MatchEvent }) => {
     );
 };
 
-const EventSide = ({ event, align }: { event: MatchEvent; align: 'left' | 'right' }) => (
-    <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
-        <p className={`line-clamp-2 break-words text-[11px] font-bold leading-tight ${getEventTone(event)}`}>
-            {getEventTitle(event)}
-        </p>
-        <p className={`mt-1 line-clamp-2 break-words text-[9px] leading-tight ${getEventDetailTone(event)}`}>
-            {getEventDetail(event)}
-        </p>
-    </div>
-);
+const EventSide = ({ event, align, fallbackTeamName }: {
+    event: MatchEvent;
+    align: 'left' | 'right';
+    fallbackTeamName?: string;
+}) => {
+    const title = getEventTitle(event, fallbackTeamName);
+    const detail = getEventDetail(event);
+
+    return (
+        <div className={`min-w-0 ${align === 'right' ? 'text-right' : 'text-left'}`}>
+            {title && (
+                <p className={`line-clamp-2 break-words text-[11px] font-bold leading-tight ${getEventTone(event)}`}>
+                    {title}
+                </p>
+            )}
+            {detail && (
+                <p className={`mt-1 line-clamp-2 break-words text-[9px] leading-tight ${getEventDetailTone(event)}`}>
+                    {detail}
+                </p>
+            )}
+        </div>
+    );
+};
 
 export default function LiveMatchTimeline({
     events = [],
@@ -131,6 +152,11 @@ export default function LiveMatchTimeline({
                     const isHomeEvent = teamId !== '' && teamId === normalizedHomeId;
                     const isAwayEvent = teamId !== '' && teamId === normalizedAwayId;
                     const accessibleSide = isHomeEvent ? homeTeamName : isAwayEvent ? awayTeamName : 'Tarafsız';
+                    const fallbackTeamName = isHomeEvent ? homeTeamName : isAwayEvent ? awayTeamName : '';
+                    const visibleTitle = getEventTitle(event, fallbackTeamName);
+                    const accessibleTitle = event.player || (!event.isYellowCard && !event.isRedCard)
+                        ? visibleTitle
+                        : '';
 
                     return (
                         <Fragment key={`${event.clock}-${event.type}-${event.player}-${index}`}>
@@ -143,17 +169,17 @@ export default function LiveMatchTimeline({
                             )}
                             <li
                                 className="grid min-h-14 grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center gap-2 border-b border-white/[0.06] py-2 last:border-b-0"
-                                aria-label={`${formatMatchClock(event.clock)}, ${accessibleSide}, ${getEventTitle(event)}, ${getEventDetail(event)}`}
+                                aria-label={[formatMatchClock(event.clock), accessibleSide, accessibleTitle, getAccessibleEventDetail(event)].filter(Boolean).join(', ')}
                             >
                                 <div className="min-w-0 pr-1">
-                                    {isHomeEvent && <EventSide event={event} align="right" />}
+                                    {isHomeEvent && <EventSide event={event} align="right" fallbackTeamName={fallbackTeamName} />}
                                 </div>
                                 <div className="flex flex-col items-center justify-center gap-1">
                                     <span className="font-mono text-[10px] font-black tabular-nums text-slate-300">{formatMatchClock(event.clock)}</span>
                                     <EventVisual event={event} />
                                 </div>
                                 <div className="min-w-0 pl-1">
-                                    {isAwayEvent && <EventSide event={event} align="left" />}
+                                    {isAwayEvent && <EventSide event={event} align="left" fallbackTeamName={fallbackTeamName} />}
                                     {!isHomeEvent && !isAwayEvent && <EventSide event={event} align="left" />}
                                 </div>
                             </li>
