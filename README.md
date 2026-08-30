@@ -6,21 +6,24 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.17.0-blue)
+![Version](https://img.shields.io/badge/version-2.18.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.17.0
+## What's New in v2.18.0
+
+- **Observable Lineup Automation** - The administration panel now refreshes ESPN lineup status automatically and records incomplete or missing provider observations with actionable status details
+- **Durable Starting XI Editing** - Manual formation positions, lineup slots, and player photos remain stable across provider refreshes and deployments
+- **Reliable ESPN Card Attribution** - Card events combine ESPN scoreboard and summary data, show the recipient when available, fall back to the team name for unattributed technical-area cards, and exclude anonymous cards from player totals
+
+<details>
+<summary>Previous: v2.14.0 – v2.17.0</summary>
 
 - **Protected Recipient Targeting** - Administrators can select eligible users from a masked, on-demand directory or save revision-protected recipient groups without exposing device tokens
 - **Verified Delivery Workflow** - Self-testing is required for the exact content and audience before one-time topic, user, or group delivery, with aggregate results and invalid-token cleanup
 - **Trusted Social Destinations** - Notifications can safely open the Fan Hub, official Fenerbahçe X posts, or supported Instagram profiles and posts
-
-<details>
-<summary>Previous: v2.14.0 – v2.16.1</summary>
-
 - **Cross-Platform Builder Reliability** - Continuous page scrolling restored Android, narrow-web, and iPhone access to every player while synchronized release metadata fixed the administration-panel version display
 - **Operational Data Resilience** - Independent ESPN/cache controls, 06:00 last-known-good snapshots, bounded browser requests, transient retries, partial competition success, and explicit administrator fallback improved fixture, standings, and statistics reliability
 - **Lineup and European Coverage** - Statistics now combine every European competition, verified lineups remain bound to the selected fixture, and administrators can remove a public Starting XI without losing its draft, ESPN detection, or paused automation state
@@ -122,6 +125,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Next Match Card**: Live countdown timer with team logos and match details
 - **Live Match State Flow**: Countdown → Checking → Live/Post (stable post-match fallback while preserving final data)
 - **Live Match Tracking**: Real-time score updates, match events (goals, cards), and live statistics via ESPN API → DB Cache
+- **Reliable Card Attribution**: ESPN scoreboard and summary events are reconciled to recover named recipients when safe; unattributed technical-area cards use the team name in the timeline and stay out of player card totals
 - **Post-Match Actual Lineups**: After a match ends, the detail modal shows ESPN-sourced formation, starting XI on a mini pitch, bench list, and substitution timeline. If lineup data is unavailable the section is silently hidden
 - **Verified Starting XI Banner & Modal**: Validated ESPN or administrator-published data under `cache/matchLineups/{matchId}` opens a shared two-team pitch with formations, shirt numbers, squad photos, benches, and substitutions
 - **League & Europe Center**: Süper Lig standings plus a season-aware UEFA journey that resolves Champions League, Europa League, or Conference League automatically and exposes Fener’s route, league-phase standings, and the published knockout bracket
@@ -192,11 +196,13 @@ This small public read-only node is published from the claim-protected administr
 
 ### Starting XI Publishing
 - **Automatic Discovery**: The existing live scheduler checks every three minutes from T-90 to T-30 and every minute afterward for supported Süper Lig and UEFA fixtures
+- **Observable Provider Status**: Every eligible poll records a lineup observation even when ESPN returns no usable roster, while the administration panel refreshes the current status every 30 seconds
 - **Provider Identity Guard**: ESPN data is accepted only after home team, away team, kickoff time, and competition agree with the scheduled SofaScore match
 - **Publication Gate**: Both teams must contain 11 unique, named players with unique numeric shirt numbers, and the same lineup must appear in two consecutive checks
 - **Manual Fallback**: Türkiye Kupası and incomplete ESPN data can be handled from the claim-protected administration panel; a manual Fenerbahçe lock preserves the ESPN opponent lineup and blocks automatic Fenerbahçe overwrites
 - **Safe Rollout**: `autoPublishLineups` and `autoPushLineups` default to `false`. A late lineup is displayed after validation but never sends a Starting XI push after kickoff
 - **Durable Match Binding**: Published lineups remain under `cache/matchLineups/{matchId}`. The dashboard follows only the active fixture, so the previous lineup disappears at the normal 06:00 fixture transition; an administrator can also explicitly remove a publication while preserving its private draft and ESPN detection
+- **Durable Manual Layouts**: Saved player identities, pitch positions, lineup slots, and squad photos remain stable across provider refreshes and deployments
 - **Public/Private Separation**: Published sports data is public read-only cache data. Detection fingerprints, drafts, manual locks, settings, health records, notification locks, and audit records live under server-only `ops`
 - **Single Publication Path**: Verified lineups are published only under `cache/matchLineups/{matchId}`, with detection, locks, drafts, settings, and audit state isolated under private `ops`
 
@@ -248,7 +254,7 @@ This small public read-only node is published from the claim-protected administr
 
 | Area | File | What's tested |
 |------|------|---------------|
-| ESPN parsing | `functions/services/espn.test.js` | Event flag normalization, summary event filtering, key event parsing, ordered stat picking |
+| ESPN parsing | `functions/services/espn.test.js` | Event flag normalization, safe card-recipient recovery and reconciliation, anonymous-card statistics, summary event filtering, key event parsing, and ordered stat picking |
 | Formation engine | `src/components/match-lineups/formation-engine.test.ts` | Position classification, formation parsing, preset/numeric/detailed/fallback row building |
 | Dashboard helpers | `src/utils/dashboardHelpers.test.ts` | Halftime detection, goal team resolution, and goal summary formatting |
 | Notification helpers | `src/utils/notificationHelpers.test.ts` | Option creation/normalization, enabled count, match option keys |
@@ -262,7 +268,7 @@ This small public read-only node is published from the claim-protected administr
 | Notification timing | `functions/utils/notificationSchedule.test.js` | Istanbul daily window and next-three-match reminder windows without early full-user scans |
 | Final-match cache | `functions/utils/finalMatchCache.test.js` | Five-minute transient cleanup with durable final-score continuity |
 | Topic reconciliation | `functions/schedulers/topicSync.test.js` | Indexed pending-sync and deferred old-token cleanup paths |
-| Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
+| Lineup automation | `functions/utils/lineupAutomation.test.js`, `functions/services/lineupPublishing.test.js` | 90/30-minute polling, missing/incomplete provider observations, complete 11+11 validation, stable observations, last-minute changes, late publication, manual locks, and push deduplication |
 | Admin authorization and schemas | `functions/handlers/middleware.admin.test.js`, `functions/handlers/adminRouter.test.js` | Missing/revoked tokens, non-admin claims, shared-route gating, path manipulation, unknown fields, ESPN/cache controls, lineup/player-status draft constraints, masked recipient pages, revision-safe notification groups, verified targeted delivery, and trusted notification URLs |
 | Shared lineup UI | `src/components/MatchLineups.test.tsx`, `src/components/FormationBuilder.test.tsx` | Fenerbahçe-first home/away tabs, incomplete provider sides, and mobile touch editing |
 | Player-status UI and realtime parsing | `src/components/admin/AdminPlayerStatusManager.test.tsx`, `src/components/AdminPanel.preview.test.tsx`, `src/services/api/statistics.player-status.test.ts` | Mobile squad/manual editing, stale warnings, local-only writes, legacy/modern data parsing, and realtime updates |
@@ -573,6 +579,7 @@ firebase deploy --only database
 - **Frontend State Flow**: Countdown → Checking → Live/Post (no misleading pre fallback after kickoff)
 - **Leagues**: Süper Lig plus the main and qualifying/play-off feeds for Champions League, Europa League, and Conference League
 - **Match Identity Guard**: Live/final cache is shown only when its home team, away team, and available kickoff time match the dashboard's current fixture
+- **Card Attribution Guard**: Named card recipients are merged only when team, card type, and event time identify an unambiguous ESPN match; otherwise the event remains attributed to the team without guessing a person
 - **Cleanup**: Only the transient `liveMatch` payload is deleted five minutes after full time; repeated ESPN polling for that finished fixture then stops
 - **Post-Match Persistence**: Final match context remains accessible via `lastFinishedMatch` until the next scheduled fixture changes the dashboard identity
 
@@ -660,4 +667,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.17.0** | August 2026
+**v2.18.0** | August 2026
