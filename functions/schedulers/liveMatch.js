@@ -234,29 +234,27 @@ const updateLiveMatch = onSchedule("every 1 minutes", async (_event) => {
         }
 
         let lineupObservation = null;
-        if (summaryLineups) {
-            try {
-                lineupObservation = await observeEspnLineups({
-                    scheduledMatch: nextMatch,
-                    espnEventId: fenerbahceMatch.id,
-                    league: matchLeague,
-                    matchState,
-                    lineups: summaryLineups,
-                    homeTeam: {
-                        id: homeTeam?.team?.id,
-                        name: homeTeam?.team?.displayName,
-                        logo: homeTeam?.team?.logo
-                    },
-                    awayTeam: {
-                        id: awayTeam?.team?.id,
-                        name: awayTeam?.team?.displayName,
-                        logo: awayTeam?.team?.logo
-                    },
-                    now
-                });
-            } catch (lineupError) {
-                console.error('ESPN lineup observation failed:', lineupError?.code || lineupError?.message || 'unknown');
-            }
+        try {
+            lineupObservation = await observeEspnLineups({
+                scheduledMatch: nextMatch,
+                espnEventId: fenerbahceMatch.id,
+                league: matchLeague,
+                matchState,
+                lineups: summaryLineups,
+                homeTeam: {
+                    id: homeTeam?.team?.id,
+                    name: homeTeam?.team?.displayName,
+                    logo: homeTeam?.team?.logo
+                },
+                awayTeam: {
+                    id: awayTeam?.team?.id,
+                    name: awayTeam?.team?.displayName,
+                    logo: awayTeam?.team?.logo
+                },
+                now
+            });
+        } catch (lineupError) {
+            console.error('ESPN lineup observation failed:', lineupError?.code || lineupError?.message || 'unknown');
         }
 
         if (lineupOnly) {

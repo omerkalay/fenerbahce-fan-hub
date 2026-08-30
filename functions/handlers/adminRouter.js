@@ -168,7 +168,11 @@ const sanitizeLineupState = ({ detection, published, draft, settings, manualLock
     detection: detection ? {
         status: detection.status || 'idle',
         consecutiveSeen: Number(detection.consecutiveSeen || 0),
+        initialSeenAt: detection.initialSeenAt ?? null,
+        initialReadyAt: detection.initialReadyAt || null,
         firstSeenAt: detection.firstSeenAt || null,
+        readyAt: detection.readyAt || null,
+        lastFingerprintChangedAt: detection.lastFingerprintChangedAt || null,
         lastSeenAt: detection.lastSeenAt || null,
         payload: detection.payload || null
     } : null,

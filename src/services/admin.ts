@@ -42,7 +42,11 @@ export interface AdminLineupDetail {
     detection: {
         status: 'observing' | 'ready' | 'idle';
         consecutiveSeen: number;
+        initialSeenAt: number | null;
+        initialReadyAt: number | null;
         firstSeenAt: number | null;
+        readyAt: number | null;
+        lastFingerprintChangedAt: number | null;
         lastSeenAt: number | null;
         payload: PublishedMatchLineups | null;
     } | null;

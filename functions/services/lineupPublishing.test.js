@@ -79,6 +79,8 @@ const scheduledMatch = {
     awayTeam: { id: 2, name: 'Opponent' }
 };
 
+const quietLogger = { info: vi.fn() };
+
 const observe = (database, messaging, overrides = {}) => observeEspnLineups({
     database,
     messaging,
@@ -90,6 +92,7 @@ const observe = (database, messaging, overrides = {}) => observeEspnLineups({
     homeTeam: scheduledMatch.homeTeam,
     awayTeam: scheduledMatch.awayTeam,
     now: 1_999_000_000,
+    logger: quietLogger,
     ...overrides
 });
 
@@ -115,6 +118,62 @@ describe('lineup publishing', () => {
         expect(second).toMatchObject({ status: 'ready', published: false, reason: 'auto-publish-disabled' });
         expect(database.data.cache?.matchLineups).toBeUndefined();
         expect(messaging.send).not.toHaveBeenCalled();
+    });
+
+    it('logs observable lineup transitions with provider IDs and player counts', async () => {
+        const database = createDatabase();
+        const messaging = { send: vi.fn() };
+        const logger = { info: vi.fn() };
+
+        await observe(database, messaging, { logger });
+        await observe(database, messaging, { logger, now: 1_999_060_000 });
+
+        expect(logger.info).toHaveBeenCalledTimes(2);
+        const observingLog = logger.info.mock.calls[0][0];
+        const readyLog = logger.info.mock.calls[1][0];
+        expect(observingLog).toContain('[lineup-detection]');
+        expect(observingLog).toContain('"transition":"observing"');
+        expect(observingLog).toContain('"espnEventId":"750125"');
+        expect(observingLog).toContain('"starters":11');
+        expect(observingLog).toContain('"observedAt":1999000000');
+        expect(observingLog).toContain('"scheduledKickoffAt":2000000000');
+        expect(readyLog).toContain('"transition":"ready"');
+        expect(database.data.ops.health.lineupAutomation).toMatchObject({
+            status: 'ready',
+            consecutiveSeen: 2,
+            initialSeenAt: 1_999_000_000,
+            initialReadyAt: 1_999_060_000,
+            currentVersionFirstSeenAt: 1_999_000_000,
+            currentVersionReadyAt: 1_999_060_000,
+            homeStarters: 11,
+            awayStarters: 11
+        });
+    });
+
+    it('records incomplete ESPN lineup observations for later log analysis', async () => {
+        const database = createDatabase();
+        const messaging = { send: vi.fn() };
+        const logger = { info: vi.fn() };
+
+        const result = await observe(database, messaging, {
+            logger,
+            lineups: { home: makeTeam('1', 'Fenerbahce'), away: null }
+        });
+
+        expect(result).toEqual({ status: 'incomplete' });
+        expect(logger.info).toHaveBeenCalledTimes(1);
+        expect(logger.info.mock.calls[0][0]).toContain('"transition":"incomplete"');
+        expect(logger.info.mock.calls[0][0]).toContain('"homeStarters":11');
+        expect(logger.info.mock.calls[0][0]).toContain('"awayStarters":0');
+        expect(database.data.ops.health.lineupAutomation).toMatchObject({
+            status: 'incomplete',
+            reason: 'missing-or-incomplete-lineups',
+            observedAt: 1_999_000_000,
+            scheduledKickoffAt: 2_000_000_000,
+            homeStarters: 11,
+            awayStarters: 0
+        });
+        expect(database.data.ops.lineups).toBeUndefined();
     });
 
     it('publishes after two stable observations and permanently deduplicates the push', async () => {

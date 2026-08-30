@@ -286,6 +286,47 @@ describe('admin route validation', () => {
         ]));
     });
 
+    it('does not mislabel a legacy lineup version timestamp as the first-ever ESPN detection', async () => {
+        const match = {
+            id: 401888314,
+            startTimestamp: 1_800_000_000,
+            homeTeam: { id: 436, name: 'Fenerbahçe' },
+            awayTeam: { id: 100, name: 'Opponent' }
+        };
+        const database = createMemoryDatabase({
+            cache: { nextMatch: match, next3Matches: [] },
+            ops: {
+                lineups: {
+                    '401888314': {
+                        detection: {
+                            status: 'ready',
+                            consecutiveSeen: 12,
+                            firstSeenAt: 100,
+                            lastSeenAt: 200,
+                            payload: { matchId: '401888314' }
+                        }
+                    }
+                }
+            }
+        });
+        const res = makeRes();
+
+        await handleAdminRoute(makeReq(), res, ['lineups', '401888314'], {
+            requireAdminClaims: vi.fn().mockResolvedValue({ uid: 'admin-uid', admin: true }),
+            database,
+            messaging: { send: vi.fn() }
+        });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.detection).toMatchObject({
+            initialSeenAt: null,
+            initialReadyAt: null,
+            firstSeenAt: 100,
+            readyAt: null,
+            lastSeenAt: 200
+        });
+    });
+
     it('removes a published lineup without deleting its draft or ESPN detection', async () => {
         const published = {
             matchId: '401888314',

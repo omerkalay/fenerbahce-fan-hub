@@ -639,7 +639,13 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                                 </div>
                                 <div className="mt-3 border-t border-white/10 pt-3">
                                     <p>ESPN durumu: <strong className="text-white">{lineupDetail?.detection?.status || 'henüz veri yok'}</strong></p>
-                                    <p className="mt-1">İlk görülme: {formatDateTime(lineupDetail?.detection?.firstSeenAt)}</p>
+                                    <p className="mt-1">İlk ESPN tespiti: {formatDateTime(lineupDetail?.detection?.initialSeenAt)}</p>
+                                    <p className="mt-1">İlk hazır olma: {formatDateTime(lineupDetail?.detection?.initialReadyAt)}</p>
+                                    <p className="mt-1">Mevcut kadro sürümü: {formatDateTime(lineupDetail?.detection?.firstSeenAt)}</p>
+                                    <p className="mt-1">Mevcut sürüm hazır: {formatDateTime(lineupDetail?.detection?.readyAt)}</p>
+                                    <p className="mt-1">Son kadro değişimi: {formatDateTime(lineupDetail?.detection?.lastFingerprintChangedAt)}</p>
+                                    <p className="mt-1">Son ESPN kontrolü: {formatDateTime(lineupDetail?.detection?.lastSeenAt)}</p>
+                                    <p className="mt-1">Ardışık aynı gözlem: {lineupDetail?.detection?.consecutiveSeen || 0}</p>
                                     <p className="mt-1">Yayın: <strong className={publishedPreview ? 'text-emerald-300' : 'text-slate-400'}>{publishedPreview ? 'Yayında' : 'Yayında değil'}</strong></p>
                                     <p className="mt-1">ESPN otomasyonu: {lineupDetail?.manualLocked ? 'Bu maç için duraklatıldı' : 'Etkin'}</p>
                                     <p className="mt-1">İlk 11 push: {lineupDetail?.notification?.status || 'henüz gönderilmedi'}</p>

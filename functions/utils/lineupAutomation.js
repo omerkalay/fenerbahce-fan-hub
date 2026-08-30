@@ -144,14 +144,35 @@ const buildPublishedLineup = ({
 const updateDetectionState = (current, { fingerprint, payload, now }) => {
     const previous = current && typeof current === 'object' ? current : {};
     const sameFingerprint = previous.fingerprint === fingerprint;
+    const fingerprintChanged = Boolean(previous.fingerprint) && !sameFingerprint;
     const consecutiveSeen = sameFingerprint ? Number(previous.consecutiveSeen || 0) + 1 : 1;
+    const status = consecutiveSeen >= 2 ? 'ready' : 'observing';
+    const firstSeenAt = sameFingerprint && previous.firstSeenAt ? previous.firstSeenAt : now;
+    const readyAt = status === 'ready'
+        ? (previous.readyAt || (previous.status === 'observing' ? now : null))
+        : null;
+    // Legacy records cannot prove the original detection time because firstSeenAt
+    // was reset on fingerprint changes. Keep those permanent fields null instead
+    // of inventing a timestamp; new records track them from their first observation.
+    const initialSeenAt = previous.initialSeenAt !== undefined
+        ? previous.initialSeenAt
+        : (previous.fingerprint ? null : now);
+    const initialReadyAt = previous.initialReadyAt || (
+        status === 'ready' && previous.status === 'observing' && previous.initialSeenAt
+            ? now
+            : null
+    );
 
     return {
         ...previous,
-        status: consecutiveSeen >= 2 ? 'ready' : 'observing',
+        status,
         fingerprint,
         consecutiveSeen,
-        firstSeenAt: sameFingerprint && previous.firstSeenAt ? previous.firstSeenAt : now,
+        initialSeenAt,
+        initialReadyAt,
+        firstSeenAt,
+        readyAt,
+        lastFingerprintChangedAt: fingerprintChanged ? now : previous.lastFingerprintChangedAt || null,
         lastSeenAt: now,
         payload
     };

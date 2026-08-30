@@ -149,14 +149,43 @@ const observeEspnLineups = async ({
     lineups,
     homeTeam,
     awayTeam,
-    now = Date.now()
+    now = Date.now(),
+    logger = console
 }) => {
     const matchId = String(scheduledMatch?.id || '');
     const matchTime = Number(scheduledMatch?.startTimestamp) * 1000;
     const normalizedLineups = normalizeCompleteLineups(lineups);
     const fingerprint = fingerprintLineups(normalizedLineups);
+    const observedAt = now;
+    const scheduledKickoffAt = Number.isFinite(matchTime) ? matchTime : null;
+    const homeStarters = Array.isArray(lineups?.home?.starters) ? lineups.home.starters.length : 0;
+    const awayStarters = Array.isArray(lineups?.away?.starters) ? lineups.away.starters.length : 0;
 
     if (!matchId || !normalizedLineups || !fingerprint) {
+        const reason = !matchId ? 'missing-match-id' : 'missing-or-incomplete-lineups';
+        logger.info(`[lineup-detection] ${JSON.stringify({
+            transition: 'incomplete',
+            reason,
+            matchId: matchId || null,
+            espnEventId: String(espnEventId || ''),
+            league: league || null,
+            matchState: matchState || null,
+            observedAt,
+            scheduledKickoffAt,
+            homeStarters,
+            awayStarters
+        })}`);
+        await database.ref('ops/health/lineupAutomation').update({
+            lastRunAt: now,
+            lastMatchId: matchId || null,
+            lastEspnEventId: String(espnEventId || ''),
+            status: 'incomplete',
+            reason,
+            observedAt,
+            scheduledKickoffAt,
+            homeStarters,
+            awayStarters
+        });
         return { status: 'incomplete' };
     }
 
@@ -174,13 +203,57 @@ const observeEspnLineups = async ({
         updateDetectionState(current, { fingerprint, payload: detectedPayload, now })
     ));
     const detection = transaction.snapshot.val();
+    const isDetectionTransition = detection.consecutiveSeen === 1 || detection.consecutiveSeen === 2;
+
+    if (isDetectionTransition) {
+        logger.info(`[lineup-detection] ${JSON.stringify({
+            transition: detection.status,
+            matchId,
+            espnEventId: String(espnEventId || ''),
+            league: league || null,
+            matchState: matchState || null,
+            observedAt,
+            scheduledKickoffAt,
+            fingerprint,
+            consecutiveSeen: detection.consecutiveSeen,
+            initialSeenAt: detection.initialSeenAt || null,
+            initialReadyAt: detection.initialReadyAt || null,
+            currentVersionFirstSeenAt: detection.firstSeenAt || null,
+            currentVersionReadyAt: detection.readyAt || null,
+            lastFingerprintChangedAt: detection.lastFingerprintChangedAt || null,
+            home: {
+                id: normalizedLineups.home.teamId,
+                name: normalizedLineups.home.teamName,
+                formation: normalizedLineups.home.formation,
+                starters: normalizedLineups.home.starters.length,
+                bench: normalizedLineups.home.bench.length
+            },
+            away: {
+                id: normalizedLineups.away.teamId,
+                name: normalizedLineups.away.teamName,
+                formation: normalizedLineups.away.formation,
+                starters: normalizedLineups.away.starters.length,
+                bench: normalizedLineups.away.bench.length
+            }
+        })}`);
+    }
 
     await database.ref('ops/health/lineupAutomation').update({
         lastRunAt: now,
         lastMatchId: matchId,
         lastEspnEventId: String(espnEventId || ''),
         status: detection.status,
-        consecutiveSeen: detection.consecutiveSeen
+        reason: null,
+        observedAt,
+        scheduledKickoffAt,
+        consecutiveSeen: detection.consecutiveSeen,
+        initialSeenAt: detection.initialSeenAt || null,
+        initialReadyAt: detection.initialReadyAt || null,
+        currentVersionFirstSeenAt: detection.firstSeenAt || null,
+        currentVersionReadyAt: detection.readyAt || null,
+        lastFingerprintChangedAt: detection.lastFingerprintChangedAt || null,
+        homeStarters: normalizedLineups.home.starters.length,
+        awayStarters: normalizedLineups.away.starters.length
     });
 
     if (detection.status !== 'ready') {

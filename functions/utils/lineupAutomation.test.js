@@ -74,9 +74,16 @@ describe('lineup automation', () => {
         const second = updateDetectionState(first, { fingerprint, payload: lineups, now: 200 });
         expect(first.status).toBe('observing');
         expect(first.consecutiveSeen).toBe(1);
+        expect(first.initialSeenAt).toBe(100);
+        expect(first.initialReadyAt).toBeNull();
+        expect(first.readyAt).toBeNull();
+        expect(first.lastFingerprintChangedAt).toBeNull();
         expect(second.status).toBe('ready');
         expect(second.consecutiveSeen).toBe(2);
         expect(second.firstSeenAt).toBe(100);
+        expect(second.initialSeenAt).toBe(100);
+        expect(second.initialReadyAt).toBe(200);
+        expect(second.readyAt).toBe(200);
     });
 
     it('resets stability when the starting lineup changes', () => {
@@ -96,5 +103,56 @@ describe('lineup automation', () => {
         expect(changed.status).toBe('observing');
         expect(changed.consecutiveSeen).toBe(1);
         expect(changed.firstSeenAt).toBe(200);
+        expect(changed.initialSeenAt).toBe(100);
+        expect(changed.readyAt).toBeNull();
+        expect(changed.lastFingerprintChangedAt).toBe(200);
+    });
+
+    it('keeps initial timestamps while tracking readiness for a corrected lineup version', () => {
+        const original = { home: makeTeam('1', 'Home'), away: makeTeam('2', 'Away') };
+        const corrected = structuredClone(original);
+        corrected.away.starters[10].name = 'Corrected Starter';
+        const originalFingerprint = fingerprintLineups(original);
+        const correctedFingerprint = fingerprintLineups(corrected);
+
+        const first = updateDetectionState(null, { fingerprint: originalFingerprint, payload: original, now: 100 });
+        const originalReady = updateDetectionState(first, { fingerprint: originalFingerprint, payload: original, now: 200 });
+        const changed = updateDetectionState(originalReady, { fingerprint: correctedFingerprint, payload: corrected, now: 300 });
+        const correctedReady = updateDetectionState(changed, { fingerprint: correctedFingerprint, payload: corrected, now: 400 });
+
+        expect(correctedReady).toMatchObject({
+            status: 'ready',
+            initialSeenAt: 100,
+            initialReadyAt: 200,
+            firstSeenAt: 300,
+            readyAt: 400,
+            lastFingerprintChangedAt: 300
+        });
+    });
+
+    it('keeps unprovable permanent timestamps empty for a legacy ready detection record', () => {
+        const lineups = { home: makeTeam('1', 'Home'), away: makeTeam('2', 'Away') };
+        const fingerprint = fingerprintLineups(lineups);
+        const legacy = {
+            status: 'ready',
+            fingerprint,
+            consecutiveSeen: 12,
+            firstSeenAt: 100,
+            lastSeenAt: 150,
+            payload: lineups
+        };
+
+        const migrated = updateDetectionState(legacy, { fingerprint, payload: lineups, now: 200 });
+
+        expect(migrated).toMatchObject({
+            status: 'ready',
+            consecutiveSeen: 13,
+            initialSeenAt: null,
+            initialReadyAt: null,
+            firstSeenAt: 100,
+            readyAt: null,
+            lastFingerprintChangedAt: null,
+            lastSeenAt: 200
+        });
     });
 });
