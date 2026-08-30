@@ -44,6 +44,7 @@ const DATA_RESOURCE_LABELS: Record<DataSourceResource, string> = {
 };
 
 const LINEUP_ACTION_BUTTON_CLASS = 'min-h-12 w-full rounded-xl px-4 py-3 text-sm font-black transition-colors disabled:cursor-not-allowed disabled:opacity-40';
+const LINEUP_AUTO_REFRESH_MS = 30_000;
 
 const formatDateTime = (value: unknown): string => {
     const timestamp = Number(value);
@@ -51,6 +52,16 @@ const formatDateTime = (value: unknown): string => {
     return new Date(timestamp).toLocaleString('tr-TR', {
         dateStyle: 'short',
         timeStyle: 'short',
+        timeZone: 'Europe/Istanbul'
+    });
+};
+
+const formatRefreshTime = (value: number | null): string => {
+    if (!value) return 'Henüz yok';
+    return new Date(value).toLocaleTimeString('tr-TR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
         timeZone: 'Europe/Istanbul'
     });
 };
@@ -70,9 +81,12 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     const [lineupEditorOpen, setLineupEditorOpen] = useState(false);
     const [dataSeasonStartYear, setDataSeasonStartYear] = useState(() => getCurrentSeasonStartYear());
     const [busy, setBusy] = useState(false);
+    const [lineupRefreshing, setLineupRefreshing] = useState(false);
+    const [lineupLastRefreshedAt, setLineupLastRefreshedAt] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const lineupRequestRef = useRef(0);
+    const lineupRefreshInFlightRef = useRef(false);
     const playerStatusRequestRef = useRef(0);
     const dataSeasonOptions = useMemo(() => getRecentSeasonOptions(), []);
 
@@ -91,15 +105,40 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
         if (data.dataSources?.seasonStartYear) setDataSeasonStartYear(data.dataSources.seasonStartYear);
     }, []);
 
-    const loadLineup = useCallback(async (matchId: string) => {
+    const loadLineup = useCallback(async (
+        matchId: string,
+        { preserveDraft = false }: { preserveDraft?: boolean } = {}
+    ) => {
         if (!matchId) return;
         const requestId = ++lineupRequestRef.current;
         const data = await fetchAdminLineup(matchId);
         if (requestId !== lineupRequestRef.current) return;
         setLineupDetail(data);
-        setDraft(data.draft);
-        setLineupEditorOpen((current) => findLineupPreview(data) ? current : true);
+        if (!preserveDraft) setDraft(data.draft);
+        setLineupLastRefreshedAt(Date.now());
+        if (!preserveDraft) {
+            setLineupEditorOpen((current) => findLineupPreview(data) ? current : true);
+        }
     }, []);
+
+    const refreshLineupStatus = useCallback(async (matchId: string, showNotice = false) => {
+        if (!matchId || lineupRefreshInFlightRef.current) return;
+        lineupRefreshInFlightRef.current = true;
+        setLineupRefreshing(true);
+        if (showNotice) {
+            setError(null);
+            setNotice(null);
+        }
+        try {
+            await loadLineup(matchId, { preserveDraft: true });
+            if (showNotice) setNotice('İlk 11 durumu yenilendi.');
+        } catch (refreshError) {
+            setError((refreshError as Error).message);
+        } finally {
+            lineupRefreshInFlightRef.current = false;
+            setLineupRefreshing(false);
+        }
+    }, [loadLineup]);
 
     const loadPlayerStatuses = useCallback(async () => {
         const requestId = ++playerStatusRequestRef.current;
@@ -181,6 +220,21 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     useEffect(() => {
         setLineupEditorOpen(false);
     }, [selectedMatchId]);
+
+    useEffect(() => {
+        if (
+            ADMIN_STATUS_PREVIEW_MODE
+            || !visible
+            || tab !== 'lineups'
+            || !selectedMatchId
+            || busy
+        ) return;
+
+        const timer = window.setInterval(() => {
+            void refreshLineupStatus(selectedMatchId);
+        }, LINEUP_AUTO_REFRESH_MS);
+        return () => window.clearInterval(timer);
+    }, [busy, refreshLineupStatus, selectedMatchId, tab, visible]);
 
     useEffect(() => {
         if (!visible || tab !== 'player-status') return;
@@ -566,11 +620,30 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                             </div>
 
                             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-slate-300">
-                                <p>ESPN durumu: <strong className="text-white">{lineupDetail?.detection?.status || 'henüz veri yok'}</strong></p>
-                                <p className="mt-1">İlk görülme: {formatDateTime(lineupDetail?.detection?.firstSeenAt)}</p>
-                                <p className="mt-1">Yayın: <strong className={publishedPreview ? 'text-emerald-300' : 'text-slate-400'}>{publishedPreview ? 'Yayında' : 'Yayında değil'}</strong></p>
-                                <p className="mt-1">ESPN otomasyonu: {lineupDetail?.manualLocked ? 'Bu maç için duraklatıldı' : 'Etkin'}</p>
-                                <p className="mt-1">İlk 11 push: {lineupDetail?.notification?.status || 'henüz gönderilmedi'}</p>
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="font-bold text-white">İlk 11 durumu</p>
+                                        <p className="mt-1 text-[10px] text-slate-500">
+                                            30 saniyede otomatik yenilenir · Son yenileme: {formatRefreshTime(lineupLastRefreshedAt)}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        aria-label="İlk 11 durumunu yenile"
+                                        disabled={busy || lineupRefreshing || !selectedMatchId}
+                                        onClick={() => void refreshLineupStatus(selectedMatchId, true)}
+                                        className="min-h-10 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black text-slate-100 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        {lineupRefreshing ? 'Yenileniyor…' : 'Yenile'}
+                                    </button>
+                                </div>
+                                <div className="mt-3 border-t border-white/10 pt-3">
+                                    <p>ESPN durumu: <strong className="text-white">{lineupDetail?.detection?.status || 'henüz veri yok'}</strong></p>
+                                    <p className="mt-1">İlk görülme: {formatDateTime(lineupDetail?.detection?.firstSeenAt)}</p>
+                                    <p className="mt-1">Yayın: <strong className={publishedPreview ? 'text-emerald-300' : 'text-slate-400'}>{publishedPreview ? 'Yayında' : 'Yayında değil'}</strong></p>
+                                    <p className="mt-1">ESPN otomasyonu: {lineupDetail?.manualLocked ? 'Bu maç için duraklatıldı' : 'Etkin'}</p>
+                                    <p className="mt-1">İlk 11 push: {lineupDetail?.notification?.status || 'henüz gönderilmedi'}</p>
+                                </div>
                             </div>
 
                             {preview?.lineups && !lineupEditorOpen && (

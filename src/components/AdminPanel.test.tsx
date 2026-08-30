@@ -163,6 +163,34 @@ describe('AdminPanel notices', () => {
         expect(await screen.findByText('Fikstür cache’i yenilendi.')).toBeInTheDocument();
     });
 
+    it('refreshes lineup status manually and schedules background refreshes every thirty seconds', async () => {
+        const nativeSetInterval = window.setInterval.bind(window);
+        let autoRefresh: (() => void) | null = null;
+        const intervalSpy = vi.spyOn(window, 'setInterval').mockImplementation((handler, timeout, ...args) => {
+            if (timeout === 30_000 && typeof handler === 'function') {
+                autoRefresh = () => handler();
+            }
+            return nativeSetInterval(handler, timeout, ...args);
+        });
+
+        render(<AdminPanel visible matches={matches} onClose={vi.fn()} />);
+        await screen.findByText('Canlı sürüm');
+        fireEvent.click(screen.getByRole('button', { name: 'İlk 11' }));
+
+        expect(await screen.findByText(/30 saniyede otomatik yenilenir/)).toBeInTheDocument();
+        await waitFor(() => expect(autoRefresh).not.toBeNull());
+
+        const initialCalls = mocks.fetchAdminLineup.mock.calls.length;
+        fireEvent.click(screen.getByRole('button', { name: 'İlk 11 durumunu yenile' }));
+        await waitFor(() => expect(mocks.fetchAdminLineup).toHaveBeenCalledTimes(initialCalls + 1));
+        expect(await screen.findByText('İlk 11 durumu yenilendi.')).toBeInTheDocument();
+
+        const manualCalls = mocks.fetchAdminLineup.mock.calls.length;
+        act(() => { autoRefresh?.(); });
+        await waitFor(() => expect(mocks.fetchAdminLineup).toHaveBeenCalledTimes(manualCalls + 1));
+        intervalSpy.mockRestore();
+    });
+
     it('shows either the published lineup or the manual editor, never both pitches', async () => {
         mocks.fetchAdminLineup.mockResolvedValue({
             detection: null,
