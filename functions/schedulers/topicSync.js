@@ -1,5 +1,6 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { admin, db } = require('../config');
+const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
 
 const isTerminalTokenCode = (code) =>
     code === 'messaging/invalid-registration-token' || code === 'messaging/registration-token-not-registered';
@@ -138,12 +139,18 @@ const createTopicSyncReconciler = ({
 const runTopicSyncReconciler = createTopicSyncReconciler();
 
 const reconcileTopicSync = onSchedule(
-    { schedule: "every 5 minutes", maxInstances: 1 },
+    { schedule: "every 5 minutes", maxInstances: 1, region: US_ROLLBACK_REGION },
+    runTopicSyncReconciler
+);
+
+const reconcileTopicSyncEurope = onSchedule(
+    { schedule: "every 5 minutes", maxInstances: 1, region: PRIMARY_REGION },
     runTopicSyncReconciler
 );
 
 module.exports = {
     reconcileTopicSync,
+    reconcileTopicSyncEurope,
     createTopicSyncReconciler,
     readTopicSyncWork
 };

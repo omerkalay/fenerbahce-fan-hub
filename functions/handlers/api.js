@@ -18,10 +18,12 @@ const { handleHealth, handleRefresh } = require('./admin');
 const { handleReminder, handleReminderPreferences } = require('./reminders');
 const { handleAdminRoute } = require('./adminRouter');
 const { version: APP_VERSION } = require('../package.json');
+const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
 
 // Main API - Express-style routing
 const api = onRequest({
     ...corsOptions,
+    region: [US_ROLLBACK_REGION, PRIMARY_REGION],
     secrets: [rapidApiKey, rapidApiHost, adminRefreshKey]
 }, async (req, res) => {
     const path = req.path.replace(/^\/+|\/+$/g, ''); // Remove leading/trailing slashes

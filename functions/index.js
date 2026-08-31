@@ -10,13 +10,17 @@
  */
 
 const { api } = require('./handlers/api');
-const { dailyDataRefresh } = require('./schedulers/dailyRefresh');
-const { updateLiveMatch } = require('./schedulers/liveMatch');
-const { checkMatchNotifications } = require('./schedulers/notifications');
-const { reconcileTopicSync } = require('./schedulers/topicSync');
+const { dailyDataRefresh, dailyDataRefreshEurope } = require('./schedulers/dailyRefresh');
+const { updateLiveMatch, updateLiveMatchEurope } = require('./schedulers/liveMatch');
+const { checkMatchNotifications, checkMatchNotificationsEurope } = require('./schedulers/notifications');
+const { reconcileTopicSync, reconcileTopicSyncEurope } = require('./schedulers/topicSync');
 
 exports.api = api;
 exports.dailyDataRefresh = dailyDataRefresh;
 exports.updateLiveMatch = updateLiveMatch;
 exports.checkMatchNotifications = checkMatchNotifications;
 exports.reconcileTopicSync = reconcileTopicSync;
+exports.dailyDataRefreshEurope = dailyDataRefreshEurope;
+exports.updateLiveMatchEurope = updateLiveMatchEurope;
+exports.checkMatchNotificationsEurope = checkMatchNotificationsEurope;
+exports.reconcileTopicSyncEurope = reconcileTopicSyncEurope;

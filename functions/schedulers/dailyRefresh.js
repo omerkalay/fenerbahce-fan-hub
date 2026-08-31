@@ -13,15 +13,13 @@ const {
 } = require('../utils/cupFixtures');
 const { refreshUefaJourneyCache } = require('../services/uefaJourney');
 const { refreshDataSnapshots } = require('../services/dataSnapshots');
+const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
 
 /**
  * Runs once per day, fetching SofaScore and ESPN data into the Firebase cache.
  * The 03:00 UTC schedule is 06:00 in Istanbul.
  */
-const dailyDataRefresh = onSchedule({
-    schedule: "0 3 * * *",
-    secrets: [rapidApiKey, rapidApiHost]
-}, async (_event) => {
+const runDailyDataRefresh = async (_event) => {
     const runStartedAt = Date.now();
     let runStatus = 'ok';
     let errorCode = null;
@@ -176,6 +174,25 @@ const dailyDataRefresh = onSchedule({
             console.error('Daily refresh health update failed:', healthError?.code || 'unknown');
         });
     }
-});
+};
 
-module.exports = { dailyDataRefresh };
+const dailyDataRefreshOptions = {
+    schedule: "0 3 * * *",
+    secrets: [rapidApiKey, rapidApiHost]
+};
+
+const dailyDataRefresh = onSchedule({
+    ...dailyDataRefreshOptions,
+    region: US_ROLLBACK_REGION
+}, runDailyDataRefresh);
+
+const dailyDataRefreshEurope = onSchedule({
+    ...dailyDataRefreshOptions,
+    region: PRIMARY_REGION
+}, runDailyDataRefresh);
+
+module.exports = {
+    dailyDataRefresh,
+    dailyDataRefreshEurope,
+    runDailyDataRefresh
+};

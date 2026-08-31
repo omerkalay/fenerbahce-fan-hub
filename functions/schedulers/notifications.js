@@ -1,13 +1,12 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { admin, db, ISTANBUL_TIMEZONE } = require('../config');
 const { buildNotificationSchedule } = require('../utils/notificationSchedule');
+const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
 
 /**
  * Checks cached match notification windows every minute without calling a sports API.
  */
-const checkMatchNotifications = onSchedule(
-    { schedule: "every 1 minutes", maxInstances: 1 },
-    async (_event) => {
+const runCheckMatchNotifications = async (_event) => {
     const schedulerStartedAt = Date.now();
     let healthStatus = 'ok';
     let healthErrorCode = null;
@@ -233,6 +232,25 @@ const checkMatchNotifications = onSchedule(
             console.error('Notification health update failed:', healthError?.code || 'unknown');
         });
     }
-});
+};
 
-module.exports = { checkMatchNotifications };
+const checkMatchNotificationsOptions = {
+    schedule: "every 1 minutes",
+    maxInstances: 1
+};
+
+const checkMatchNotifications = onSchedule({
+    ...checkMatchNotificationsOptions,
+    region: US_ROLLBACK_REGION
+}, runCheckMatchNotifications);
+
+const checkMatchNotificationsEurope = onSchedule({
+    ...checkMatchNotificationsOptions,
+    region: PRIMARY_REGION
+}, runCheckMatchNotifications);
+
+module.exports = {
+    checkMatchNotifications,
+    checkMatchNotificationsEurope,
+    runCheckMatchNotifications
+};

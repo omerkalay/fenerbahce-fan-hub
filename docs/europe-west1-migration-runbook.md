@@ -1,118 +1,132 @@
 # Europe West 1 Migration Runbook
 
-Planned active cutover: **2026-08-31, 10:00-12:30 Europe/Istanbul**
-
-This is not a six-hour continuous coding session. The active work is split into two short blocks with a brief verification pause; the 24-72 hour period is passive monitoring only. If a stop condition occurs, roll back and continue in a later session instead of extending the cutover.
+Migration window opened on **2026-08-31 Europe/Istanbul**. The next verified match is **Fenerbahçe–Beşiktaş on 2026-09-05 at 20:00 Europe/Istanbul**. US rollback resources must remain available until the match has finished and an additional three-hour observation window has passed.
 
 This runbook moves the stateless Firebase Cloud Functions and their second-generation scheduled functions from `us-central1` to `europe-west1`. The existing Realtime Database already runs in `europe-west1` and must not be recreated, imported, cleared, or otherwise moved.
 
 ## Safety rules
 
-- Do not start if a Fenerbahçe match is within the `T-90 minutes` to `final + 3 hours` live-processing window.
-- Do not run the US and Europe notification schedulers at the same time.
-- Do not redirect the orphan `checkMatchNotificationsV2` job to the active service.
-- Do not delete US functions or jobs on cutover day. Keep them available for rollback for at least 24-72 hours.
-- Do not change the RTDB URL, Firebase project ID, Auth, FCM, database rules, or user data.
-- Stop immediately if tests fail, secrets are unavailable, a Europe endpoint returns 5xx, or a scheduler health timestamp stops advancing.
+- Do not start or continue a cutover inside the `T-90 minutes` to match-finish-plus-three-hours processing window.
+- Never run the US and Europe versions of the same scheduler at the same time.
+- Never redirect the orphan `checkMatchNotificationsV2` job to the active notification service.
+- Do not delete US functions or jobs during cutover. Keep them paused and deployable for rollback through the first real match.
+- Do not change the RTDB URL, Firebase project ID, Auth, FCM, database rules, user data, notification preferences, or poll data.
+- Stop immediately if tests fail, the selected Firebase project is wrong, secrets are unavailable, Europe returns 5xx, a scheduler invocation fails, or duplicate notification activity appears.
+- Use the Google Cloud Console only for Scheduler pause/resume operations. Do not edit job URIs or OIDC settings manually.
 
-## Current architecture
+## Migration contract
 
 - Frontend: GitHub Pages
-- RTDB: `europe-west1`
-- HTTP API: `us-central1`
-- Schedulers: `us-central1`
-  - `dailyDataRefresh` at 03:00 UTC / 06:00 Istanbul
-  - `updateLiveMatch` every minute
-  - `checkMatchNotifications` every minute
-  - `reconcileTopicSync` every five minutes
-- Orphan job: `firebase-schedule-checkMatchNotificationsV2-us-central1`
+- RTDB: `europe-west1`, unchanged
+- HTTP API during observation: `api` in both `us-central1` and `europe-west1`
+- Primary frontend origin after cutover: `https://europe-west1-fb-hub-ed9de.cloudfunctions.net`
+- US scheduler exports retained for rollback:
+  - `dailyDataRefresh`
+  - `reconcileTopicSync`
+  - `updateLiveMatch`
+  - `checkMatchNotifications`
+- Europe scheduler exports:
+  - `dailyDataRefreshEurope`
+  - `reconcileTopicSyncEurope`
+  - `updateLiveMatchEurope`
+  - `checkMatchNotificationsEurope`
+- Orphan job to pause: `firebase-schedule-checkMatchNotificationsV2-us-central1`
 
-## 10:00-10:20 — Preflight
+## Phase 1 — Preflight
 
-- [ ] Renew the Firebase CLI session and verify that the intended production account and project are active.
-- [ ] Use Firebase CLI 15.28.1 with Node 22.
-- [ ] Activate JDK 21 or newer for the RTDB emulator. The current default is Corretto 17, although Homebrew OpenJDK 23 is already installed.
-- [ ] Confirm the working tree and review every pending change.
-- [ ] Run lint, typecheck, tests, RTDB rules tests, and production build.
-- [ ] Export a read-only RTDB backup and record its timestamp. Do not import it.
-- [ ] Record the current public API health response and `cache/lastUpdate`.
-- [ ] Record the latest values under `ops/health` for all schedulers.
-- [ ] Confirm the active non-V2 Scheduler job has recent successful executions.
-- [ ] Confirm the next match is outside the live-processing window.
+- [ ] Use Firebase CLI `15.28.1` with Node 22 and verify `fb-hub-ed9de` is the current project. Never use `firebase login:list --json`.
+- [ ] Activate JDK 21 or newer for the RTDB emulator.
+- [ ] Confirm the Git working tree and review every pending change.
+- [ ] Run lint, typecheck, tests, RTDB rules tests, production build, and `git diff --check`.
+- [ ] Create a permission-restricted, read-only RTDB export outside the repository and record its SHA-256 digest. Do not import it during this migration.
+- [ ] Record `firebase functions:list`, public API health, `cache/nextMatch`, and `ops/health`.
+- [ ] Confirm the next match remains outside the live-processing window.
 
-## 10:20-10:35 — Remove the current 404 noise
+## Phase 2 — Remove orphan 404 noise
 
-- [ ] Pause only `firebase-schedule-checkMatchNotificationsV2-us-central1`.
+- [ ] In Cloud Scheduler, pause only `firebase-schedule-checkMatchNotificationsV2-us-central1`.
 - [ ] Wait at least ten minutes.
-- [ ] Confirm no new V2 404 entries are generated.
-- [ ] Confirm `ops/health/notificationScheduler` continues to advance through the active non-V2 job.
-- [ ] Leave the orphan job paused; do not delete it on cutover day.
+- [ ] Confirm no new V2 404 entries appear.
+- [ ] Confirm `ops/health/notificationScheduler` continues to advance through the active non-V2 US job.
+- [ ] Leave the orphan job paused; do not delete it during the observation window.
 
-Rollback: resume the V2 job only if the evidence unexpectedly shows it is required. Do not point it at the non-V2 service.
+Rollback: resume the orphan only if evidence unexpectedly proves it is required. Never point it at the non-V2 service.
 
-## 10:35-11:10 — Prepare and validate the Europe HTTP API
+## Phase 3 — Deploy and validate the Europe HTTP API
 
-- [ ] Add explicit `europe-west1` region configuration using a new temporary production function name.
-- [ ] Keep the current US API deployed and unchanged.
-- [ ] Deploy only the new Europe HTTP API.
-- [ ] Test `/health` and other read-only cache endpoints first.
-- [ ] Verify CORS, Firebase Auth, admin claims, Secret Manager bindings, RTDB reads, and expected 401/403 behavior.
-- [ ] Run controlled write-path checks using non-destructive test records where available.
-- [ ] Compare response latency and Cloud Run error rates between US and Europe.
+- [ ] Deploy only `functions:api`. Its temporary multi-region declaration keeps the US URL available and creates the same `/api` endpoint in Europe.
+- [ ] Verify Europe `/health`, `/next-match`, `/next-3-matches`, `/squad`, and cached image endpoints.
+- [ ] Verify allowed CORS, expected unauthenticated 401/403 responses, Firebase Auth, admin claims, Secret Manager bindings, and RTDB reads.
+- [ ] Compare US and Europe response payloads, latency, and Cloud Run errors.
+- [ ] Do not continue if Europe returns different application data or any unexpected 5xx response.
 
-Rollback: stop using the Europe URL. The US API remains the production endpoint.
+Rollback: keep the frontend on the US origin. The US API remains deployed.
 
-## 11:10-11:35 — Frontend API cutover
+## Phase 4 — Frontend cutover
 
-- [ ] Update `VITE_BACKEND_ORIGIN` and the source fallback to the verified Europe API.
-- [ ] Build and verify the frontend.
-- [ ] Deploy the backward-compatible backend first, then publish the frontend.
-- [ ] Verify dashboard, fixture cache, poll, notification preferences, authentication, and administration flows.
-- [ ] Keep the US API available for older cached PWA/frontend versions.
+- [ ] Set the source fallback and GitHub Pages `VITE_BACKEND_ORIGIN` to the verified Europe host.
+- [ ] Publish the reviewed `main` commit only after the Europe API passes acceptance.
+- [ ] Wait for the CI quality gate and GitHub Pages deployment.
+- [ ] Verify dashboard, fixtures, polls, notification preferences, authentication, administration, player images, and PWA update behavior.
+- [ ] Confirm production browser requests use the Europe host.
+- [ ] Keep the US API available for older cached PWA/frontend versions and rollback.
 
-Rollback: restore the US backend origin and redeploy the frontend. No database restore is required.
+Rollback: restore the US backend origin and republish the frontend. No database restore is required.
 
-## 11:35-12:15 — Scheduler cutover
+## Phase 5 — Scheduler cutover
 
-Migrate one scheduler at a time. For each scheduler: pause the US job, deploy the new Europe function/job, observe its first successful run, verify the corresponding RTDB health record, and only then continue.
+Migrate one scheduler at a time. For every scheduler, pause the US job first, deploy only the Europe function, verify its region and first safe invocations, and only then continue. If deployment or verification fails, pause Europe and resume US immediately.
 
 Order:
 
-1. [ ] `dailyDataRefresh` — verify deployment and configuration; do not manually invoke the full daily refresh unless necessary.
-2. [ ] `reconcileTopicSync` — verify a successful run and no unexpected queue growth.
-3. [ ] `updateLiveMatch` — verify health without entering live-match processing outside its match window.
-4. [ ] `checkMatchNotifications` — migrate last and ensure there is never an overlap with the US notification scheduler.
+1. [ ] `dailyDataRefreshEurope`
+   - Do not manually invoke the full refresh.
+   - Verify its schedule and target during cutover.
+   - Final acceptance occurs after the next 06:00 Istanbul run; if it fails, resume US and run the recovered job manually from the Console.
+2. [ ] `reconcileTopicSyncEurope`
+   - Observe at least two five-minute cycles.
+   - Confirm no unexpected pending or cleanup queue growth.
+3. [ ] `updateLiveMatchEurope`
+   - Outside the live window the handler returns early and does not advance RTDB health.
+   - Use Cloud Scheduler execution status and Cloud Run request logs to verify 2xx invocations.
+4. [ ] `checkMatchNotificationsEurope`
+   - Migrate last.
+   - Observe at least three one-minute cycles and confirm `ops/health/notificationScheduler` advances.
+   - Confirm the US notification job is paused before the Europe job is allowed to run.
 
-Per-scheduler rollback:
+## Phase 6 — Acceptance and freeze
 
-1. Pause the Europe Scheduler job.
-2. Resume the corresponding US Scheduler job.
-3. Confirm the US health timestamp advances.
-4. Investigate without deleting either function.
-
-## 12:15-12:30 — Acceptance and freeze
-
-- [ ] Public API returns 200 and reads the existing Europe RTDB data.
-- [ ] Europe schedulers show successful execution.
-- [ ] All `ops/health` timestamps are current.
-- [ ] No new V2 404 logs appear.
-- [ ] No duplicate notification or lineup publication is observed.
-- [ ] No Cloud Run 5xx, OIDC 401/403, Secret Manager, FCM, or RTDB permission errors appear.
+- [ ] Europe API returns 200 and reads the existing Europe RTDB data.
+- [ ] Europe Scheduler jobs target `europe-west1` and show successful execution where an immediate no-op run is expected.
+- [ ] Daily refresh is marked pending until its next scheduled full run.
+- [ ] No new V2 404 logs, duplicate notification activity, Cloud Run 5xx, OIDC 401/403, Secret Manager, FCM, or RTDB permission errors appear.
 - [ ] Record Europe and US function/job states for rollback.
-- [ ] Freeze infrastructure changes for the remainder of the day.
+- [ ] Freeze Functions and Scheduler changes for the observation window.
 
-## 24-72 hours after cutover
+## Observation through the first match
 
-- Monitor Cloud Run errors, Scheduler results, API latency, FCM failures, RTDB usage, and all scheduler health records.
-- Keep US jobs paused and US functions deployed during the observation window.
-- Delete the orphan V2 job only after the observation window.
-- Remove US scheduler functions one at a time after Europe has remained healthy.
-- Remove or convert the US HTTP API only after cached clients no longer depend on it.
-- Keep explicit region settings in source so future deploys cannot silently fall back to `us-central1`.
+- Confirm the next Europe daily refresh after 06:00 Istanbul.
+- Monitor API errors, Scheduler results, FCM failures, RTDB usage, topic sync queues, and health records daily.
+- On 2026-09-05 monitor the 09:00 daily notification, the configured pre-match windows beginning at 17:00, lineup/live processing from 18:30, the 20:00 match, and final cache persistence.
+- Keep all US rollback functions deployed and their jobs paused until the match has finished plus three hours.
+
+## Final cleanup
+
+Only after the first-match acceptance window:
+
+1. Change the `api` declaration to `europe-west1` only and remove the US scheduler exports from source.
+2. Run the complete local quality gate again.
+3. Deploy the final Europe functions and verify them.
+4. Delete only the explicitly inventoried US functions with `--region us-central1`.
+5. Delete the paused orphan V2 Scheduler job from the Cloud Console.
+6. Review and remove only unreferenced US build images; never delete an Artifact Registry repository in bulk.
+7. Confirm `firebase functions:list` and Cloud Scheduler show only intended Europe production resources.
+8. Remove the temporary RTDB export after the rollback window closes.
 
 ## Final success criteria
 
 - The existing RTDB remains unchanged in `europe-west1`.
 - All production Cloud Functions and active Scheduler jobs run in `europe-west1`.
+- The production frontend calls the Europe API.
 - Auth, FCM, user preferences, polls, cache data, admin data, and operational state continue without reset.
-- The US deployment remains a tested rollback path until the observation period is complete.
+- No `us-central1` runtime remains after the first-match rollback window and explicit cleanup.
