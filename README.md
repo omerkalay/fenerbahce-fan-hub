@@ -6,17 +6,26 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.18.0-blue)
+![Version](https://img.shields.io/badge/version-2.18.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.18.0
+## What's New in v2.18.1
+
+- **Europe-First Backend** - The production API now runs in `europe-west1` beside the existing Realtime Database, reducing cross-region traffic while retaining the US endpoint during the guarded rollback window
+- **Controlled Scheduler Migration** - Region-explicit Europe scheduler exports, shared handlers, deployment-contract tests, and a no-overlap cutover order protect live data and FCM delivery
+- **Data-Preserving Rollback** - Auth, FCM, RTDB paths, security rules, polls, preferences, and admin data remain unchanged while paused US functions stay available through the first verified match
+
+<details>
+<summary>Previous: v2.18.0</summary>
 
 - **Observable Lineup Automation** - The administration panel now refreshes ESPN lineup status automatically and records incomplete or missing provider observations with actionable status details
 - **Durable Starting XI Editing** - Manual formation positions, lineup slots, and player photos remain stable across provider refreshes and deployments
 - **Reliable ESPN Card Attribution** - Card events combine ESPN scoreboard and summary data, show the recipient when available, fall back to the team name for unattributed technical-area cards, and exclude anonymous cards from player totals
+
+</details>
 
 <details>
 <summary>Previous: v2.14.0 – v2.17.0</summary>
@@ -495,7 +504,7 @@ npm install
    VITE_FIREBASE_PROJECT_ID=...
    # ... other firebase config
    VITE_FIREBASE_VAPID_KEY=...
-   VITE_BACKEND_ORIGIN=https://us-central1-YOUR-PROJECT.cloudfunctions.net
+   VITE_BACKEND_ORIGIN=https://europe-west1-YOUR-PROJECT.cloudfunctions.net
    ```
 
 4. **Run development server**
@@ -536,8 +545,8 @@ The command revokes existing refresh tokens; sign out and back in before opening
 4. **Deploy Functions**
 
 ```bash
-firebase login
-firebase deploy --only functions
+npx --yes firebase-tools@15.28.1 login
+npx --yes firebase-tools@15.28.1 deploy --only functions
 ```
 
 Deploy the versioned Realtime Database rules separately after reviewing them:
@@ -548,7 +557,7 @@ firebase deploy --only database
 
 5. **Initialize Cache**
    ```bash
-   curl -H "x-admin-key: YOUR_ADMIN_REFRESH_KEY" https://us-central1-YOUR-PROJECT.cloudfunctions.net/api/refresh
+   curl -H "x-admin-key: YOUR_ADMIN_REFRESH_KEY" https://europe-west1-YOUR-PROJECT.cloudfunctions.net/api/refresh
    ```
 
 ## How It Works
@@ -557,10 +566,10 @@ firebase deploy --only database
 
 | Function | Schedule | Description |
 |----------|----------|-------------|
-| `dailyDataRefresh` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, writes last-known-good fixture/standings/statistics snapshots, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
-| `checkMatchNotifications` | Every minute | Reads `cache/next3Matches` first (no external API call) and scans user preferences only inside a due reminder window before sending through FCM. |
-| `updateLiveMatch` | Every minute | Uses the existing live task for verified ESPN lineup discovery from T-90 (three-minute cadence until T-30, then every minute) and full live tracking in Süper Lig and supported UEFA competitions. Keeps the final live payload for five minutes, archives it durably, and stores the fixture summary. |
-| `reconcileTopicSync` | Every 5 minutes | Uses indexed RTDB queries to retry only pending `all_fans` intents or deferred old-token cleanups. |
+| `dailyDataRefreshEurope` | 03:00 UTC (06:00 TR) | Fetches match and squad data from SofaScore, persists Türkiye Kupası fixtures, refreshes the ESPN-backed UEFA journey cache, writes last-known-good fixture/standings/statistics snapshots, conditionally refreshes completed cup results, refreshes cached images, and cleans up old polls/notification records. Failed provider calls retain the last known-good cache. |
+| `checkMatchNotificationsEurope` | Every minute | Reads `cache/next3Matches` first (no external API call) and scans user preferences only inside a due reminder window before sending through FCM. |
+| `updateLiveMatchEurope` | Every minute | Uses the existing live task for verified ESPN lineup discovery from T-90 (three-minute cadence until T-30, then every minute) and full live tracking in Süper Lig and supported UEFA competitions. Keeps the final live payload for five minutes, archives it durably, and stores the fixture summary. |
+| `reconcileTopicSyncEurope` | Every 5 minutes | Uses indexed RTDB queries to retry only pending `all_fans` intents or deferred old-token cleanups. |
 
 ### Notification System
 1. **User Preference**: User selects notification options once (applies to ALL matches)
@@ -648,6 +657,8 @@ firebase deploy --only functions
 
 For releases that change both layers, deploy the backward-compatible Functions backend first. Push the reviewed frontend only after backend verification; that `main` push starts the GitHub Pages deployment.
 
+The current regional cutover and rollback procedure is documented in [`docs/europe-west1-migration-runbook.md`](docs/europe-west1-migration-runbook.md).
+
 ## Contributing
 
 This is a personal fan project. Suggestions and feedback are welcome!
@@ -667,4 +678,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.18.0** | August 2026
+**v2.18.1** | August 2026

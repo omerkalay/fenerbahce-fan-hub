@@ -1,6 +1,6 @@
 import type { Player } from '../../types';
 
-const DEFAULT_BACKEND_ORIGIN = 'https://us-central1-fb-hub-ed9de.cloudfunctions.net';
+const DEFAULT_BACKEND_ORIGIN = 'https://europe-west1-fb-hub-ed9de.cloudfunctions.net';
 
 const normalizeBaseUrl = (value = ''): string => value.replace(/\/+$/g, '');
 const appendPhotoVersion = (value: string): string => {

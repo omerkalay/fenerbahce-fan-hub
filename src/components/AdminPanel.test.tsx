@@ -156,7 +156,7 @@ describe('AdminPanel notices', () => {
         render(<AdminPanel visible matches={matches} onClose={vi.fn()} />);
 
         expect(await screen.findByText('ESPN / Cache Kontrolü')).toBeInTheDocument();
-        expect(screen.getByText('2.18.0')).toBeInTheDocument();
+        expect(screen.getByText('2.18.1')).toBeInTheDocument();
         fireEvent.click(screen.getAllByRole('button', { name: 'Cache’i şimdi yenile' })[0]);
 
         await waitFor(() => expect(mocks.refreshAdminDataCache).toHaveBeenCalledWith('fixtures', 2026));

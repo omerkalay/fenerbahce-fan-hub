@@ -185,7 +185,7 @@ const getRequestOrigin = (req) => {
 
 const buildApiBaseUrl = (req) => {
     const origin = getRequestOrigin(req);
-    return origin ? `${origin}/api` : 'https://us-central1-fb-hub-ed9de.cloudfunctions.net/api';
+    return origin ? `${origin}/api` : 'https://europe-west1-fb-hub-ed9de.cloudfunctions.net/api';
 };
 
 module.exports = {
