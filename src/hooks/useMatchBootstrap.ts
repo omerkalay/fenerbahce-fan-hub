@@ -4,13 +4,21 @@ import type { MatchData, CachedMatchPayload, SeasonMeta, SeasonState } from '../
 
 const readCachedMatchData = (): CachedMatchPayload | null => {
   if (typeof window === 'undefined') return null;
-  const raw = localStorage.getItem('fb_last_match');
-  if (!raw) return null;
   try {
+    const raw = localStorage.getItem('fb_last_match');
+    if (!raw) return null;
     return JSON.parse(raw);
   } catch (err) {
     console.warn('fb_last_match parse error:', err);
     return null;
+  }
+};
+
+const persistMatchData = (payload: CachedMatchPayload) => {
+  try {
+    localStorage.setItem('fb_last_match', JSON.stringify(payload));
+  } catch {
+    // A storage failure must not turn a successful network response into an error.
   }
 };
 
@@ -27,6 +35,9 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
   const [loading, setLoading] = useState(enabled && !cachedData);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasDataRef = useRef(Boolean(cachedData?.nextMatch));
+  const inFlightRef = useRef(false);
+  const lastAttemptRef = useRef<number | null>(null);
+  const requestGenerationRef = useRef(0);
 
   useEffect(() => {
     hasDataRef.current = Boolean(matchData);
@@ -37,6 +48,10 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
       setLoading(false);
       return;
     }
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    lastAttemptRef.current = Date.now();
+    const generation = requestGenerationRef.current;
     const hasCached = hasDataRef.current;
     setErrorMessage(null);
     if (!hasCached) {
@@ -45,6 +60,7 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
 
     try {
       const status = await fetchMatchStatus();
+      if (generation !== requestGenerationRef.current) return;
       const nextMatch = status.nextMatch;
       const upcomingMatches = status.next3Matches;
       const resolvedSeasonState = status.seasonState ?? (nextMatch ? 'active' : 'unknown');
@@ -65,9 +81,7 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
           season: status.season
         };
 
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('fb_last_match', JSON.stringify(payload));
-        }
+        persistMatchData(payload);
 
       } else if (resolvedSeasonState === 'offseason') {
         setNext3Matches(normalizedUpcoming);
@@ -84,9 +98,7 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
           season: status.season
         };
 
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('fb_last_match', JSON.stringify(payload));
-        }
+        persistMatchData(payload);
 
       } else {
         if (!hasCached) {
@@ -102,6 +114,7 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
         );
       }
     } catch (err) {
+      if (generation !== requestGenerationRef.current) return;
       console.error('loadMatchData error:', err);
       if (!hasCached) {
         setMatchData(null);
@@ -113,12 +126,31 @@ export function useMatchBootstrap({ enabled = true }: { enabled?: boolean } = {}
           : 'Beklenmeyen bir hata oluştu. Tekrar dene veya biraz sonra gel.'
       );
     } finally {
-      setLoading(false);
+      if (generation === requestGenerationRef.current) {
+        inFlightRef.current = false;
+        setLoading(false);
+      }
     }
   }, [enabled]);
 
   useEffect(() => {
-    if (enabled) loadMatchData();
+    if (!enabled) return;
+    void loadMatchData();
+    const refreshOnResume = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (lastAttemptRef.current !== null && Date.now() - lastAttemptRef.current < 30_000) return;
+      void loadMatchData();
+    };
+    document.addEventListener('visibilitychange', refreshOnResume);
+    window.addEventListener('pageshow', refreshOnResume);
+    window.addEventListener('online', refreshOnResume);
+    return () => {
+      requestGenerationRef.current += 1;
+      inFlightRef.current = false;
+      document.removeEventListener('visibilitychange', refreshOnResume);
+      window.removeEventListener('pageshow', refreshOnResume);
+      window.removeEventListener('online', refreshOnResume);
+    };
   }, [enabled, loadMatchData]);
 
   return {

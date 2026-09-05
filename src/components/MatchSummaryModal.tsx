@@ -110,7 +110,7 @@ function MatchSummaryModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="finished-match-dialog-title"
-                className="live-match-dialog flex max-h-[96dvh] min-h-[72dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#061225] shadow-2xl sm:min-h-0 sm:rounded-3xl"
+                className="live-match-dialog flex h-[96dvh] sm:h-[calc(100dvh-2.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#061225] shadow-2xl sm:rounded-3xl"
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 <header className="live-match-dialog-header flex shrink-0 items-center justify-between border-b border-white/10 bg-[#061225]/95 px-4 py-3 backdrop-blur-md sm:px-5">

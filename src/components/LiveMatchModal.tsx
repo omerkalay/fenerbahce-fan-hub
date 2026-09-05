@@ -7,9 +7,10 @@ interface LiveMatchModalProps {
     onClose: () => void;
     liveMatchData: LiveMatchData | null;
     useSquadPhotos?: boolean;
+    errorMessage?: string | null;
 }
 
-const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveMatchData, useSquadPhotos = true }) => {
+const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveMatchData, useSquadPhotos = true, errorMessage = null }) => {
     const dialogRef = useRef<HTMLDivElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -57,7 +58,7 @@ const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveM
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="live-match-dialog-title"
-                className="live-match-dialog flex max-h-[96dvh] min-h-[72dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#061225] shadow-2xl sm:min-h-0 sm:rounded-3xl"
+                className="live-match-dialog flex h-[96dvh] sm:h-[calc(100dvh-2.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#061225] shadow-2xl sm:rounded-3xl"
                 onMouseDown={(event) => event.stopPropagation()}
             >
                 <header className="live-match-dialog-header flex shrink-0 items-center justify-between border-b border-white/10 bg-[#061225]/95 px-4 py-3 backdrop-blur-md sm:px-5">
@@ -79,6 +80,9 @@ const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveM
                 </header>
 
                 <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar sm:p-5">
+                    {errorMessage && (
+                        <p role="status" className="mb-3 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">{errorMessage}</p>
+                    )}
                     {liveMatchData ? (
                         <LiveMatchScore data={liveMatchData} useSquadPhotos={useSquadPhotos} />
                     ) : (

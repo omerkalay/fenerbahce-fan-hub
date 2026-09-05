@@ -6,6 +6,7 @@ import PlayerSelectionModal from './PlayerSelectionModal';
 import PlayerImage from './PlayerImage';
 import PlayerPool from './PlayerPool';
 import type { Player, FormationDraft, FormationName, PitchPlayers, PositionCoord } from '../types';
+import { readFormationDraft, saveFormationDraft } from '../utils/formationStorage';
 
 interface FormationBuilderProps {
     adminMode?: boolean;
@@ -14,9 +15,12 @@ interface FormationBuilderProps {
 }
 
 const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChange }: FormationBuilderProps) => {
+    const [savedDraft] = useState(() => adminMode ? null : readFormationDraft());
     const [squad, setSquad] = useState<Player[]>([]);
-    const [pitchPlayers, setPitchPlayers] = useState<PitchPlayers>({});
-    const [formation, setFormation] = useState<FormationName>('4-2-3-1');
+    const [pitchPlayers, setPitchPlayers] = useState<PitchPlayers>(() => Object.fromEntries(
+        (savedDraft?.players ?? []).map(({ slot, ...player }) => [slot, player])
+    ));
+    const [formation, setFormation] = useState<FormationName>(savedDraft?.formation ?? '4-2-3-1');
     const [loading, setLoading] = useState<boolean>(true);
     const [showPlayerModal, setShowPlayerModal] = useState<boolean>(false);
     const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
@@ -26,13 +30,29 @@ const FormationBuilder = ({ adminMode = false, initialDraft = null, onDraftChang
     const appliedDraftRef = useRef<string>('');
 
     useEffect(() => {
+        let cancelled = false;
         const loadSquad = async () => {
             const data = await fetchSquad();
+            if (cancelled) return;
             setSquad(data);
+            // Do not erase a saved lineup when the squad endpoint is unavailable.
+            if (!adminMode && data.length > 0) {
+                setPitchPlayers((previous) => Object.fromEntries(
+                    Object.entries(previous).flatMap(([slot, player]) => {
+                        const current = data.find((candidate) => candidate.id === player.id);
+                        return current ? [[slot, current]] : [];
+                    })
+                ));
+            }
             setLoading(false);
         };
         loadSquad();
-    }, []);
+        return () => { cancelled = true; };
+    }, [adminMode]);
+
+    useEffect(() => {
+        if (!adminMode) saveFormationDraft(formation, pitchPlayers);
+    }, [adminMode, formation, pitchPlayers]);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {

@@ -1,6 +1,6 @@
 {
     "name": "functions",
-    "version": "2.18.1",
+    "version": "2.18.2",
     "description": "Cloud Functions for Fenerbahçe Fan Hub",
     "scripts": {
         "serve": "firebase emulators:start --only functions",

@@ -57,5 +57,6 @@ dist-ssr
 
 # Firebase security rules are versioned and emulator-tested.
 
-# Project roadmap (local reference)
+# Project planning documents (local references)
 ROADMAP.md
+docs/project-review-*.md

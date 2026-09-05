@@ -1,5 +1,6 @@
 import { BACKEND_URL, ensureAbsolutePhoto } from './base';
 import type { Player, MatchSummaryData, MatchStatusPayload } from '../../types';
+import { fetchWithTimeout } from '../../utils/fetchWithTimeout';
 
 const normalizeMatchStatusPayload = (value: Partial<MatchStatusPayload> = {}): MatchStatusPayload => ({
     nextMatch: value.nextMatch ?? null,
@@ -12,7 +13,7 @@ const normalizeMatchStatusPayload = (value: Partial<MatchStatusPayload> = {}): M
 
 export const fetchMatchStatus = async (): Promise<MatchStatusPayload> => {
     try {
-        const response = await fetch(`${BACKEND_URL}/match-status`);
+        const response = await fetchWithTimeout(`${BACKEND_URL}/match-status`);
         if (!response.ok) throw new Error('Backend fetch failed');
         const payload = await response.json();
         return normalizeMatchStatusPayload(payload);
@@ -24,7 +25,7 @@ export const fetchMatchStatus = async (): Promise<MatchStatusPayload> => {
 
 export const fetchSquad = async (): Promise<Player[]> => {
     try {
-        const response = await fetch(`${BACKEND_URL}/squad`);
+        const response = await fetchWithTimeout(`${BACKEND_URL}/squad`);
         if (!response.ok) throw new Error('Backend fetch failed');
         const squad: Player[] = await response.json();
         return squad.map(player => ({
@@ -41,7 +42,7 @@ export const fetchMatchSummary = async (matchId: string): Promise<MatchSummaryDa
     if (!matchId) return null;
 
     try {
-        const response = await fetch(`${BACKEND_URL}/match-summary/${matchId}`);
+        const response = await fetchWithTimeout(`${BACKEND_URL}/match-summary/${matchId}`);
         if (!response.ok) {
             if (response.status === 404) return null;
             throw new Error('Match summary fetch failed');

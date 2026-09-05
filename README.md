@@ -6,17 +6,29 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.18.1-blue)
+![Version](https://img.shields.io/badge/version-2.18.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.18.1
+## What's New in v2.18.2
+
+- **Persistent Formation Drafts** - Public lineups retain their formation and player selections across tab changes and restarts, with squad reconciliation and separate administrator drafts
+- **Consistent Match Data** - Obsolete summary responses are ignored, live requests are bounded and serialized, and transient failures preserve the last score with an explicit warning
+- **PWA Resume Recovery** - Returning to the app or reconnecting refreshes match context with request deduplication and resets live state when the fixture changes
+- **Stable Match Center** - Events, Statistics, and Lineups keep the same viewport-relative dialog height while long content scrolls inside the existing design
+
+This patch does not change the Europe migration topology, scheduler configuration, authentication flow, or notification delivery. US rollback resources remain subject to the existing first-match acceptance window.
+
+<details>
+<summary>Previous: v2.18.1</summary>
 
 - **Europe-First Backend** - The production API now runs in `europe-west1` beside the existing Realtime Database, reducing cross-region traffic while retaining the US endpoint during the guarded rollback window
 - **Controlled Scheduler Migration** - Region-explicit Europe scheduler exports, shared handlers, deployment-contract tests, and a no-overlap cutover order protect live data and FCM delivery
 - **Data-Preserving Rollback** - Auth, FCM, RTDB paths, security rules, polls, preferences, and admin data remain unchanged while paused US functions stay available through the first verified match
+
+</details>
 
 <details>
 <summary>Previous: v2.18.0</summary>
@@ -678,4 +690,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.18.1** | August 2026
+**v2.18.2** | September 2026

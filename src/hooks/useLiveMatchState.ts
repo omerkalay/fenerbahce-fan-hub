@@ -3,10 +3,10 @@ import { BACKEND_URL } from '../services/api';
 import { isLiveMatchForScheduledMatch } from '../utils/matchIdentity';
 import type { MatchData, LiveMatchState, LiveMatchData, CachedMatchPayload } from '../types';
 
-const shouldCheckLiveImmediately = (match: MatchData | null | undefined): boolean => {
-  if (!match?.startTimestamp) return false;
-  return (match.startTimestamp * 1000) <= Date.now();
-};
+const hasStarted = (match: MatchData | null | undefined): boolean => Boolean(
+  match?.startTimestamp && match.startTimestamp * 1000 <= Date.now()
+);
+const isPageHidden = () => document.visibilityState === 'hidden';
 
 export function useLiveMatchState(
   cachedData: CachedMatchPayload | null,
@@ -14,122 +14,106 @@ export function useLiveMatchState(
   { enabled = true }: { enabled?: boolean } = {},
 ) {
   const [liveMatchState, setLiveMatchState] = useState<LiveMatchState>(
-    enabled ? (shouldCheckLiveImmediately(cachedData?.nextMatch) ? 'checking' : 'countdown') : 'idle'
+    enabled ? (hasStarted(currentMatch ?? cachedData?.nextMatch) ? 'checking' : 'countdown') : 'idle'
   );
   const [liveMatchData, setLiveMatchData] = useState<LiveMatchData | null>(null);
-  const livePollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const currentMatchRef = useRef<MatchData | null>(currentMatch);
+  const [liveMatchError, setLiveMatchError] = useState<string | null>(null);
+  const [countdownEndedFor, setCountdownEndedFor] = useState<string | null>(null);
+  // A refreshed object for the same fixture must not restart a finished match.
+  const matchKey = currentMatch ? JSON.stringify([
+    currentMatch.id, currentMatch.startTimestamp,
+    currentMatch.homeTeam.id, currentMatch.awayTeam.id,
+    currentMatch.homeTeam.name, currentMatch.awayTeam.name,
+  ]) : '';
+  const currentMatchRef = useRef(currentMatch);
+  useEffect(() => { currentMatchRef.current = currentMatch; }, [currentMatch]);
 
   useEffect(() => {
-    currentMatchRef.current = currentMatch;
-  }, [currentMatch]);
-
-  const fetchLiveMatch = useCallback(async (): Promise<string | null> => {
-    if (!enabled) return null;
-    try {
-      const response = await fetch(`${BACKEND_URL}/live-match`);
-      if (!response.ok) {
-        setLiveMatchData(null);
-        return null;
-      }
-      const data: LiveMatchData = await response.json();
-      if (data.matchState === 'no-match') {
-        setLiveMatchData(null);
-        return 'no-match';
-      }
-      if (data.matchState === 'unsupported') {
-        setLiveMatchData(null);
-        return 'unsupported';
-      }
-      if (!isLiveMatchForScheduledMatch(data, currentMatchRef.current)) {
-        console.warn('Ignoring live cache from a different fixture');
-        setLiveMatchData(null);
-        return 'no-match';
-      }
-      setLiveMatchData(data);
-      return data.matchState;
-    } catch (err) {
-      console.error('Live match fetch error:', err);
-      return null;
+    const match = currentMatchRef.current;
+    setLiveMatchData(null);
+    setLiveMatchError(null);
+    if (!enabled || !match) {
+      setLiveMatchState('idle');
+      return;
     }
-  }, [enabled]);
-
-  const stopLivePolling = useCallback(() => {
-    if (livePollingRef.current) {
-      clearInterval(livePollingRef.current);
-      livePollingRef.current = null;
-    }
-  }, []);
-
-  const resolveNoMatchState = useCallback((): LiveMatchState => {
-    if (!currentMatch?.startTimestamp) return 'checking';
-    return (currentMatch.startTimestamp * 1000) > Date.now() ? 'countdown' : 'checking';
-  }, [currentMatch]);
-
-  const startLivePolling = useCallback(() => {
-    if (!enabled || livePollingRef.current) return;
-
-    const poll = async () => {
-      const state = await fetchLiveMatch();
-      if (state) {
-        setLiveMatchState(state === 'no-match' ? resolveNoMatchState() : state as LiveMatchState);
-      }
-    };
-
-    poll();
-    livePollingRef.current = setInterval(poll, 30000);
-  }, [enabled, fetchLiveMatch, resolveNoMatchState]);
-
-  const onCountdownEnd = useCallback(() => {
-    if (!enabled) return;
-    setLiveMatchState('checking');
-    startLivePolling();
-  }, [enabled, startLivePolling]);
-
-  // If cached/current match is already started, avoid rendering stale countdown/pre flashes.
-  useEffect(() => {
-    if (!enabled) return;
-    if (!currentMatch?.startTimestamp) return;
-
-    const started = shouldCheckLiveImmediately(currentMatch);
-
-    if (started && liveMatchState === 'countdown') {
-      setLiveMatchState('checking');
+    if (!hasStarted(match) && countdownEndedFor !== matchKey) {
+      setLiveMatchState('countdown');
       return;
     }
 
-    if (!started && (liveMatchState === 'pre' || liveMatchState === 'checking' || liveMatchState === 'unsupported') && !liveMatchData) {
-      stopLivePolling();
-      setLiveMatchState('countdown');
-    }
-  }, [currentMatch, enabled, liveMatchState, liveMatchData, stopLivePolling]);
+    setLiveMatchState('checking');
+    let cancelled = false;
+    let stopped = false;
+    let hasLiveData = false;
+    let nextPoll: ReturnType<typeof setTimeout> | undefined;
+    let request: AbortController | null = null;
 
-  // Checking state reuses existing live polling flow without adding extra calls.
-  useEffect(() => {
-    if (!enabled) return;
-    if (liveMatchState === 'checking') {
-      startLivePolling();
-    }
-  }, [enabled, liveMatchState, startLivePolling]);
+    const poll = async () => {
+      if (cancelled || stopped || request || isPageHidden()) return;
+      const controller = new AbortController();
+      request = controller;
+      // Covers both response headers and JSON decoding, not just fetch resolution.
+      const timeout = setTimeout(() => controller.abort(), 15_000);
+      try {
+        const response = await fetch(`${BACKEND_URL}/live-match`, { signal: controller.signal });
+        if (!response.ok) throw new Error(`Live match request failed: ${response.status}`);
+        const data: LiveMatchData = await response.json();
+        if (cancelled || controller.signal.aborted) return;
 
-  // Post state is stable (no auto-transition). Stop polling to avoid unnecessary requests.
-  useEffect(() => {
-    if (!enabled) return;
-    if (liveMatchState === 'post' || liveMatchState === 'unsupported') {
-      stopLivePolling();
-    }
-  }, [enabled, liveMatchState, stopLivePolling]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      stopLivePolling();
+        if (data.matchState === 'unsupported') {
+          setLiveMatchData(null);
+          setLiveMatchState('unsupported');
+          setLiveMatchError(null);
+          stopped = true;
+        } else if (data.matchState === 'no-match' || !isLiveMatchForScheduledMatch(data, match)) {
+          hasLiveData = false;
+          setLiveMatchData(null);
+          setLiveMatchError(null);
+          setLiveMatchState(hasStarted(match) ? 'checking' : 'countdown');
+          stopped = !hasStarted(match);
+        } else {
+          hasLiveData = true;
+          setLiveMatchData(data);
+          setLiveMatchState(data.matchState);
+          setLiveMatchError(null);
+          stopped = data.matchState === 'post';
+        }
+      } catch {
+        if (!cancelled) {
+          setLiveMatchError(hasLiveData
+            ? 'Canlı maç verisi yenilenemedi. Son alınan bilgiler gösteriliyor.'
+            : 'Canlı maç verisi alınamadı. Yeniden deneniyor.');
+        }
+      } finally {
+        clearTimeout(timeout);
+        request = null;
+        if (!cancelled && !stopped && !isPageHidden()) {
+          nextPoll = setTimeout(() => { void poll(); }, 30_000);
+        }
+      }
     };
-  }, [stopLivePolling]);
 
-  return {
-    liveMatchState,
-    liveMatchData,
-    onCountdownEnd,
-  };
+    const handleResume = () => {
+      clearTimeout(nextPoll);
+      if (!isPageHidden()) void poll();
+    };
+    void poll();
+    document.addEventListener('visibilitychange', handleResume);
+    window.addEventListener('online', handleResume);
+    window.addEventListener('pageshow', handleResume);
+    return () => {
+      cancelled = true;
+      clearTimeout(nextPoll);
+      request?.abort();
+      document.removeEventListener('visibilitychange', handleResume);
+      window.removeEventListener('online', handleResume);
+      window.removeEventListener('pageshow', handleResume);
+    };
+  }, [enabled, matchKey, countdownEndedFor]);
+
+  const onCountdownEnd = useCallback(() => {
+    if (enabled && matchKey) setCountdownEndedFor(matchKey);
+  }, [enabled, matchKey]);
+
+  return { liveMatchState, liveMatchData, liveMatchError, onCountdownEnd };
 }

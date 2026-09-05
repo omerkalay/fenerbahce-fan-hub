@@ -22,6 +22,7 @@ interface DashboardProps {
     loading: boolean;
     onRetry: (() => void) | undefined;
     errorMessage: string | null;
+    liveMatchError?: string | null;
     seasonState: SeasonState;
     season: SeasonMeta | null;
     liveMatchState: LiveMatchState;
@@ -37,6 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     loading,
     onRetry,
     errorMessage,
+    liveMatchError = null,
     seasonState,
     season,
     liveMatchState = 'countdown',
@@ -167,6 +169,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                 onOpenDetails={() => setShowLiveMatchModal(true)}
             />
 
+            {(liveMatchError || errorMessage) && (
+                <p role="status" className="mb-4 rounded-xl border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                    {liveMatchError || errorMessage}
+                </p>
+            )}
+
             {resolvedStartingXI && (
                 <button
                     type="button"
@@ -222,6 +230,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             <LiveMatchModal
                 visible={showLiveMatchModal}
+                errorMessage={liveMatchError}
                 onClose={() => setShowLiveMatchModal(false)}
                 liveMatchData={liveMatchData}
                 useSquadPhotos={!safeMode}

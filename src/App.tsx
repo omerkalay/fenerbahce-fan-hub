@@ -57,7 +57,7 @@ function AppContent({ runtimeOverrides }: AppProps) {
     loadMatchData,
   } = useMatchBootstrap({ enabled: !runtimeOverrides?.safeMode });
 
-  const { liveMatchState, liveMatchData, onCountdownEnd } = useLiveMatchState(
+  const { liveMatchState, liveMatchData, liveMatchError, onCountdownEnd } = useLiveMatchState(
     cachedData,
     matchData,
     { enabled: !runtimeOverrides?.safeMode },
@@ -176,6 +176,7 @@ function AppContent({ runtimeOverrides }: AppProps) {
                   loading={safeMode ? false : loading && !displayMatchData}
                   onRetry={safeMode ? undefined : loadMatchData}
                   errorMessage={safeMode ? null : errorMessage}
+                  liveMatchError={safeMode ? null : liveMatchError}
                   seasonState={safeMode ? 'active' : seasonState}
                   season={season}
                   liveMatchState={displayLiveMatchState}

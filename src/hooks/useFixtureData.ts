@@ -27,6 +27,9 @@ export function useFixtureData() {
     const [activeSummaryData, setActiveSummaryData] = useState<MatchSummaryData | null>(null);
     const [summaryLoading, setSummaryLoading] = useState<boolean>(false);
     const [summaryError, setSummaryError] = useState<string | null>(null);
+    const summaryRequestRef = useRef(0);
+
+    useEffect(() => () => { summaryRequestRef.current += 1; }, []);
 
     const [statusFilter, setStatusFilter] = useState<string>('upcoming');
     const [showFilters, setShowFilters] = useState<boolean>(false);
@@ -186,6 +189,7 @@ export function useFixtureData() {
     // ─── Summary modal ──────────────────────────────────
 
     const closeSummaryModal = () => {
+        summaryRequestRef.current += 1;
         setActiveSummaryMatch(null);
         setActiveSummaryData(null);
         setSummaryLoading(false);
@@ -194,12 +198,14 @@ export function useFixtureData() {
 
     const openSummaryModal = async (match: FixtureMatch) => {
         if (!match.summaryAvailable) return;
+        const requestId = ++summaryRequestRef.current;
         setActiveSummaryMatch(match);
         setActiveSummaryData(null);
         setSummaryError(null);
         setSummaryLoading(true);
 
-        const summary = await fetchMatchSummary(match.id);
+        const summary = await fetchMatchSummary(match.id).catch(() => null);
+        if (requestId !== summaryRequestRef.current) return;
         if (summary) {
             setActiveSummaryData(summary);
         } else {
