@@ -23,12 +23,23 @@ interface LiveMatchStatsProps {
 }
 
 export default function LiveMatchStats({ stats = [] }: LiveMatchStatsProps) {
-    const orderedStats = STAT_DEFINITIONS
+    const availableStats = STAT_DEFINITIONS
         .map((definition) => {
             const stat = stats.find((item) => definition.keys.includes(item.name));
             return stat ? { ...stat, displayLabel: definition.label, kind: definition.kind } : null;
         })
         .filter((stat): stat is MatchStat & { displayLabel: string; kind: StatDefinition['kind'] } => stat !== null);
+
+    const isCardStat = (stat: MatchStat) => ['yellowCards', 'yellowCard', 'redCards', 'redCard'].includes(stat.name);
+    const isZeroPair = (stat: MatchStat) => toNumber(stat.homeValue) === 0 && toNumber(stat.awayValue) === 0;
+    const possession = availableStats.find((stat) => stat.kind === 'possession');
+    // ESPN can return a populated array of zero placeholders when coverage is missing.
+    // Require the impossible 0–0 possession pair; legitimate zero counts stay visible.
+    const missingPossession = Boolean(possession && isZeroPair(possession));
+    const missingCoreStats = missingPossession && availableStats.filter((stat) => !isCardStat(stat)).every(isZeroPair);
+    const orderedStats = availableStats.filter((stat) => (
+        !(missingPossession && stat.kind === 'possession') && !(missingCoreStats && !isCardStat(stat))
+    ));
 
     if (orderedStats.length === 0) {
         return (
@@ -43,9 +54,11 @@ export default function LiveMatchStats({ stats = [] }: LiveMatchStatsProps) {
 
     return (
         <div className="space-y-4">
-            {orderedStats.length < 3 && (
+            {(missingPossession || orderedStats.length < 3) && (
                 <p className="live-data-notice rounded-lg bg-sky-400/10 px-3 py-2 text-[10px] leading-relaxed text-sky-200">
-                    Bazı istatistikler henüz eksik. Gelen veriler aşağıda gösteriliyor.
+                    {missingCoreStats
+                        ? 'Sağlayıcı bu maçın şut, korner, faul ve topa sahip olma verilerini paylaşmıyor. Mevcut kart bilgileri aşağıda gösteriliyor.'
+                        : 'Bazı istatistikler henüz eksik. Gelen veriler aşağıda gösteriliyor.'}
                 </p>
             )}
 

@@ -6,13 +6,18 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.18.2-blue)
+![Version](https://img.shields.io/badge/version-2.18.3-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.18.2
+## What's New in v2.18.3
+
+- **Missing Match Statistics** - ESPN's all-zero coverage placeholders now show an explicit unavailable-data notice in live and completed match centers, while supplied card totals and legitimate zero counts remain visible
+
+<details>
+<summary>Previous: v2.18.2</summary>
 
 - **Persistent Formation Drafts** - Public lineups retain their formation and player selections across tab changes and restarts, with squad reconciliation and separate administrator drafts
 - **Consistent Match Data** - Obsolete summary responses are ignored, live requests are bounded and serialized, and transient failures preserve the last score with an explicit warning
@@ -20,6 +25,8 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 - **Stable Match Center** - Events, Statistics, and Lineups keep the same viewport-relative dialog height while long content scrolls inside the existing design
 
 This patch does not change the Europe migration topology, scheduler configuration, authentication flow, or notification delivery. US rollback resources remain subject to the existing first-match acceptance window.
+
+</details>
 
 <details>
 <summary>Previous: v2.18.1</summary>
@@ -690,4 +697,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.18.2** | September 2026
+**v2.18.3** | September 2026
