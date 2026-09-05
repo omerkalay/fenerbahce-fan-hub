@@ -15,6 +15,7 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 ## What's New in v2.18.3
 
 - **Missing Match Statistics** - ESPN's all-zero coverage placeholders now show an explicit unavailable-data notice in live and completed match centers, while supplied card totals and legitimate zero counts remain visible
+- **Europe Migration Verification** - First-match processing and final-result persistence were verified; paused US schedulers await the post-match acceptance window, and the US API remains available for legacy PWA clients ([migration status](docs/europe-west1-migration-runbook.md#first-match-audit--2026-09-05))
 
 <details>
 <summary>Previous: v2.18.2</summary>

@@ -114,14 +114,30 @@ Order:
 
 Only after the first-match acceptance window:
 
-1. Change the `api` declaration to `europe-west1` only and remove the US scheduler exports from source.
+1. Recheck regional logs, queue health, and API traffic. Remove the four US scheduler exports from source after scheduler acceptance. Keep the HTTP API declared in both regions while legacy clients still use the US endpoint; scheduler retirement does not require retiring this compatibility endpoint.
 2. Run the complete local quality gate again.
-3. Deploy the final Europe functions and verify them.
-4. Delete only the explicitly inventoried US functions with `--region us-central1`.
+3. Deploy the selected Europe scheduler functions and verify them.
+4. Delete only the explicitly inventoried US scheduler functions with `--region us-central1`: `dailyDataRefresh`, `updateLiveMatch`, `checkMatchNotifications`, and `reconcileTopicSync`.
 5. Delete the paused orphan V2 Scheduler job from the Cloud Console.
-6. Review and remove only unreferenced US build images; never delete an Artifact Registry repository in bulk.
-7. Confirm `firebase functions:list` and Cloud Scheduler show only intended Europe production resources.
-8. Remove the temporary RTDB export after the rollback window closes.
+6. Retire the US HTTP API separately after legacy-client compatibility acceptance: change the `api` declaration to `europe-west1` only, rerun the quality gate, deploy and verify Europe `api`, then explicitly delete `api` in `us-central1`. A successful Europe health check alone does not establish that legacy clients can tolerate deletion.
+7. Review and remove only unreferenced US build images; never delete an Artifact Registry repository in bulk or images needed by a retained API.
+8. Confirm `firebase functions:list` and Cloud Scheduler show the intended resources. Record a retained US compatibility API as pending migration work, not a completed migration.
+9. Remove the temporary RTDB export after the rollback window closes.
+
+## First-match audit — 2026-09-05
+
+Read-only inspection at approximately **22:21 Europe/Istanbul** used Firebase CLI and its authenticated Google Cloud API client against `fb-hub-ed9de`.
+
+- The first persisted final result for ESPN event `401888301` was **21:58:05 Istanbul**, Fenerbahce 1–2 Besiktas. The three-hour observation window ends no earlier than **2026-09-06 00:58:05 Istanbul**.
+- All **8,990** available Cloud Run / Cloud Scheduler log entries from 00:00 UTC through approximately 19:20 UTC were paginated. Europe live and notification functions each had 1,160 successful HTTP 200 invocations, topic reconciliation had 232, and daily refresh had one. No HTTP 5xx or ERROR-level entries appeared. Four API HTTP 429 responses occurred before the match and require no scheduler rollback on this evidence.
+- Daily refresh completed successfully at 06:00 Istanbul. Lineup health reported 11 starters for each team. The final archive remained available after transient live data was removed at 22:04 Istanbul.
+- Notification completion logs reported five batches, 31 sends accepted and zero failures. No US scheduler executions appeared in the inspected interval; this supports no regional overlap, but is not proof of device delivery.
+- Topic synchronization had zero pending records, zero actual old tokens awaiting cleanup, and zero nonempty last-error fields in the inspected records.
+- All four Europe Scheduler jobs were enabled with Europe targets. All four legacy US jobs and the orphan V2 job were paused. Both regional API health endpoints returned HTTP 200.
+- **US HTTP retirement is not accepted:** 32 application requests reached the US API that day, including iPhone requests from the production site at **20:47 Istanbul** for live match, match status, reminders, images, and UEFA data. These were distinct from the audit's later Python health request. Preserve the US API for these legacy clients until a separate compatibility review supports removal.
+- Missing match statistics were also present in ESPN scoreboard and summary responses. The v2.18.3 frontend handles these placeholders explicitly; this provider limitation is separate from regional execution health.
+
+No production functions, jobs, database records, or authentication settings were changed by this audit. Scheduler deletion remains pending the observation window and a fresh acceptance check. The existing September 6, 10:00 Istanbul follow-up is authorized to perform the conditional scheduler cleanup; the US API remains a separate compatibility hold.
 
 ## Final success criteria
 
