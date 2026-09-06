@@ -2,6 +2,10 @@
 
 Migration window opened on **2026-08-31 Europe/Istanbul**. The next verified match is **Fenerbahçe–Beşiktaş on 2026-09-05 at 20:00 Europe/Istanbul**. US rollback resources must remain available until the match has finished and an additional three-hour observation window has passed.
 
+The dated audit sections below record execution status. Earlier phase checklists describe the original cutover procedure; they are not a live resource inventory.
+
+**Current status, 2026-09-06:** Scheduler migration and US job cleanup are complete. Four Europe schedulers are active; the only retained US Cloud Function is the compatibility HTTP `api`. Full regional retirement remains pending legacy-client compatibility acceptance.
+
 This runbook moves the stateless Firebase Cloud Functions and their second-generation scheduled functions from `us-central1` to `europe-west1`. The existing Realtime Database already runs in `europe-west1` and must not be recreated, imported, cleared, or otherwise moved.
 
 ## Safety rules
@@ -20,7 +24,7 @@ This runbook moves the stateless Firebase Cloud Functions and their second-gener
 - RTDB: `europe-west1`, unchanged
 - HTTP API during observation: `api` in both `us-central1` and `europe-west1`
 - Primary frontend origin after cutover: `https://europe-west1-fb-hub-ed9de.cloudfunctions.net`
-- US scheduler exports retained for rollback:
+- Historical US scheduler export names (retired on 2026-09-06):
   - `dailyDataRefresh`
   - `reconcileTopicSync`
   - `updateLiveMatch`
@@ -30,7 +34,7 @@ This runbook moves the stateless Firebase Cloud Functions and their second-gener
   - `reconcileTopicSyncEurope`
   - `updateLiveMatchEurope`
   - `checkMatchNotificationsEurope`
-- Orphan job to pause: `firebase-schedule-checkMatchNotificationsV2-us-central1`
+- Historical orphan job (deleted on 2026-09-06): `firebase-schedule-checkMatchNotificationsV2-us-central1`
 
 ## Phase 1 — Preflight
 
@@ -118,7 +122,7 @@ Only after the first-match acceptance window:
 2. Run the complete local quality gate again.
 3. Deploy the selected Europe scheduler functions and verify them.
 4. Delete only the explicitly inventoried US scheduler functions with `--region us-central1`: `dailyDataRefresh`, `updateLiveMatch`, `checkMatchNotifications`, and `reconcileTopicSync`.
-5. Delete the paused orphan V2 Scheduler job from the Cloud Console.
+5. Delete only the paused orphan `firebase-schedule-checkMatchNotificationsV2-us-central1` from the Cloud Console. If the Console session is unavailable, the authenticated Cloud Scheduler API is an equivalent cleanup path: verify the exact project, region, job name, paused state, and missing target function before deletion; retain a private copy of its configuration and verify the job is absent afterward. Never retarget or resume it.
 6. Retire the US HTTP API separately after legacy-client compatibility acceptance: change the `api` declaration to `europe-west1` only, rerun the quality gate, deploy and verify Europe `api`, then explicitly delete `api` in `us-central1`. A successful Europe health check alone does not establish that legacy clients can tolerate deletion.
 7. Review and remove only unreferenced US build images; never delete an Artifact Registry repository in bulk or images needed by a retained API.
 8. Confirm `firebase functions:list` and Cloud Scheduler show the intended resources. Record a retained US compatibility API as pending migration work, not a completed migration.
@@ -138,6 +142,22 @@ Read-only inspection at approximately **22:21 Europe/Istanbul** used Firebase CL
 - Missing match statistics were also present in ESPN scoreboard and summary responses. The v2.18.3 frontend handles these placeholders explicitly; this provider limitation is separate from regional execution health.
 
 No production functions, jobs, database records, or authentication settings were changed by this audit. Scheduler deletion remains pending the observation window and a fresh acceptance check. The existing September 6, 10:00 Istanbul follow-up is authorized to perform the conditional scheduler cleanup; the US API remains a separate compatibility hold.
+
+## Post-match scheduler acceptance — 2026-09-06
+
+The observation window passed at 00:58:05 Istanbul. A fresh audit at approximately 10:41 Istanbul covered all **5,247** available log entries since the previous inspection, with no warning/error entries or unsuccessful HTTP responses. Europe live and notification handlers each had 739 HTTP 200 invocations, topic reconciliation had 148, and the 06:00 daily refresh completed successfully. The archived final result and both starting lineups remained intact; transient live data, pending topic-sync work, cleanup tokens, and recorded sync errors were empty.
+
+An initial broad logging query hit a client read-quota HTTP 429. Retrying only the unaudited interval with paced pagination completed successfully; the incomplete query was not used as acceptance evidence.
+
+The source now exports only the four Europe schedulers and the dual-region HTTP API. Deployment-contract tests protect the existing schedules, instance limits, and API compatibility, and prevent retired US scheduler exports from returning. Validation passed: lint, typecheck, **519 tests**, **6 RTDB emulator rule tests**, production build, and whitespace checks, using Node 22, Firebase CLI 15.28.1, and JDK 23 for the emulator.
+
+All four selected Europe scheduler functions deployed successfully at approximately 10:43 Istanbul and reported `ACTIVE`. Firebase CLI generated the matching Europe Cloud Run Scheduler targets automatically. Neither API region was redeployed, and no database, Auth, notification preference, secret, or Artifact Registry configuration was changed. The daily refresh was not invoked manually; its next scheduled run remains the normal 06:00 Istanbul execution.
+
+New live-match and notification revisions returned HTTP 200 from their scheduled calls starting at 10:44; the new topic-sync revision returned HTTP 200 at 10:48. No errors appeared in the inspected new-revision logs.
+
+The four inventoried US functions (`dailyDataRefresh`, `updateLiveMatch`, `checkMatchNotifications`, `reconcileTopicSync`) were then deleted with Firebase CLI 15.28.1 and an explicit `--region us-central1`. Their associated jobs were removed. The orphan V2 job was deleted through the authenticated Cloud Scheduler API because the Console required a new sign-in. Its exact identity, paused state, unchanged target, and missing target function were verified before deletion; its configuration was retained privately outside the repository, and the subsequent read returned HTTP 404.
+
+Final inventory at approximately **10:50 Istanbul**: five active Europe functions (API plus four schedulers), four enabled Europe jobs, one active US function (`api`), and **zero US Scheduler jobs**. Both API health endpoints returned HTTP 200. Version remains **2.18.3**. The one-time scheduler-cleanup follow-up is complete; US HTTP retirement is still on compatibility hold. No Artifact Registry images or repositories were deleted, including assets potentially needed by the retained US API.
 
 ## Final success criteria
 

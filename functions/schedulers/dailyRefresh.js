@@ -13,7 +13,7 @@ const {
 } = require('../utils/cupFixtures');
 const { refreshUefaJourneyCache } = require('../services/uefaJourney');
 const { refreshDataSnapshots } = require('../services/dataSnapshots');
-const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
+const { PRIMARY_REGION } = require('../regions');
 
 /**
  * Runs once per day, fetching SofaScore and ESPN data into the Firebase cache.
@@ -181,18 +181,12 @@ const dailyDataRefreshOptions = {
     secrets: [rapidApiKey, rapidApiHost]
 };
 
-const dailyDataRefresh = onSchedule({
-    ...dailyDataRefreshOptions,
-    region: US_ROLLBACK_REGION
-}, runDailyDataRefresh);
-
 const dailyDataRefreshEurope = onSchedule({
     ...dailyDataRefreshOptions,
     region: PRIMARY_REGION
 }, runDailyDataRefresh);
 
 module.exports = {
-    dailyDataRefresh,
     dailyDataRefreshEurope,
     runDailyDataRefresh
 };

@@ -10,22 +10,18 @@ process.env.GCLOUD_PROJECT = 'test-dummy';
 const require = createRequire(import.meta.url);
 const { api } = require('./handlers/api');
 const {
-    dailyDataRefresh,
     dailyDataRefreshEurope,
     runDailyDataRefresh
 } = require('./schedulers/dailyRefresh');
 const {
-    updateLiveMatch,
     updateLiveMatchEurope,
     runUpdateLiveMatch
 } = require('./schedulers/liveMatch');
 const {
-    checkMatchNotifications,
     checkMatchNotificationsEurope,
     runCheckMatchNotifications
 } = require('./schedulers/notifications');
 const {
-    reconcileTopicSync,
     reconcileTopicSyncEurope
 } = require('./schedulers/topicSync');
 
@@ -33,23 +29,34 @@ const region = (fn) => fn.__endpoint.region;
 const schedule = (fn) => fn.__endpoint.scheduleTrigger.schedule;
 
 describe('regional function deployment', () => {
-    it('keeps the HTTP API available in both regions during cutover', () => {
+    it('keeps the legacy HTTP API available while old PWA clients still use it', () => {
         expect(region(api)).toEqual(['us-central1', 'europe-west1']);
     });
 
-    it('keeps rollback schedulers in the US and creates equivalent Europe schedulers', () => {
-        const pairs = [
-            [dailyDataRefresh, dailyDataRefreshEurope],
-            [updateLiveMatch, updateLiveMatchEurope],
-            [checkMatchNotifications, checkMatchNotificationsEurope],
-            [reconcileTopicSync, reconcileTopicSyncEurope]
+    it('deploys only Europe schedulers with their established schedules', () => {
+        const scheduledFunctions = [
+            [dailyDataRefreshEurope, '0 3 * * *'],
+            [updateLiveMatchEurope, 'every 1 minutes'],
+            [checkMatchNotificationsEurope, 'every 1 minutes'],
+            [reconcileTopicSyncEurope, 'every 5 minutes']
         ];
 
-        for (const [usFunction, europeFunction] of pairs) {
-            expect(region(usFunction)).toEqual(['us-central1']);
-            expect(region(europeFunction)).toEqual(['europe-west1']);
-            expect(schedule(europeFunction)).toBe(schedule(usFunction));
+        for (const [fn, expectedSchedule] of scheduledFunctions) {
+            expect(region(fn)).toEqual(['europe-west1']);
+            expect(schedule(fn)).toBe(expectedSchedule);
         }
+        expect(checkMatchNotificationsEurope.__endpoint.maxInstances).toBe(1);
+        expect(reconcileTopicSyncEurope.__endpoint.maxInstances).toBe(1);
+    });
+
+    it('does not reintroduce retired US schedulers through the deployment entry point', () => {
+        expect(Object.keys(require('./index')).sort()).toEqual([
+            'api',
+            'checkMatchNotificationsEurope',
+            'dailyDataRefreshEurope',
+            'reconcileTopicSyncEurope',
+            'updateLiveMatchEurope'
+        ]);
     });
 
     it('exposes shared handlers instead of duplicating scheduler behavior', () => {

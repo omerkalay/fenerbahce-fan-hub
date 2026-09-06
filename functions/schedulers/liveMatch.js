@@ -15,7 +15,7 @@ const { isSameMatch } = require('../utils/matchIdentity');
 const { buildFinalMatchCachePlan, shouldStopFinalPolling } = require('../utils/finalMatchCache');
 const { shouldPollLineups } = require('../utils/lineupAutomation');
 const { observeEspnLineups, mergePublishedWithLiveLineups } = require('../services/lineupPublishing');
-const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
+const { PRIMARY_REGION } = require('../regions');
 
 /**
  * Runs every minute. Lineup discovery starts 90 minutes before kickoff,
@@ -446,18 +446,12 @@ const runUpdateLiveMatch = async (_event) => {
     }
 };
 
-const updateLiveMatch = onSchedule({
-    schedule: "every 1 minutes",
-    region: US_ROLLBACK_REGION
-}, runUpdateLiveMatch);
-
 const updateLiveMatchEurope = onSchedule({
     schedule: "every 1 minutes",
     region: PRIMARY_REGION
 }, runUpdateLiveMatch);
 
 module.exports = {
-    updateLiveMatch,
     updateLiveMatchEurope,
     runUpdateLiveMatch
 };

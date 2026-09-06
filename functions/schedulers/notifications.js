@@ -1,7 +1,7 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { admin, db, ISTANBUL_TIMEZONE } = require('../config');
 const { buildNotificationSchedule } = require('../utils/notificationSchedule');
-const { PRIMARY_REGION, US_ROLLBACK_REGION } = require('../regions');
+const { PRIMARY_REGION } = require('../regions');
 
 /**
  * Checks cached match notification windows every minute without calling a sports API.
@@ -239,18 +239,12 @@ const checkMatchNotificationsOptions = {
     maxInstances: 1
 };
 
-const checkMatchNotifications = onSchedule({
-    ...checkMatchNotificationsOptions,
-    region: US_ROLLBACK_REGION
-}, runCheckMatchNotifications);
-
 const checkMatchNotificationsEurope = onSchedule({
     ...checkMatchNotificationsOptions,
     region: PRIMARY_REGION
 }, runCheckMatchNotifications);
 
 module.exports = {
-    checkMatchNotifications,
     checkMatchNotificationsEurope,
     runCheckMatchNotifications
 };
