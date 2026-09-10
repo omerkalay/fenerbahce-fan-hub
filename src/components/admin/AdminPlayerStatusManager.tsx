@@ -1,3 +1,4 @@
+import ModalViewport from '../ModalViewport';
 import { useEffect, useMemo, useState } from 'react';
 import type { Player } from '../../types';
 import type {
@@ -244,7 +245,7 @@ const AdminPlayerStatusManager = ({
             </div>
 
             {pickerOpen && (
-                <div className="fixed inset-0 z-[150] flex items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Oyuncu seç">
+                <ModalViewport className="fixed inset-0 z-[150] flex items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Oyuncu seç">
                     <div className="max-h-[82vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl">
                         <div className="mb-3 flex items-center justify-between">
                             <p className="text-base font-black text-white">Oyuncu seç</p>
@@ -268,11 +269,11 @@ const AdminPlayerStatusManager = ({
                             ))}
                         </div>
                     </div>
-                </div>
+                </ModalViewport>
             )}
 
             {editor && (
-                <div className="fixed inset-0 z-[160] flex items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Oyuncu durumunu düzenle">
+                <ModalViewport className="fixed inset-0 z-[160] flex items-end bg-slate-950/80 p-3 backdrop-blur-sm sm:items-center sm:justify-center" role="dialog" aria-modal="true" aria-label="Oyuncu durumunu düzenle">
                     <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-slate-950 p-4 shadow-2xl">
                         <div className="mb-4 flex items-center justify-between">
                             <p className="text-base font-black text-white">{editingIndex === null ? 'Durum ekle' : 'Durumu düzenle'}</p>
@@ -352,7 +353,7 @@ const AdminPlayerStatusManager = ({
                             className="mt-4 w-full rounded-xl bg-yellow-400 px-3 py-3 text-sm font-black text-slate-950 disabled:opacity-40"
                         >Taslağa ekle</button>
                     </div>
-                </div>
+                </ModalViewport>
             )}
         </div>
     );

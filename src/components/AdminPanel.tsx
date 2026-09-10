@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import FormationBuilder from './FormationBuilder';
 import MatchLineups from './MatchLineups';
@@ -444,7 +445,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[120] bg-slate-950/95 backdrop-blur-md p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Yönetim paneli">
+        <ModalViewport className="fixed inset-0 z-[120] bg-slate-950/95 backdrop-blur-md p-3 sm:p-6" role="dialog" aria-modal="true" aria-label="Yönetim paneli">
             <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-slate-950 shadow-2xl">
                 <header className="flex items-center justify-between border-b border-white/10 p-4">
                     <div>
@@ -726,7 +727,7 @@ const AdminPanel = ({ visible, matches, onClose }: AdminPanelProps) => {
                     )}
                 </div>
             </div>
-        </div>
+        </ModalViewport>
     );
 };
 

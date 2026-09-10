@@ -621,6 +621,48 @@ html[data-theme='white-kit'] .text-orange-400 {
     backdrop-filter: blur(10px);
 }
 
+.modal-viewport {
+    --modal-gap: 12px;
+    position: fixed;
+    top: var(--modal-top, 0px);
+    bottom: auto;
+    height: var(--modal-height, 100dvh);
+    box-sizing: border-box;
+    padding-top: calc(var(--modal-safe-top, env(safe-area-inset-top, 0px)) + var(--modal-gap));
+    padding-bottom: calc(var(--modal-safe-bottom, env(safe-area-inset-bottom, 0px)) + var(--modal-gap));
+    padding-left: calc(var(--modal-safe-left, env(safe-area-inset-left, 0px)) + var(--modal-gap));
+    padding-right: calc(var(--modal-safe-right, env(safe-area-inset-right, 0px)) + var(--modal-gap));
+    overflow: hidden;
+}
+
+.modal-viewport > :first-child {
+    max-height: 100%;
+    min-height: 0;
+}
+
+.modal-viewport > :first-child > header,
+.modal-viewport > :first-child > .flex:first-child,
+.modal-viewport .settings-header {
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: inherit;
+}
+
+.modal-viewport button[aria-label*='kapat' i] {
+    min-width: 44px;
+    min-height: 44px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (min-width: 640px) {
+    .modal-viewport { --modal-gap: 20px; }
+}
+
 .settings-dialog {
     padding: 1.4rem;
     color: var(--app-text);

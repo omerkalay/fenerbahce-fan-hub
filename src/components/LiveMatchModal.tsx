@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import { useEffect, useRef } from 'react';
 import LiveMatchScore from './LiveMatchScore';
 import type { LiveMatchData } from '../types';
@@ -52,7 +53,7 @@ const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveM
     if (!visible) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/80 sm:items-center sm:p-5" onMouseDown={onClose}>
+        <ModalViewport className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/80 sm:items-center sm:p-5" onMouseDown={onClose}>
             <div
                 ref={dialogRef}
                 role="dialog"
@@ -92,7 +93,7 @@ const LiveMatchModal: React.FC<LiveMatchModalProps> = ({ visible, onClose, liveM
                     )}
                 </div>
             </div>
-        </div>
+        </ModalViewport>
     );
 };
 

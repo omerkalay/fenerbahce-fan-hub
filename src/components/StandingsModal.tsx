@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import { useEffect, useMemo, useState } from 'react';
 import CustomStandings from './CustomStandings';
 import SeasonSelector from './SeasonSelector';
@@ -77,7 +78,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
     if (!visible) return null;
 
     return (
-        <div
+        <ModalViewport
             className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fadeIn ${isUefa ? 'p-0 sm:p-4' : 'p-4'}`}
             onClick={onClose}
         >
@@ -91,7 +92,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
                 onClick={(e: React.MouseEvent) => e.stopPropagation()}
             >
                 <div className={`flex shrink-0 items-start justify-between gap-3 border-b border-white/10 ${isUefa
-                    ? 'px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:p-4'
+                    ? 'px-4 pb-3 pt-4 sm:p-4'
                     : 'p-4'
                 }`}>
                     <div className="min-w-0 flex-1">
@@ -137,7 +138,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
                     </nav>
                 )}
 
-                <div className={`min-h-0 w-full flex-1 ${isUefa && activeUefaTab === 'bracket' ? 'overflow-hidden' : 'overflow-y-auto'} ${isUefa ? 'pb-[env(safe-area-inset-bottom)]' : ''}`}>
+                <div className={`min-h-0 w-full flex-1 ${isUefa && activeUefaTab === 'bracket' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                     {!isUefa && (
                         <CustomStandings league="superlig" seasonStartYear={selectedSeasonStartYear} />
                     )}
@@ -167,7 +168,7 @@ const StandingsModal: React.FC<StandingsModalProps> = ({ visible, league, initia
                     )}
                 </div>
             </div>
-        </div>
+        </ModalViewport>
     );
 };
 

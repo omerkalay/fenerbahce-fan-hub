@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import MatchLineups from './MatchLineups';
 import type { PublishedMatchLineups } from '../types';
 
@@ -21,7 +22,7 @@ const StartingXIModal = ({
     const singleManualLineup = availableSides.length === 1 && data.sources?.[availableSides[0]] === 'manual';
 
     return (
-        <div
+        <ModalViewport
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm animate-fadeIn"
             onClick={onClose}
         >
@@ -57,7 +58,7 @@ const StartingXIModal = ({
                     />
                 </div>
             </div>
-        </div>
+        </ModalViewport>
     );
 };
 

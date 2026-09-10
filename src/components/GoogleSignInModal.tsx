@@ -1,4 +1,5 @@
-﻿import type { ReactNode } from 'react';
+import ModalViewport from './ModalViewport';
+import type { ReactNode } from 'react';
 
 interface GoogleSignInButtonProps {
   onClick: () => void | Promise<void>;
@@ -46,12 +47,12 @@ const GoogleSignInModal = ({
   if (!open) return null;
 
   return (
-    <div
+    <ModalViewport
       className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
       onClick={onClose}
     >
       <div
-        className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-sm w-full animate-slideUp shadow-2xl"
+        className="overflow-y-auto bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-sm w-full animate-slideUp shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex justify-between items-start mb-4">
@@ -82,7 +83,7 @@ const GoogleSignInModal = ({
           {footer}
         </div>
       </div>
-    </div>
+    </ModalViewport>
   );
 };
 

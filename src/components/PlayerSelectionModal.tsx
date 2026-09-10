@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import { useState } from 'react';
 import PlayerImage from './PlayerImage';
 import type { Player, PitchPlayers } from '../types';
@@ -26,7 +27,7 @@ const PlayerSelectionModal = ({ visible, squad, activePitchPlayers, onSelect, on
     };
 
     return (
-        <div
+        <ModalViewport
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
             role="dialog"
             aria-modal="true"
@@ -122,7 +123,7 @@ const PlayerSelectionModal = ({ visible, squad, activePitchPlayers, onSelect, on
                     </div>
                 </div>
             </div>
-        </div>
+        </ModalViewport>
     );
 };
 

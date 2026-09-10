@@ -6,17 +6,25 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.19.0-blue)
+![Version](https://img.shields.io/badge/version-2.19.1-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.19.0
+## What's New in v2.19.1
+
+- **Safe-Area Dialogs** - Admin, match centers, standings, lineups, settings, and player dialogs reserve space around the notch and home indicator, with at least 44px close controls
+- **Stable Overlay Layout** - Dialogs render outside clipped or transformed ancestors, keep headers accessible while scrolling, and follow the visible viewport when the keyboard changes its height
+
+<details>
+<summary>Previous: v2.19.0</summary>
 
 - **Champions League Nights** - The classic dashboard automatically adopts a royal-blue match skin for upcoming Champions League fixtures, with animated light waves and coordinated match-card artwork
 - **Original 1080p Backdrop** - The original video replaces the compressed copy; a poster keeps the background visible while loading, with a still-image fallback on video errors and for reduced-motion preferences
 - **iPhone Edge Continuity** - Page and browser colors follow the active match skin, safe-area spacing protects content around the notch and home indicator, and a soft upper fade blends the moving backdrop into a steady status-bar edge
+
+</details>
 
 <details>
 <summary>Previous: v2.18.3</summary>
@@ -707,4 +715,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.19.0** | September 2026
+**v2.19.1** | September 2026

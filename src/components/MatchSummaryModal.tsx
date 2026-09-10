@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import { useEffect, useMemo, useRef } from 'react';
 import LiveMatchScore from './LiveMatchScore';
 import { getCurrentSeasonStartYear } from '../utils/seasons';
@@ -101,7 +102,7 @@ function MatchSummaryModal({
     if (!activeSummaryMatch) return null;
 
     return (
-        <div
+        <ModalViewport
             className="fixed inset-0 z-[100] flex items-end justify-center bg-slate-950/80 sm:items-center sm:p-5"
             onMouseDown={onClose}
         >
@@ -154,7 +155,7 @@ function MatchSummaryModal({
                     )}
                 </div>
             </div>
-        </div>
+        </ModalViewport>
     );
 }
 

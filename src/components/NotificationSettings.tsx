@@ -1,3 +1,4 @@
+import ModalViewport from './ModalViewport';
 import { useEffect, useRef, useState } from 'react';
 import type { NotificationOptions } from '../types';
 import { useAuth } from '../contexts/authContextDef';
@@ -183,7 +184,7 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
       </button>
 
       {showSettings && (
-        <div
+        <ModalViewport
           className="settings-backdrop fixed inset-0 flex items-center justify-center z-[100] p-4 animate-fadeIn"
           onMouseDown={handleCloseSettings}
         >
@@ -272,7 +273,7 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
               </div>
             )}
           </div>
-        </div>
+        </ModalViewport>
       )}
 
       {!themeOnly && <GoogleSignInModal
@@ -306,7 +307,7 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
       </GoogleSignInModal>}
 
       {!themeOnly && showNotifications && user && (
-        <div
+        <ModalViewport
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
           onClick={handleCloseNotifications}
         >
@@ -435,7 +436,7 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
               </button>
             </div>
           </div>
-        </div>
+        </ModalViewport>
       )}
     </>
   );
