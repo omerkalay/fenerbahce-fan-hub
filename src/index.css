@@ -1007,3 +1007,274 @@ html[data-theme='white-kit'] .settings-notification-button {
 .animate-shimmer {
     animation: shimmer 2s ease-in-out infinite;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Champions League night — dashboard skin
+
+   Applied to the app shell only while the active tab is the dashboard and the
+   next fixture is a Champions League match (see src/theme/matchSkin.ts).
+
+   The chevrons stay in the backdrop, where they only reach the side gutters —
+   so they step back on a phone and open up on a desktop window. On the card
+   itself the competition gets a single line: the rail across the top turns from
+   club gold to the spectrum. Everything else re-grounds to navy, and the gold
+   countdown keeps the fixture as the thing you look at.
+   ────────────────────────────────────────────────────────────────────────── */
+
+html[data-theme='classic'] .app-shell[data-match-skin='ucl-night'] {
+    --app-bg: #0d2280;
+    --app-surface: #0b1e70;
+    --app-surface-raised: #12297f;
+    --app-muted: #93a4d6;
+    --app-subtle: #6f81b8;
+    --app-border: rgba(126, 162, 255, 0.18);
+    --app-border-strong: rgba(126, 162, 255, 0.4);
+    --app-wash: rgba(126, 162, 255, 0.08);
+    --app-wash-strong: rgba(126, 162, 255, 0.16);
+    --panel-bg: rgba(6, 16, 66, 0.62);
+    --card-bg: linear-gradient(140deg, rgba(60, 100, 230, 0.18), rgba(5, 14, 60, 0.66));
+    --surface-shadow: 0 18px 40px rgba(6, 14, 60, 0.3);
+    --card-shadow: 0 14px 30px rgba(6, 14, 60, 0.26);
+
+    /* A single even wash of royal blue. No vignette — a dark rim here reads
+       as a smudge behind the cards and snuffs out the light at the edges. */
+    /* The identity's ground is a live royal blue, not navy — the hairlines are
+       barely lighter than it, and on a dark ground they would be invisible. */
+    background-image:
+        radial-gradient(120% 90% at 28% 38%, rgba(38, 96, 255, 0.5), transparent 62%),
+        linear-gradient(160deg, #10309e 0%, #0c2489 48%, #081a67 100%);
+}
+
+/* ── Backdrop ───────────────────────────────────────────────────────────── */
+
+.ucl-night-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+/* One soft pool of royal blue behind everything, as in the competition's own
+   opening: the light comes from the middle, the corners carry the colour. */
+.ucl-night-bloom {
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    width: 150vmax;
+    height: 110vmax;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(
+        closest-side,
+        rgba(58, 118, 255, 0.22),
+        rgba(24, 60, 190, 0.1) 55%,
+        transparent 78%
+    );
+}
+
+/* Screen keeps the brackets reading as light on the navy instead of as paint.
+   --ax/--ay say where a bracket's vertex sits inside its own box once rotated;
+   --vx/--vy say where that vertex should land in the viewport. */
+/* A looping video frame, when one has been dropped in. */
+.ucl-night-motion {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+/* An artwork frame, when one has been dropped in. Cover, centred, and darkened
+   just enough at the middle that the cards keep their contrast. */
+.ucl-night-artwork {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+}
+
+.ucl-night-scrim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        86% 60% at 50% 42%,
+        rgba(4, 10, 40, 0.72),
+        rgba(4, 10, 40, 0.42) 58%,
+        rgba(4, 10, 40, 0.16) 100%
+    );
+}
+
+.ucl-cluster {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: block;
+    overflow: visible;
+    mix-blend-mode: screen;
+    width: var(--ucl-size);
+    height: var(--ucl-size);
+    transform: translate(calc(var(--vx) - var(--ax)), calc(var(--vy) - var(--ay)));
+}
+
+.ucl-cluster--top-right {
+    --ucl-size: min(150vw, 720px);
+    --ax: 62%;
+    --ay: 38%;
+    --vx: 62vw;
+    --vy: 20vh;
+}
+
+.ucl-cluster--left {
+    --ucl-size: min(165vw, 780px);
+    --ax: 33%;
+    --ay: 50%;
+    --vx: 22vw;
+    --vy: 64vh;
+}
+
+.ucl-cluster--bottom-right {
+    --ucl-size: min(120vw, 560px);
+    --ax: 62%;
+    --ay: 62%;
+    --vx: 74vw;
+    --vy: 96vh;
+    opacity: 0.8;
+}
+
+/* On a wide window the content is a narrow column in the middle, so the
+   brackets move out of its way and frame it instead of crossing it. */
+@media (min-width: 900px) {
+    .ucl-cluster--top-right {
+        --vx: 72vw;
+        --vy: 14vh;
+    }
+
+    .ucl-cluster--left {
+        --vx: 20vw;
+        --vy: 62vh;
+    }
+
+    .ucl-cluster--bottom-right {
+        --vx: 82vw;
+        --vy: 92vh;
+    }
+}
+
+/* ── Hero card ──────────────────────────────────────────────────────────── */
+
+[data-match-skin='ucl-night'] .live-match-hero {
+    border-color: rgba(140, 175, 255, 0.22);
+    background:
+        radial-gradient(120% 90% at 50% -22%, rgba(78, 128, 255, 0.2), transparent 62%),
+        linear-gradient(178deg, rgba(8, 22, 84, 0.72), rgba(4, 11, 52, 0.78));
+    box-shadow:
+        0 18px 40px rgba(6, 14, 60, 0.3),
+        inset 0 1px 0 rgba(170, 200, 255, 0.16);
+}
+
+/* Nothing across the top of the card at all. The spectrum bar was too loud and
+   the plain highlight that replaced it read as a white scratch on the edge —
+   the card's own border is enough. The competition's mark is the corner below. */
+[data-match-skin='ucl-night'] .live-match-hero > [aria-hidden='true']:first-child {
+    display: none;
+}
+
+/* The corner mark: the bundle from the backdrop artwork, turned so its vertex
+   points out through the card's top-right. The mask is anchored at that corner
+   so the shape is at full strength where it meets it and gone before it reaches
+   the crests or the countdown. */
+[data-match-skin='ucl-night'] .live-match-hero::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 56%;
+    aspect-ratio: 820 / 470;
+    pointer-events: none;
+    background-image: url('./assets/ucl-corner.webp');
+    background-size: cover;
+    background-position: top right;
+    background-repeat: no-repeat;
+    opacity: 0.55;
+    mix-blend-mode: screen;
+    /* Anchored at the corner and falling away in every direction, so none of the
+       image's own edges ever land on the card as a seam. */
+    -webkit-mask-image: radial-gradient(115% 125% at 100% 0%, #000 0%, rgba(0, 0, 0, 0.5) 40%, transparent 70%);
+    mask-image: radial-gradient(115% 125% at 100% 0%, #000 0%, rgba(0, 0, 0, 0.5) 40%, transparent 70%);
+}
+
+/* The kickoff date and the stage sit in the top corners, which is where the
+   artwork is brightest — at the default muted grey they disappear into it. */
+[data-match-skin='ucl-night'] .live-match-hero .text-slate-500 {
+    color: #c3d4f5;
+    text-shadow: 0 1px 6px rgba(4, 10, 44, 0.9);
+}
+
+[data-match-skin='ucl-night'] .live-match-hero .text-slate-300 {
+    text-shadow: 0 1px 6px rgba(4, 10, 44, 0.75);
+}
+
+[data-match-skin='ucl-night'] .live-match-hero .rounded-full {
+    border-color: rgba(150, 185, 255, 0.26);
+    box-shadow: 0 0 20px rgba(70, 120, 255, 0.18);
+}
+
+[data-match-skin='ucl-night'] .live-match-hero .glass-panel {
+    border-color: rgba(140, 175, 255, 0.24);
+    background: linear-gradient(180deg, rgba(20, 44, 130, 0.6), rgba(5, 13, 56, 0.7));
+    box-shadow: none;
+}
+
+[data-match-skin='ucl-night'] .live-match-hero .text-yellow-400 {
+    text-shadow: 0 0 18px rgba(250, 204, 21, 0.32);
+}
+
+/* ── Panels: quiet navy, no borrowed colour ─────────────────────────────── */
+
+/* The competition's colour lives in the backdrop and on the hero rail. The
+   panels stay plain so the fixtures stay readable over it. */
+[data-match-skin='ucl-night'] .next-matches-panel {
+    border-color: rgba(126, 162, 255, 0.18);
+    background: linear-gradient(178deg, rgba(7, 19, 76, 0.68), rgba(4, 11, 52, 0.74));
+}
+
+[data-match-skin='ucl-night'] .next-matches-panel .glass-panel {
+    border-color: rgba(126, 162, 255, 0.16);
+    background: rgba(9, 22, 84, 0.5);
+    box-shadow: none;
+}
+
+/* The same corner in the fixtures panel, mirrored into the opposite corner and
+   at a third of the strength: enough for the two cards to belong together. */
+[data-match-skin='ucl-night'] .next-matches-panel {
+    position: relative;
+    overflow: hidden;
+}
+
+[data-match-skin='ucl-night'] .next-matches-panel::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 48%;
+    aspect-ratio: 820 / 470;
+    pointer-events: none;
+    background-image: url('./assets/ucl-corner.webp');
+    background-size: cover;
+    background-position: top right;
+    background-repeat: no-repeat;
+    transform: scale(-1, -1);
+    opacity: 0.26;
+    mix-blend-mode: screen;
+    -webkit-mask-image: radial-gradient(115% 125% at 100% 0%, #000 0%, rgba(0, 0, 0, 0.5) 40%, transparent 70%);
+    mask-image: radial-gradient(115% 125% at 100% 0%, #000 0%, rgba(0, 0, 0, 0.5) 40%, transparent 70%);
+}
+
+/* ── The floating nav: quiet navy glass, no borrowed colour ─────────────── */
+
+[data-match-skin='ucl-night'] .app-bottom-nav {
+    border-color: rgba(126, 162, 255, 0.2);
+    background: rgba(5, 14, 60, 0.8);
+}
+

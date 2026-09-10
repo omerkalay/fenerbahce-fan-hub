@@ -10,7 +10,7 @@ const FENERBAHCE_ID: number = 3052;
 
 const NextMatchesPanel: React.FC<NextMatchesPanelProps> = ({ next3Matches }) => {
     return (
-        <div className="glass-panel rounded-2xl p-4 mb-6">
+        <div className="next-matches-panel glass-panel rounded-2xl p-4 mb-6">
             <div className="flex items-center gap-2 mb-4">
                 <span className="text-sm font-bold">Sonraki Maçlar</span>
             </div>
