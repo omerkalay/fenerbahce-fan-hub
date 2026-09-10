@@ -16,6 +16,7 @@ import { DataSourceProvider } from './contexts/DataSourceContext';
 import { useTheme } from './contexts/themeContextDef';
 import { resolveTeamCrest } from './theme/teamCrest';
 import { resolveMatchSkin } from './theme/matchSkin';
+import { applyMatchSkinToDocument } from './theme/theme';
 import AdminPanel from './components/AdminPanel';
 import UclNightBackdrop from './components/UclNightBackdrop';
 import type { LiveMatchData, LiveMatchState, MatchData, PublishedMatchLineups } from './types';
@@ -73,6 +74,11 @@ function AppContent({ runtimeOverrides }: AppProps) {
   const safeMode = runtimeOverrides?.safeMode === true;
   const matchSkin = resolveMatchSkin(displayMatchData, theme);
   const isUclNight = activeTab === 'dashboard' && matchSkin === 'ucl-night';
+
+  useEffect(() => {
+    applyMatchSkinToDocument(isUclNight, document);
+    return () => applyMatchSkinToDocument(false, document);
+  }, [isUclNight]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;

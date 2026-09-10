@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
           name: 'Fenerbahçe Fan Hub',
           short_name: 'FB Hub',
           description: 'Fenerbahçe taraftarı için maç, kadro ve formasyon merkezi',
-          theme_color: '#0f172a',
+          theme_color: '#020617',
           background_color: '#020617',
           display: 'standalone',
           scope: APP_BASE,

@@ -26,6 +26,8 @@
  * viewport.
  */
 
+import { useState } from 'react';
+
 const dropped = (matches: Record<string, unknown>) =>
     Object.values(matches)[0] as string | undefined;
 
@@ -309,7 +311,8 @@ function LightWaves({ className, idPrefix, rotation, reversed }: BundleProps) {
 }
 
 export default function UclNightBackdrop() {
-    if (MOTION && !prefersReducedMotion()) {
+    const [videoFailed, setVideoFailed] = useState(false);
+    if (MOTION && !videoFailed && !prefersReducedMotion()) {
         return (
             <div className="ucl-night-backdrop" aria-hidden="true">
                 <video
@@ -323,6 +326,7 @@ export default function UclNightBackdrop() {
                     preload="auto"
                     disablePictureInPicture
                     tabIndex={-1}
+                    onError={() => setVideoFailed(true)}
                 />
                 {/* Keeps the fixtures readable over whatever the clip does. */}
                 <div className="ucl-night-scrim" />

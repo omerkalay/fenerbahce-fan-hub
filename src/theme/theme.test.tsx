@@ -5,6 +5,7 @@ import { ThemeProvider } from '../contexts/ThemeContext';
 import { useTheme } from '../contexts/themeContextDef';
 import {
   applyThemeToDocument,
+  applyMatchSkinToDocument,
   DEFAULT_THEME,
   loadTheme,
   persistTheme,
@@ -24,6 +25,7 @@ describe('theme storage', () => {
   beforeEach(() => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-match-skin');
     document.documentElement.removeAttribute('style');
     document.head.innerHTML = '<meta name="theme-color" content="#0f172a">';
   });
@@ -60,6 +62,23 @@ describe('theme storage', () => {
     expect(document.documentElement.dataset.theme).toBe('white-kit');
     expect(document.documentElement.style.colorScheme).toBe('light');
     expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe('#F5F0E1');
+  });
+
+  it('keeps the browser color aligned across match skin and theme transitions', () => {
+    const color = () => document.querySelector('meta[name="theme-color"]')?.getAttribute('content');
+    applyThemeToDocument('classic', document);
+    expect(color()).toBe('#020617');
+    applyMatchSkinToDocument(true, document);
+    expect(document.documentElement.dataset.matchSkin).toBe('ucl-night');
+    expect(color()).toBe('#0d2280');
+    applyThemeToDocument('classic', document);
+    expect(color()).toBe('#0d2280');
+    applyThemeToDocument('white-kit', document);
+    expect(color()).toBe('#F5F0E1');
+    applyThemeToDocument('classic', document);
+    applyMatchSkinToDocument(false, document);
+    expect(document.documentElement.dataset.matchSkin).toBeUndefined();
+    expect(color()).toBe('#020617');
   });
 });
 

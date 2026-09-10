@@ -1021,6 +1021,21 @@ html[data-theme='white-kit'] .settings-notification-button {
    countdown keeps the fixture as the thing you look at.
    ────────────────────────────────────────────────────────────────────────── */
 
+html[data-theme='classic'][data-match-skin='ucl-night'] {
+    --app-bg: #0d2280;
+}
+
+.app-shell {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+}
+
+.app-bottom-nav {
+    bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+}
+
 html[data-theme='classic'] .app-shell[data-match-skin='ucl-night'] {
     --app-bg: #0d2280;
     --app-surface: #0b1e70;
@@ -1053,6 +1068,16 @@ html[data-theme='classic'] .app-shell[data-match-skin='ucl-night'] {
     z-index: 0;
     overflow: hidden;
     pointer-events: none;
+}
+
+/* Keep the status-bar edge constant while the video changes underneath. */
+.ucl-night-backdrop::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(env(safe-area-inset-top, 0px) + 160px);
+    background: linear-gradient(to bottom, var(--app-bg) 0px,
+        var(--app-bg) env(safe-area-inset-top, 0px), transparent 100%);
 }
 
 /* One soft pool of royal blue behind everything, as in the competition's own
@@ -1277,4 +1302,3 @@ html[data-theme='classic'] .app-shell[data-match-skin='ucl-night'] {
     border-color: rgba(126, 162, 255, 0.2);
     background: rgba(5, 14, 60, 0.8);
 }
-

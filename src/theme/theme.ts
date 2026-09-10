@@ -4,7 +4,7 @@ export const THEME_STORAGE_KEY = 'fenerbahce-fan-hub.theme.v1';
 export const DEFAULT_THEME: ThemeId = 'classic';
 
 export const THEME_META_COLORS: Record<ThemeId, string> = {
-  classic: '#0f172a',
+  classic: '#020617',
   'white-kit': '#F5F0E1',
 };
 
@@ -45,8 +45,20 @@ export const applyThemeToDocument = (
   targetDocument.documentElement.dataset.theme = theme;
   targetDocument.documentElement.style.colorScheme = theme === 'white-kit' ? 'light' : 'dark';
 
-  const themeMeta = targetDocument.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  themeMeta?.setAttribute('content', THEME_META_COLORS[theme]);
+  syncBrowserColor(targetDocument);
+};
+
+const syncBrowserColor = (targetDocument: Document): void => {
+  const theme = readThemeFromDocument(targetDocument);
+  const isUcl = theme === 'classic' && targetDocument.documentElement.dataset.matchSkin === 'ucl-night';
+  targetDocument.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+    ?.setAttribute('content', isUcl ? '#0d2280' : THEME_META_COLORS[theme]);
+};
+
+export const applyMatchSkinToDocument = (isUcl: boolean, targetDocument: Document): void => {
+  if (isUcl) targetDocument.documentElement.dataset.matchSkin = 'ucl-night';
+  else delete targetDocument.documentElement.dataset.matchSkin;
+  syncBrowserColor(targetDocument);
 };
 
 export const readThemeFromDocument = (targetDocument?: Document): ThemeId => {
