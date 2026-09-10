@@ -29,7 +29,9 @@ describe('ModalViewport', () => {
         const remove = vi.spyOn(viewport, 'removeEventListener');
         vi.stubGlobal('visualViewport', viewport);
         const { unmount } = render(<ModalViewport role="dialog"><div>İçerik</div></ModalViewport>);
-        const dialog = screen.getByRole('dialog');
+        const backdrop = screen.getByRole('dialog');
+        const dialog = backdrop.firstElementChild as HTMLElement;
+        expect(backdrop.style.getPropertyValue('--modal-height')).toBe('');
         expect(dialog.style.getPropertyValue('--modal-height')).toBe('852px');
         act(() => {
             viewport.height = 420;
@@ -38,6 +40,7 @@ describe('ModalViewport', () => {
         });
         expect(dialog.style.getPropertyValue('--modal-height')).toBe('420px');
         expect(dialog.style.getPropertyValue('--modal-top')).toBe('30px');
+        expect(backdrop.style.getPropertyValue('--modal-top')).toBe('');
         unmount();
         expect(remove).toHaveBeenCalledWith('resize', expect.any(Function));
         expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function));

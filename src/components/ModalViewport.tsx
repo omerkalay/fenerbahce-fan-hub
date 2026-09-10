@@ -22,7 +22,9 @@ export default function ModalViewport({ className = '', children, ...props }: HT
     }, []);
 
     return createPortal(
-        <div {...props} ref={ref} className={`modal-viewport ${className}`}>{children}</div>,
+        <div {...props} className={`modal-backdrop ${className}`}>
+            <div ref={ref} className={`modal-viewport ${className}`}>{children}</div>
+        </div>,
         document.body,
     );
 }

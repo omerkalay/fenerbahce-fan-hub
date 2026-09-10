@@ -6,16 +6,23 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.19.1-blue)
+![Version](https://img.shields.io/badge/version-2.19.2-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.19.1
+## What's New in v2.19.2
+
+- **Full-Screen Modal Backdrop** - The dimmed backdrop now fills the layout viewport independently of the safe-area content box, preventing the dashboard background from appearing below dialogs when iOS reports a shorter visible viewport
+
+<details>
+<summary>Previous: v2.19.1</summary>
 
 - **Safe-Area Dialogs** - Admin, match centers, standings, lineups, settings, and player dialogs reserve space around the notch and home indicator, with at least 44px close controls
 - **Stable Overlay Layout** - Dialogs render outside clipped or transformed ancestors, keep headers accessible while scrolling, and follow the visible viewport when the keyboard changes its height
+
+</details>
 
 <details>
 <summary>Previous: v2.19.0</summary>
@@ -715,4 +722,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.19.1** | September 2026
+**v2.19.2** | September 2026
