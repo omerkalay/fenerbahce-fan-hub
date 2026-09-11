@@ -67,7 +67,7 @@ describe('theme storage', () => {
   it('keeps the browser color aligned across match skin and theme transitions', () => {
     const color = () => document.querySelector('meta[name="theme-color"]')?.getAttribute('content');
     applyThemeToDocument('classic', document);
-    expect(color()).toBe('#080d20');
+    expect(color()).toBe('#01051b');
     applyMatchSkinToDocument(true, document);
     expect(document.documentElement.dataset.matchSkin).toBe('ucl-night');
     expect(color()).toBe('#0d2280');
@@ -78,7 +78,7 @@ describe('theme storage', () => {
     applyThemeToDocument('classic', document);
     applyMatchSkinToDocument(false, document);
     expect(document.documentElement.dataset.matchSkin).toBeUndefined();
-    expect(color()).toBe('#080d20');
+    expect(color()).toBe('#01051b');
   });
 });
 

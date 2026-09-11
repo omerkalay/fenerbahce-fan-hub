@@ -3,7 +3,7 @@
 
 :root,
 html[data-theme='classic'] {
-    --app-bg: #080d20;
+    --app-bg: #01051b;
     --app-surface: #0c1430;
     --app-surface-raised: #111b3e;
     --app-text: #ffffff;
@@ -1424,4 +1424,20 @@ html[data-theme='classic'] .app-shell[data-match-skin='ucl-night'] {
         var(--app-bg) env(safe-area-inset-top, 0px),
         transparent 100%
     );
+}
+
+/* The clip is 9:16. On anything wider, covering it would crop away two thirds
+   of the frame and blow the rest up — on a desktop window that is a 2.7x
+   enlargement of a third of the picture. Fitting it to the height instead
+   scales it *down*, so it stays sharp, and because the ground is the clip's
+   own edge colour the space either side reads as the same field rather than
+   as a letterbox. */
+@media (min-aspect-ratio: 9/16) {
+    .classic-backdrop-motion,
+    .classic-backdrop-still {
+        object-fit: contain;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+    }
 }
