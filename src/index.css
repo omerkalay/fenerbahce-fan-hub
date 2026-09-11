@@ -3,9 +3,9 @@
 
 :root,
 html[data-theme='classic'] {
-    --app-bg: #020617;
-    --app-surface: #0f172a;
-    --app-surface-raised: #111c31;
+    --app-bg: #080d20;
+    --app-surface: #0c1430;
+    --app-surface-raised: #111b3e;
     --app-text: #ffffff;
     --app-text-soft: #cbd5e1;
     --app-muted: #94a3b8;
@@ -18,8 +18,8 @@ html[data-theme='classic'] {
     --app-border-strong: rgba(250, 204, 21, 0.3);
     --app-wash: rgba(255, 255, 255, 0.05);
     --app-wash-strong: rgba(255, 255, 255, 0.1);
-    --panel-bg: rgba(15, 23, 42, 0.6);
-    --card-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    --panel-bg: rgba(8, 15, 44, 0.6);
+    --card-bg: linear-gradient(140deg, rgba(40, 62, 140, 0.16), rgba(7, 13, 36, 0.66));
     --standings-dialog-bg: #0f172a;
     --standings-dialog-border: rgba(255, 255, 255, 0.12);
     --standings-dialog-shadow: 0 24px 64px rgba(0, 0, 0, 0.48);
@@ -1354,4 +1354,74 @@ html[data-theme='classic'] .app-shell[data-match-skin='ucl-night'] {
 [data-match-skin='ucl-night'] .app-bottom-nav {
     border-color: rgba(126, 162, 255, 0.2);
     background: rgba(5, 14, 60, 0.8);
+}
+
+/* The moving-backdrop switch, alongside the theme choices in Ayarlar. */
+.settings-motion-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--app-border);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Classic backdrop
+
+   The clip carries the background on every night that is not a Champions
+   League one. It sits at the bottom of the shell, fixed to the viewport, with
+   the content above it at z-10.
+
+   The band across the top is the part that matters on a notched phone: it
+   holds the status-bar edge at the flat ground colour while the clip moves
+   underneath, so the strip behind the clock never shimmers. `--app-bg`, the
+   `theme-color` meta and the boot script in index.html all carry the same
+   value, and index.html asks for `viewport-fit=cover`, so there is no seam
+   between the system chrome and the page.
+   ────────────────────────────────────────────────────────────────────────── */
+
+.classic-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.classic-backdrop-motion,
+.classic-backdrop-still {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background-size: cover;
+    background-position: center;
+}
+
+.classic-backdrop-scrim {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+        88% 58% at 50% 44%,
+        rgba(4, 9, 28, 0.3),
+        rgba(4, 9, 28, 0.16) 58%,
+        rgba(4, 9, 28, 0.04) 100%
+    );
+}
+
+/* Holds the status-bar edge steady while the clip moves under it. */
+.classic-backdrop::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: calc(env(safe-area-inset-top, 0px) + 150px);
+    background: linear-gradient(
+        to bottom,
+        var(--app-bg) 0px,
+        var(--app-bg) env(safe-area-inset-top, 0px),
+        transparent 100%
+    );
 }

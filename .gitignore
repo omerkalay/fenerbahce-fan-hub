@@ -60,3 +60,6 @@ dist-ssr
 # Project planning documents (local references)
 ROADMAP.md
 docs/project-review-*.md
+
+# Local agent instructions
+CLAUDE.md

@@ -4,7 +4,7 @@ export const THEME_STORAGE_KEY = 'fenerbahce-fan-hub.theme.v1';
 export const DEFAULT_THEME: ThemeId = 'classic';
 
 export const THEME_META_COLORS: Record<ThemeId, string> = {
-  classic: '#020617',
+  classic: '#080d20',
   'white-kit': '#F5F0E1',
 };
 

@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import App from '../App';
 import {
     buildDevLiveSimulation,
+    DEV_LIVE_COMPETITIONS,
     DEV_LIVE_SCENARIOS,
+    resolveDevLiveCompetition,
     resolveDevLiveScenario,
+    type DevLiveCompetition,
     type DevLiveScenario,
 } from './liveMatchSimulation';
 
@@ -18,12 +21,21 @@ const SCENARIO_LABELS: Record<DevLiveScenario, string> = {
     'partial-data': "Eksik Veri · 54'",
 };
 
+const COMPETITION_LABELS: Record<DevLiveCompetition, string> = {
+    ucl: 'Şampiyonlar Ligi · gece teması',
+    superlig: 'Süper Lig · klasik tema',
+};
+
 const DevScenarioSelector = ({
     scenario,
+    competition,
     onChange,
+    onCompetitionChange,
 }: {
     scenario: DevLiveScenario;
+    competition: DevLiveCompetition;
     onChange: (scenario: DevLiveScenario) => void;
+    onCompetitionChange: (competition: DevLiveCompetition) => void;
 }) => (
     <aside data-dev-live-simulator className="dev-live-panel mb-3 rounded-xl border border-dashed border-slate-500/70 bg-[#0a172a] p-3" aria-label="Geliştirme canlı maç simülatörü">
         <div className="mb-2 flex items-center justify-between gap-3">
@@ -38,11 +50,24 @@ const DevScenarioSelector = ({
         >
             {DEV_LIVE_SCENARIOS.map((value) => <option key={value} value={value}>{SCENARIO_LABELS[value]}</option>)}
         </select>
+
+        {/* The mock fixture is a Champions League tie, so the dashboard is in
+            its night skin unless this says otherwise. */}
+        <label htmlFor="dev-live-competition" className="mt-2 block text-[9px] font-black uppercase tracking-[0.15em] text-slate-400">Kupa</label>
+        <select
+            id="dev-live-competition"
+            value={competition}
+            onChange={(event) => onCompetitionChange(event.target.value as DevLiveCompetition)}
+            className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-slate-900 px-3 text-xs font-bold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-400"
+        >
+            {DEV_LIVE_COMPETITIONS.map((value) => <option key={value} value={value}>{COMPETITION_LABELS[value]}</option>)}
+        </select>
     </aside>
 );
 
 export default function DevApp() {
     const [scenario, setScenario] = useState<DevLiveScenario | null>(() => resolveDevLiveScenario(window.location.search, true));
+    const [competition, setCompetition] = useState<DevLiveCompetition>(() => resolveDevLiveCompetition(window.location.search));
 
     useEffect(() => {
         const handlePopState = () => setScenario(resolveDevLiveScenario(window.location.search, true));
@@ -50,7 +75,10 @@ export default function DevApp() {
         return () => window.removeEventListener('popstate', handlePopState);
     }, []);
 
-    const simulation = useMemo(() => scenario ? buildDevLiveSimulation(scenario) : null, [scenario]);
+    const simulation = useMemo(
+        () => scenario ? buildDevLiveSimulation(scenario, competition) : null,
+        [scenario, competition],
+    );
 
     if (!simulation || !scenario) return <App />;
 
@@ -61,6 +89,13 @@ export default function DevApp() {
         setScenario(nextScenario);
     };
 
+    const changeCompetition = (nextCompetition: DevLiveCompetition) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('mockCompetition', nextCompetition);
+        window.history.replaceState(window.history.state, '', url);
+        setCompetition(nextCompetition);
+    };
+
     return (
         <App
             runtimeOverrides={{
@@ -69,7 +104,14 @@ export default function DevApp() {
                 liveMatchState: simulation.liveMatchState,
                 liveMatchData: simulation.liveMatchData,
                 startingXI: simulation.startingXI,
-                controls: <DevScenarioSelector scenario={scenario} onChange={changeScenario} />,
+                controls: (
+                    <DevScenarioSelector
+                        scenario={scenario}
+                        competition={competition}
+                        onChange={changeScenario}
+                        onCompetitionChange={changeCompetition}
+                    />
+                ),
             }}
         />
     );

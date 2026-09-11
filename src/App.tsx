@@ -19,6 +19,7 @@ import { resolveMatchSkin } from './theme/matchSkin';
 import { applyMatchSkinToDocument } from './theme/theme';
 import AdminPanel from './components/AdminPanel';
 import UclNightBackdrop from './components/UclNightBackdrop';
+import ClassicBackdrop from './components/ClassicBackdrop';
 import type { LiveMatchData, LiveMatchState, MatchData, PublishedMatchLineups } from './types';
 import { ADMIN_STATUS_PREVIEW_MODE } from './utils/adminStatusPreview';
 
@@ -148,11 +149,13 @@ function AppContent({ runtimeOverrides }: AppProps) {
       {/* Background Effects */}
       {isUclNight ? (
         <UclNightBackdrop />
-      ) : (
+      ) : isWhiteKit ? (
         <div className="app-ambient fixed top-0 left-0 w-full h-full pointer-events-none z-0">
           <div className="app-ambient-gold absolute top-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full blur-[100px]"></div>
           <div className="app-ambient-navy absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full blur-[100px]"></div>
         </div>
+      ) : (
+        <ClassicBackdrop />
       )}
 
       <div className="relative z-10 max-w-md mx-auto h-full min-h-screen flex flex-col">

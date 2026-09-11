@@ -10,6 +10,7 @@ const FORBIDDEN_MARKERS = [
   'partial-data',
   'adminStatusPreview',
   'Yerel önizleme — Firebase’e yazılmaz',
+  'mockCompetition',
 ];
 
 const collectFiles = async (directoryUrl) => {

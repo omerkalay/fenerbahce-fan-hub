@@ -23,6 +23,17 @@ export const DEV_LIVE_SCENARIOS = [
 
 export type DevLiveScenario = typeof DEV_LIVE_SCENARIOS[number];
 
+/**
+ * Which competition the mock fixture belongs to. The simulation was written
+ * around a Champions League tie, which means the dashboard is always in its
+ * night skin while the simulator is on — so the classic look, and the
+ * background studies in `backgroundDesigns.ts`, could never be seen with mock
+ * data. Switching this to `superlig` relabels the same fixture so they can.
+ */
+export const DEV_LIVE_COMPETITIONS = ['ucl', 'superlig'] as const;
+
+export type DevLiveCompetition = typeof DEV_LIVE_COMPETITIONS[number];
+
 export interface DevLiveSimulation {
     scenario: DevLiveScenario;
     matchData: MatchData;
@@ -220,6 +231,33 @@ const createLiveData = ({
     lineups,
 });
 
+/** Only the competition labels change; the teams and the events stay put. */
+const COMPETITION_LABELS: Record<DevLiveCompetition, Pick<MatchData, 'tournament' | 'roundInfo'>> = {
+    ucl: {
+        tournament: {
+            name: 'UEFA Champions League',
+            uniqueTournament: { name: 'UEFA Champions League', slug: 'uefa-champions-league', id: 7 },
+        },
+        roundInfo: { name: 'Playoffs', slug: 'playoffs' },
+    },
+    superlig: {
+        tournament: {
+            name: 'Trendyol Süper Lig',
+            uniqueTournament: { name: 'Trendyol Süper Lig', slug: 'trendyol-super-lig', id: 52 },
+        },
+        roundInfo: { round: 12 },
+    },
+};
+
+export const resolveDevLiveCompetition = (
+    search: string,
+    isDev: boolean = import.meta.env.DEV,
+): DevLiveCompetition => {
+    if (!isDev) return 'ucl';
+    const value = new URLSearchParams(search).get('mockCompetition');
+    return DEV_LIVE_COMPETITIONS.includes(value as DevLiveCompetition) ? value as DevLiveCompetition : 'ucl';
+};
+
 export const resolveDevLiveScenario = (
     search: string,
     isDev: boolean = import.meta.env.DEV,
@@ -229,7 +267,7 @@ export const resolveDevLiveScenario = (
     return DEV_LIVE_SCENARIOS.includes(value as DevLiveScenario) ? value as DevLiveScenario : null;
 };
 
-export const buildDevLiveSimulation = (scenario: DevLiveScenario): DevLiveSimulation => {
+const buildScenario = (scenario: DevLiveScenario): DevLiveSimulation => {
     if (scenario === 'countdown' || scenario === 'pre-match') {
         const secondsUntilKickoff = scenario === 'countdown' ? (25 * 60 * 60) + (20 * 60) : 3 * 60;
         const upcomingMatchData: MatchData = {
@@ -311,5 +349,23 @@ export const buildDevLiveSimulation = (scenario: DevLiveScenario): DevLiveSimula
         ...common,
         liveMatchData: partialLiveData,
         startingXI: buildStartingXI(partialInitialLineups),
+    };
+};
+
+/**
+ * The fixture the scenarios are built on is a Champions League tie. Relabelling
+ * it is enough to take the dashboard out of its night skin, which is what the
+ * classic-theme background studies need in order to be visible at all.
+ */
+export const buildDevLiveSimulation = (
+    scenario: DevLiveScenario,
+    competition: DevLiveCompetition = 'ucl',
+): DevLiveSimulation => {
+    const simulation = buildScenario(scenario);
+    if (competition === 'ucl') return simulation;
+
+    return {
+        ...simulation,
+        matchData: { ...simulation.matchData, ...COMPETITION_LABELS[competition] },
     };
 };

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { NotificationOptions } from '../types';
 import { useAuth } from '../contexts/authContextDef';
 import { useTheme } from '../contexts/themeContextDef';
+import useMotionBackdrop from '../hooks/useMotionBackdrop';
 import type { ThemeId } from '../theme/theme';
 import { getSignInErrorMessage } from '../utils/authHelpers';
 import useNotificationPreferences from '../hooks/useNotificationPreferences';
@@ -16,6 +17,7 @@ interface NotificationSettingsProps {
 const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) => {
   const { user, signInWithGoogle } = useAuth();
   const { theme, setTheme } = useTheme();
+  const [motionBackdrop, setMotionBackdrop] = useMotionBackdrop();
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showNotificationAuth, setShowNotificationAuth] = useState(false);
@@ -249,6 +251,32 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
                     </button>
                   );
                 })}
+              </div>
+
+              <div className="settings-motion-row">
+                <div>
+                  <span className="settings-section-label">Hareketli arka plan</span>
+                  <p className="settings-description">
+                    Kapatırsan arka plan sabit kalır. Cihazında azaltılmış hareket açıksa zaten sabit gelir.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={motionBackdrop}
+                  aria-label="Hareketli arka plan"
+                  onClick={() => setMotionBackdrop(!motionBackdrop)}
+                  className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                    motionBackdrop ? 'bg-yellow-400' : 'bg-white/15'
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
+                      motionBackdrop ? 'left-6' : 'left-1'
+                    }`}
+                  />
+                </button>
               </div>
             </fieldset>
 
