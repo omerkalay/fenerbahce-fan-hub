@@ -6,15 +6,25 @@ Modern, interactive fan application for Fenerbahçe SK supporters with match tra
 
 **Live Site:** https://omerkalay.com/fenerbahce-fan-hub/
 
-![Version](https://img.shields.io/badge/version-2.19.2-blue)
+![Version](https://img.shields.io/badge/version-2.20.0-blue)
 ![Status](https://img.shields.io/badge/status-active-success)
 ![React](https://img.shields.io/badge/React-19.2.0-blue)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
 ![Firebase](https://img.shields.io/badge/Firebase-Auth_+_Cloud_Functions-orange)
 
-## What's New in v2.19.2
+## What's New in v2.20.0
+
+- **Moving Classic Backdrop** - Ordinary nights get the same treatment as Champions League ones: a looping clip of gold light drifting through the corners of a navy field, with a per-device switch in Ayarlar and a still frame whenever motion is off, reduced motion is requested, or the video cannot play
+- **Backdrop Scaling** - Past a 9:16 viewport the clip fits to the height instead of covering the window, so a desktop screen no longer crops and enlarges the frame; the page ground matches the clip's own edge colour
+- **Notification Settings Rebuild** - The notification dialog follows the app's design system instead of its own palette: one colour per group, quieter selected rows, and no filler copy. Announcements stay green, match reminders gold, the daily check blue
+- **Notification Dialog Layout** - The header and the save bar stay in place while only the option list scrolls, so the actions are always reachable on a phone; section labels no longer collide with their divider, rows keep 44px touch targets, and the dialog now renders correctly in the White Kit theme
+
+<details>
+<summary>Previous: v2.19.2</summary>
 
 - **Full-Screen Modal Backdrop** - The dimmed backdrop now fills the layout viewport independently of the safe-area content box, preventing the dashboard background from appearing below dialogs when iOS reports a shorter visible viewport
+
+</details>
 
 <details>
 <summary>Previous: v2.19.1</summary>
@@ -722,4 +732,4 @@ MIT License - Free to use and modify
 
 Made with passion for Fenerbahçe fans
 
-**v2.19.2** | September 2026
+**v2.20.0** | September 2026

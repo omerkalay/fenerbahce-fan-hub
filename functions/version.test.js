@@ -7,7 +7,7 @@ const functionsPackage = require('./package.json');
 
 describe('release version metadata', () => {
     it('keeps frontend and Cloud Functions versions synchronized', () => {
-        expect(rootPackage.version).toBe('2.19.2');
+        expect(rootPackage.version).toBe('2.20.0');
         expect(functionsPackage.version).toBe(rootPackage.version);
     });
 });
