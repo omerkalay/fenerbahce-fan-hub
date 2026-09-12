@@ -25,6 +25,8 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
   const [authError, setAuthError] = useState<string | null>(null);
   const settingsCloseButtonRef = useRef<HTMLButtonElement>(null);
   const settingsDialogRef = useRef<HTMLDivElement>(null);
+  const notificationsCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const notificationsDialogRef = useRef<HTMLDivElement>(null);
 
   const {
     currentDraftOptions,
@@ -74,11 +76,14 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
     setAuthError(null);
   };
 
-  const handleSettingsDialogKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab' || !settingsDialogRef.current) return;
+  const handleDialogKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    dialogRef: React.RefObject<HTMLDivElement | null>,
+  ) => {
+    if (event.key !== 'Tab' || !dialogRef.current) return;
 
     const focusableElements = Array.from(
-      settingsDialogRef.current.querySelectorAll<HTMLElement>(
+      dialogRef.current.querySelectorAll<HTMLElement>(
         'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
       ),
     );
@@ -104,6 +109,10 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
   useEffect(() => {
     if (showSettings) settingsCloseButtonRef.current?.focus();
   }, [showSettings]);
+
+  useEffect(() => {
+    if (showNotifications) notificationsCloseButtonRef.current?.focus();
+  }, [showNotifications]);
 
   useEffect(() => {
     if (!user || !openNotificationsAfterAuth) return;
@@ -147,28 +156,47 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
     },
   ];
 
-  const notificationOptions: Array<{ id: keyof NotificationOptions; label: string; description: string }> = [
-    {
-      id: 'threeHours',
-      label: 'Maçtan 3 saat önce',
-      description: 'Hazırlık yapmaya zamanın olsun'
-    },
-    {
-      id: 'oneHour',
-      label: 'Maçtan 1 saat önce',
-      description: 'Heyecan zamanı!'
-    },
-    {
-      id: 'thirtyMinutes',
-      label: 'Maçtan 30 dakika önce',
-      description: 'Son hazırlık'
-    },
-    {
-      id: 'fifteenMinutes',
-      label: 'Maçtan 15 dakika önce',
-      description: 'Maç başlıyor!'
-    }
+  const matchReminderOptions: Array<{ id: keyof NotificationOptions; label: string }> = [
+    { id: 'threeHours', label: 'Maçtan 3 saat önce' },
+    { id: 'oneHour', label: 'Maçtan 1 saat önce' },
+    { id: 'thirtyMinutes', label: 'Maçtan 30 dakika önce' },
+    { id: 'fifteenMinutes', label: 'Maçtan 15 dakika önce' }
   ];
+
+  const selectionSummary = draftGeneralCount === 0 && draftMatchCount === 0
+    ? 'Şu an hiçbir bildirim seçili değil.'
+    : `${[
+        draftGeneralCount > 0 ? `${draftGeneralCount} genel` : null,
+        draftMatchCount > 0 ? `${draftMatchCount} maç` : null
+      ].filter(Boolean).join(' ve ')} bildirimi açık.`;
+
+  const renderNotificationOption = (
+    id: keyof NotificationOptions,
+    label: string,
+    description?: string,
+  ) => {
+    const selected = Boolean(currentDraftOptions[id]);
+
+    return (
+      <label key={id} className={`notify-option ${selected ? 'is-selected' : ''}`}>
+        <input
+          type="checkbox"
+          className="notify-input"
+          checked={selected}
+          onChange={() => toggleOption(id)}
+        />
+        <span className="notify-check" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 10.5l4 4 8-8" />
+          </svg>
+        </span>
+        <span className="notify-copy">
+          <strong>{label}</strong>
+          {description && <small>{description}</small>}
+        </span>
+      </label>
+    );
+  };
 
   return (
     <>
@@ -196,7 +224,7 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-title"
-            onKeyDown={handleSettingsDialogKeyDown}
+            onKeyDown={(event) => handleDialogKeyDown(event, settingsDialogRef)}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="settings-header">
@@ -336,136 +364,91 @@ const NotificationSettings = ({ themeOnly = false }: NotificationSettingsProps) 
 
       {!themeOnly && showNotifications && user && (
         <ModalViewport
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fadeIn"
-          onClick={handleCloseNotifications}
+          className="settings-backdrop fixed inset-0 flex items-center justify-center z-[100] p-4 animate-fadeIn"
+          onMouseDown={handleCloseNotifications}
         >
           <div
-            className="bg-[#0f172a] border border-white/10 rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto animate-slideUp shadow-2xl"
-            onClick={(event: React.MouseEvent) => event.stopPropagation()}
+            ref={notificationsDialogRef}
+            className="settings-dialog notify-dialog w-full max-w-md animate-slideUp"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notification-settings-title"
+            onKeyDown={(event) => handleDialogKeyDown(event, notificationsDialogRef)}
+            onMouseDown={(event: React.MouseEvent) => event.stopPropagation()}
           >
-            <div className="flex justify-between items-start mb-6">
-              <div>
-                <h2 className="text-xl font-bold text-white">Bildirim Ayarları</h2>
-                <p className="text-sm text-slate-400 mt-2">Genel ve maç bildirimlerini ayrı ayrı yönet</p>
-              </div>
+            <div className="settings-header">
+              <h2 id="notification-settings-title">Bildirim Ayarları</h2>
               <button
+                ref={notificationsCloseButtonRef}
                 type="button"
                 onClick={handleCloseNotifications}
-                className="text-slate-400 hover:text-white hover:rotate-90 transition-all duration-300"
-                aria-label="Kapat"
+                className="settings-close"
+                aria-label="Bildirim ayarlarını kapat"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            <div className="mb-5">
-              <h3 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-3">Genel Bildirimler</h3>
-              <label
-                className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.generalNotifications ? 'bg-emerald-400/20 border-emerald-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
-              >
-                <input
-                  type="checkbox"
-                  checked={currentDraftOptions.generalNotifications}
-                  onChange={() => toggleOption('generalNotifications')}
-                  className="mt-1 w-5 h-5 rounded border-2 border-emerald-400 bg-transparent checked:bg-emerald-400 cursor-pointer accent-emerald-400"
-                />
-                <div className="flex-1">
-                  <span className="font-semibold text-white">Önemli Duyurular</span>
-                  <p className="text-xs text-slate-400 mt-1">Kulüple ilgili önemli duyuru ve manuel toplu bildirimleri al</p>
+            <div className="notify-body">
+              <fieldset className="settings-section notify-group notify-group-general">
+                <legend>Duyurular</legend>
+                <div className="notify-list">
+                  {renderNotificationOption(
+                    'generalNotifications',
+                    'Önemli duyurular',
+                    'Kulüp haberleri ve toplu bildirimler',
+                  )}
                 </div>
-              </label>
-            </div>
+              </fieldset>
 
-            <div className="mb-6">
-              <h3 className="text-xs font-bold text-yellow-400 uppercase tracking-wider mb-3">Maç Bildirimleri</h3>
-
-              <div className="glass-panel rounded-xl p-4 mb-4 border border-yellow-400/20">
-                <div className="flex items-center gap-2 text-yellow-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-sm font-semibold">Bu ayarlar tüm maçlara uygulanır</span>
-                </div>
-                <p className="text-xs text-slate-400 mt-2">Bir kez ayarla, her maç için otomatik bildirim al!</p>
-              </div>
-
-              <div className="space-y-3">
-                {notificationOptions.map((option) => (
-                  <label
-                    key={option.id}
-                    className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions[option.id] ? 'bg-yellow-400/20 border-yellow-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={Boolean(currentDraftOptions[option.id])}
-                      onChange={() => toggleOption(option.id)}
-                      className="mt-1 w-5 h-5 rounded border-2 border-yellow-400 bg-transparent checked:bg-yellow-400 cursor-pointer accent-yellow-400"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-white">{option.label}</span>
-                      </div>
-                      <p className="text-xs text-slate-400">{option.description}</p>
-                    </div>
-                  </label>
-                ))}
-
-                <div className="pt-3 border-t border-white/10">
-                  <label className={`flex items-start gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200 border-2 ${currentDraftOptions.dailyCheck ? 'bg-blue-400/20 border-blue-400 scale-[1.02]' : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'}`}>
-                    <input
-                      type="checkbox"
-                      checked={currentDraftOptions.dailyCheck}
-                      onChange={() => toggleOption('dailyCheck')}
-                      className="mt-1 w-5 h-5 rounded border-2 border-blue-400 bg-transparent checked:bg-blue-400 cursor-pointer accent-blue-400"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-white">Günlük Maç Kontrolü</span>
-                        <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full font-bold">ÖZEL</span>
-                      </div>
-                      <p className="text-xs text-slate-400">Her sabah 09:00'da kontrol et, o gün maç varsa bildir</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            {(draftGeneralCount > 0 || draftMatchCount > 0) && (
-              <div className="bg-yellow-400/10 border border-yellow-400/30 rounded-lg p-3 mb-4 animate-fadeIn">
-                <p className="text-xs text-yellow-200">
-                  <strong className="text-yellow-400">
-                    {draftGeneralCount > 0 && draftMatchCount > 0
-                      ? `${draftGeneralCount} genel + ${draftMatchCount} maç`
-                      : draftGeneralCount > 0
-                        ? `${draftGeneralCount} genel`
-                        : `${draftMatchCount} maç`}
-                  </strong>{' '}bildirim seçtiniz
+              <fieldset className="settings-section notify-group">
+                <legend>Maç hatırlatmaları</legend>
+                <p className="settings-description">
+                  Seçtiğin hatırlatmalar bütün maçlar için geçerli olur.
                 </p>
-              </div>
-            )}
+                <div className="notify-list">
+                  {matchReminderOptions.map((option) => renderNotificationOption(option.id, option.label))}
+                </div>
+              </fieldset>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleCloseNotifications}
-                className="flex-1 py-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 font-medium border border-white/10 hover:border-white/20"
-              >
-                İptal
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!hasDraftChanges || isSaving}
-                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all duration-200 ${!hasDraftChanges || isSaving ? 'bg-gray-600 text-gray-400 cursor-not-allowed opacity-50' : 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:from-yellow-300 hover:to-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] hover:shadow-[0_0_30px_rgba(234,179,8,0.5)] hover:scale-105'}`}
-              >
-                {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
-              </button>
+              <fieldset className="settings-section notify-group notify-group-daily">
+                <legend>Günlük kontrol</legend>
+                <div className="notify-list">
+                  {renderNotificationOption(
+                    'dailyCheck',
+                    'Sabah 09:00 maç kontrolü',
+                    'O gün maç varsa haber verir',
+                  )}
+                </div>
+              </fieldset>
+            </div>
+
+            <div className="notify-footer">
+              <p className="notify-summary">{selectionSummary}</p>
+              <div className="notify-actions">
+                <button
+                  type="button"
+                  onClick={handleCloseNotifications}
+                  className="notify-button"
+                >
+                  İptal
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!hasDraftChanges || isSaving}
+                  className="notify-button notify-button-primary"
+                >
+                  {isSaving ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+              </div>
             </div>
           </div>
         </ModalViewport>
       )}
+
     </>
   );
 };
